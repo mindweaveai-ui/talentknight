@@ -1,0 +1,2099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TalentKnight — AI-matched candidates, ready when you are</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0a08;
+    --bg-soft: #13110e;
+    --surface: #1a1613;
+    --surface-raised: #221d18;
+    --border: rgba(201, 169, 97, 0.14);
+    --border-strong: rgba(201, 169, 97, 0.28);
+    --gold: #c9a961;
+    --gold-bright: #e8c878;
+    --gold-dim: #8a7641;
+    --text: #f5f0e6;
+    --text-muted: #a8a097;
+    --text-dim: #6d665d;
+    --sage: #8aa683;
+    --amber: #d4a55a;
+    --rose: #b87a6f;
+    --shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    --serif: 'Cormorant Garamond', Georgia, serif;
+    --sans: 'Manrope', -apple-system, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 0%, rgba(201, 169, 97, 0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 100%, rgba(201, 169, 97, 0.04) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.5;
+    pointer-events: none;
+    z-index: 1;
+    mix-blend-mode: overlay;
+  }
+
+  /* ============ NAVIGATION ============ */
+  nav {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 48px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(11, 10, 8, 0.7);
+    backdrop-filter: blur(12px);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+  }
+
+  .brand-mark {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-strong);
+    border-radius: 3px;
+    background: linear-gradient(135deg, rgba(201, 169, 97, 0.12), rgba(201, 169, 97, 0.02));
+  }
+
+  .brand-mark svg {
+    width: 18px;
+    height: 18px;
+    fill: var(--gold);
+  }
+
+  .brand-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1;
+  }
+
+  .brand-name {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text);
+  }
+
+  .brand-name .k-accent { color: var(--gold); }
+
+  .brand-tag {
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-top: 6px;
+  }
+
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .scenario-indicator {
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    background: rgba(201, 169, 97, 0.03);
+  }
+
+  .scenario-indicator .dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    margin-right: 8px;
+    vertical-align: middle;
+    box-shadow: 0 0 8px var(--gold);
+  }
+
+  .ai-indicator {
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--sage);
+    padding: 6px 14px;
+    border: 1px solid rgba(138, 166, 131, 0.25);
+    border-radius: 2px;
+    background: rgba(138, 166, 131, 0.05);
+    display: none;
+  }
+
+  .ai-indicator .dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--sage);
+    margin-right: 8px;
+    vertical-align: middle;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  .admin-toggle {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: var(--sans);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    border-radius: 2px;
+  }
+
+  .admin-toggle:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+    background: rgba(201, 169, 97, 0.05);
+  }
+
+  /* ============ LAYOUT ============ */
+  main {
+    position: relative;
+    z-index: 5;
+    min-height: calc(100vh - 91px);
+    padding: 0 48px;
+  }
+
+  .view { display: none; animation: fadeIn 0.6s ease; }
+  .view.active { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ============ SCREEN 1: BRIEF INPUT ============ */
+  #screen-brief {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 100px 0 60px;
+  }
+
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .eyebrow::before {
+    content: '';
+    width: 24px;
+    height: 1px;
+    background: var(--gold);
+  }
+
+  h1.headline {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: clamp(40px, 5vw, 58px);
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    margin-bottom: 24px;
+    color: var(--text);
+  }
+
+  h1.headline em {
+    font-style: italic;
+    color: var(--gold);
+    font-weight: 400;
+  }
+
+  .sub {
+    font-size: 17px;
+    color: var(--text-muted);
+    max-width: 560px;
+    margin-bottom: 56px;
+    line-height: 1.7;
+  }
+
+  .brief-field {
+    position: relative;
+    margin-bottom: 28px;
+  }
+
+  .brief-field label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 14px;
+  }
+
+  textarea#briefInput {
+    width: 100%;
+    min-height: 160px;
+    padding: 24px 26px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    font-family: var(--serif);
+    font-size: 21px;
+    line-height: 1.5;
+    resize: vertical;
+    transition: all 0.25s ease;
+    outline: none;
+  }
+
+  textarea#briefInput::placeholder {
+    color: var(--text-dim);
+    font-style: italic;
+  }
+
+  textarea#briefInput:focus {
+    border-color: var(--gold);
+    background: var(--surface-raised);
+    box-shadow: 0 0 0 1px rgba(201, 169, 97, 0.15), 0 20px 40px rgba(0,0,0,0.3);
+  }
+
+  .brief-actions {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-top: 40px;
+  }
+
+  button.primary {
+    background: var(--gold);
+    border: none;
+    color: #1a1410;
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 18px 42px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.25s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  button.primary:hover {
+    background: var(--gold-bright);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(201, 169, 97, 0.25);
+  }
+
+  button.primary:active { transform: translateY(0); }
+
+  .brief-hint {
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+  }
+
+  .brief-hint kbd {
+    background: rgba(201, 169, 97, 0.08);
+    border: 1px solid var(--border);
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-family: var(--sans);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* ============ SCREEN 2: LOADING ============ */
+  #screen-loading {
+    max-width: 540px;
+    margin: 0 auto;
+    padding: 160px 0;
+    text-align: center;
+  }
+
+  .loader-mark {
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 48px;
+    position: relative;
+  }
+
+  .loader-mark svg {
+    width: 100%;
+    height: 100%;
+    animation: slowSpin 3s linear infinite;
+  }
+
+  @keyframes slowSpin {
+    to { transform: rotate(360deg); }
+  }
+
+  .loader-stages {
+    list-style: none;
+    text-align: left;
+    max-width: 380px;
+    margin: 0 auto;
+  }
+
+  .loader-stages li {
+    padding: 14px 0;
+    font-size: 15px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    opacity: 0.3;
+    transition: all 0.5s ease;
+  }
+
+  .loader-stages li.active {
+    opacity: 1;
+    color: var(--text);
+  }
+
+  .loader-stages li.done {
+    opacity: 0.7;
+    color: var(--text-muted);
+  }
+
+  .stage-marker {
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--border-strong);
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .loader-stages li.active .stage-marker::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--gold);
+    animation: pulse 1s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.7); }
+  }
+
+  .loader-stages li.done .stage-marker {
+    background: var(--gold);
+    border-color: var(--gold);
+  }
+
+  .loader-stages li.done .stage-marker::after {
+    content: '';
+    width: 8px;
+    height: 4px;
+    border-left: 1.5px solid #1a1410;
+    border-bottom: 1.5px solid #1a1410;
+    transform: rotate(-45deg) translate(1px, -1px);
+  }
+
+  /* ============ SCREEN 3: RESULTS ============ */
+  #screen-results {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 60px 0 100px;
+  }
+
+  .results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 48px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .results-title {
+    font-family: var(--serif);
+    font-size: 34px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+
+  .results-title em {
+    font-style: italic;
+    color: var(--gold);
+  }
+
+  .results-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+    margin-top: 10px;
+  }
+
+  .results-subtitle .ai-badge {
+    display: inline-block;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--sage);
+    border: 1px solid rgba(138, 166, 131, 0.3);
+    padding: 2px 8px;
+    border-radius: 2px;
+    margin-left: 10px;
+    vertical-align: middle;
+  }
+
+  .new-search {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: var(--sans);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 10px 20px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.25s ease;
+  }
+
+  .new-search:hover { border-color: var(--gold); color: var(--gold); }
+
+  .candidates-grid {
+    display: grid;
+    gap: 20px;
+  }
+
+  .candidate {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 28px 32px;
+    display: grid;
+    grid-template-columns: 60px 1fr auto;
+    gap: 28px;
+    align-items: start;
+    transition: all 0.3s ease;
+    opacity: 0;
+    transform: translateY(12px);
+    animation: slideIn 0.5s ease forwards;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .candidate::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--gold);
+    transform: scaleY(0);
+    transform-origin: top;
+    transition: transform 0.4s ease;
+  }
+
+  .candidate:hover {
+    border-color: var(--border-strong);
+    background: var(--surface-raised);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+  }
+
+  .candidate:hover::before { transform: scaleY(1); }
+
+  @keyframes slideIn {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .candidate:nth-child(1) { animation-delay: 0.1s; }
+  .candidate:nth-child(2) { animation-delay: 0.2s; }
+  .candidate:nth-child(3) { animation-delay: 0.3s; }
+  .candidate:nth-child(4) { animation-delay: 0.4s; }
+  .candidate:nth-child(5) { animation-delay: 0.5s; }
+
+  .avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(201, 169, 97, 0.2), rgba(201, 169, 97, 0.05));
+    border: 1px solid var(--border-strong);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--gold);
+    letter-spacing: 0.02em;
+  }
+
+  .candidate-body { min-width: 0; }
+
+  .candidate-name {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    color: var(--text);
+  }
+
+  .candidate-headline {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+    letter-spacing: 0.02em;
+  }
+
+  .candidate-why {
+    font-style: italic;
+    font-family: var(--serif);
+    font-size: 16px;
+    color: var(--text-muted);
+    line-height: 1.65;
+    max-width: 580px;
+  }
+
+  .candidate-why::before {
+    content: '"';
+    color: var(--gold);
+    font-size: 22px;
+    margin-right: 2px;
+    opacity: 0.6;
+  }
+
+  .candidate-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 16px;
+    min-width: 180px;
+  }
+
+  .fit-score {
+    text-align: right;
+  }
+
+  .fit-score-label {
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+
+  .fit-score-value {
+    font-family: var(--serif);
+    font-size: 36px;
+    font-weight: 500;
+    line-height: 1;
+    color: var(--gold);
+  }
+
+  .fit-score-value .max {
+    font-size: 14px;
+    color: var(--text-dim);
+    margin-left: 2px;
+  }
+
+  .fit-bar {
+    width: 140px;
+    height: 3px;
+    background: rgba(201, 169, 97, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+
+  .fit-bar-fill {
+    height: 100%;
+    background: var(--gold);
+    width: 0;
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1) 0.3s;
+  }
+
+  .fit-bar-fill.sage { background: var(--sage); }
+  .fit-bar-fill.amber { background: var(--amber); }
+
+  .candidate-actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  .btn-interest, .btn-pass {
+    font-family: var(--sans);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 10px 16px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s ease;
+    font-weight: 500;
+  }
+
+  .btn-interest {
+    background: var(--gold);
+    border: 1px solid var(--gold);
+    color: #1a1410;
+  }
+
+  .btn-interest:hover {
+    background: var(--gold-bright);
+    border-color: var(--gold-bright);
+  }
+
+  .btn-pass {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+
+  .btn-pass:hover {
+    border-color: var(--text-muted);
+    color: var(--text-muted);
+  }
+
+  .candidate.interested {
+    border-color: var(--gold);
+    background: linear-gradient(135deg, rgba(201, 169, 97, 0.08), rgba(201, 169, 97, 0.02));
+  }
+
+  .interest-confirm {
+    grid-column: 1 / -1;
+    margin-top: 12px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-family: var(--serif);
+    font-style: italic;
+    color: var(--gold);
+    font-size: 15px;
+    display: none;
+  }
+
+  .candidate.interested .interest-confirm { display: block; }
+  .candidate.interested .candidate-actions { display: none; }
+  .candidate.passed { opacity: 0.35; }
+
+  /* ============ ERROR STATE ============ */
+  .error-notice {
+    background: rgba(184, 122, 111, 0.08);
+    border: 1px solid rgba(184, 122, 111, 0.2);
+    border-radius: 3px;
+    padding: 14px 20px;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+    display: none;
+  }
+
+  /* ============ FALLBACK / EMPTY STATE ============ */
+  .fallback-state {
+    max-width: 600px;
+    margin: 80px auto;
+    text-align: center;
+    padding: 60px 40px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+  }
+
+  .fallback-state .crest {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 24px;
+    opacity: 0.6;
+  }
+
+  .fallback-state h3 {
+    font-family: var(--serif);
+    font-size: 28px;
+    font-weight: 500;
+    margin-bottom: 16px;
+  }
+
+  .fallback-state p {
+    color: var(--text-muted);
+    line-height: 1.7;
+    margin-bottom: 28px;
+  }
+
+  /* ============ ADMIN VIEW ============ */
+  #admin-view {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 60px 0 100px;
+  }
+
+  .admin-header {
+    margin-bottom: 48px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .admin-header h2 {
+    font-family: var(--serif);
+    font-size: 38px;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+
+  .admin-header h2 em {
+    font-style: italic;
+    color: var(--gold);
+  }
+
+  .admin-header p {
+    color: var(--text-muted);
+    font-size: 15px;
+    max-width: 600px;
+  }
+
+  .admin-notice {
+    background: rgba(138, 166, 131, 0.08);
+    border: 1px solid rgba(138, 166, 131, 0.2);
+    border-radius: 3px;
+    padding: 16px 20px;
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: 40px;
+    line-height: 1.6;
+  }
+
+  .admin-notice strong {
+    color: var(--sage);
+    font-weight: 600;
+  }
+
+  .admin-section {
+    margin-bottom: 56px;
+  }
+
+  .admin-section-title {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+
+  .admin-section-desc {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+
+  .active-scenario-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+  }
+
+  .active-scenario-row label {
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  select.scenario-select {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    padding: 12px 16px;
+    border-radius: 2px;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  select.scenario-select:focus, select.scenario-select:hover {
+    border-color: var(--gold);
+  }
+
+  .scenarios-list {
+    display: grid;
+    gap: 14px;
+  }
+
+  .scenario-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 24px 28px;
+  }
+
+  .scenario-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 16px;
+    gap: 20px;
+  }
+
+  .scenario-card-title {
+    font-family: var(--serif);
+    font-size: 20px;
+    font-weight: 500;
+  }
+
+  .scenario-card-meta {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  .keywords {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .keyword {
+    font-size: 11px;
+    padding: 4px 10px;
+    background: rgba(201, 169, 97, 0.08);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+  }
+
+  .scenario-card-actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  .btn-small {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: var(--sans);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 8px 14px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+
+  .btn-small:hover { border-color: var(--gold); color: var(--gold); }
+  .btn-small.danger:hover { border-color: var(--rose); color: var(--rose); }
+
+  .btn-add {
+    background: transparent;
+    border: 1px dashed var(--border-strong);
+    color: var(--gold);
+    font-family: var(--sans);
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 18px 24px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.25s;
+    width: 100%;
+    margin-top: 14px;
+  }
+
+  .btn-add:hover {
+    border-color: var(--gold);
+    background: rgba(201, 169, 97, 0.04);
+  }
+
+  /* ============ MODAL ============ */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    z-index: 100;
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 60px 20px;
+    overflow-y: auto;
+  }
+
+  .modal-backdrop.active { display: flex; }
+
+  .modal {
+    background: var(--bg-soft);
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    max-width: 760px;
+    width: 100%;
+    padding: 40px 44px;
+    box-shadow: var(--shadow);
+  }
+
+  .modal h3 {
+    font-family: var(--serif);
+    font-size: 28px;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+
+  .modal-desc {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-bottom: 32px;
+  }
+
+  .field {
+    margin-bottom: 20px;
+  }
+
+  .field label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  .field input, .field textarea {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    padding: 12px 14px;
+    border-radius: 2px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .field input:focus, .field textarea:focus { border-color: var(--gold); }
+
+  .field textarea { min-height: 70px; resize: vertical; font-family: var(--serif); font-size: 15px; }
+
+  .field-hint {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 6px;
+  }
+
+  .candidate-editor {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 20px;
+    margin-bottom: 14px;
+    position: relative;
+  }
+
+  .candidate-editor-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .candidate-editor-title {
+    font-family: var(--serif);
+    font-size: 15px;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+  }
+
+  .remove-candidate {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .remove-candidate:hover { color: var(--rose); }
+
+  .cand-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 120px;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: var(--sans);
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 12px 24px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+  .btn-ghost:hover { border-color: var(--text-muted); color: var(--text); }
+
+  /* ============ RESPONSIVE ============ */
+  @media (max-width: 780px) {
+    nav { padding: 14px 20px; gap: 10px; }
+    nav img[alt="TalentKnight"] { height: 52px; width: 52px; }
+    .ai-indicator { display: none !important; }
+    .scenario-indicator { display: none; }
+    .admin-toggle { padding: 8px 12px; font-size: 10px; }
+    main { padding: 0 20px; }
+    #screen-brief { padding: 48px 0 40px; }
+    textarea#briefInput { font-size: 17px; padding: 18px 20px; }
+    .brief-actions { flex-direction: column; align-items: flex-start; gap: 14px; }
+    .brief-hint { display: none; }
+    #screen-brief button.primary { width: 100%; padding: 18px 24px; text-align: center; }
+    .results-header { flex-direction: column; align-items: flex-start; gap: 16px; }
+    .results-title { font-size: 26px; }
+    .candidate { grid-template-columns: 1fr; gap: 16px; padding: 20px; }
+    .candidate-right { align-items: flex-start; min-width: 0; width: 100%; flex-direction: row; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    .fit-bar { width: 100px; }
+    .btn-interest, .btn-pass { padding: 12px 14px; flex: 1; text-align: center; }
+    .contact-fields { grid-template-columns: 1fr; }
+    .contact-submit { flex-direction: column; align-items: stretch; }
+    .contact-submit button.primary { width: 100%; }
+    .contact-confirm { flex-direction: column; gap: 16px; padding: 24px 20px; }
+    .modal-backdrop { padding: 20px 12px; }
+    .modal { padding: 24px 20px; }
+    .modal h3 { font-size: 22px; }
+    .cand-grid { grid-template-columns: 1fr; }
+    .modal-actions { flex-direction: column-reverse; gap: 10px; }
+    .modal-actions button { width: 100%; padding: 14px; }
+    #admin-view { padding: 40px 0 60px; }
+    .admin-header h2 { font-size: 28px; }
+    .active-scenario-row { flex-direction: column; align-items: stretch; gap: 12px; }
+    .scenario-card { padding: 18px 16px; }
+    .scenario-card-head { flex-direction: column; gap: 12px; }
+    .scenario-card-actions { justify-content: flex-start; }
+    .fallback-state { padding: 40px 20px; }
+    #screen-loading { padding: 100px 0; }
+  }
+
+  /* ============ CONTACT FORM ============ */
+  .contact-section {
+    margin-top: 64px;
+    padding-top: 60px;
+    border-top: 1px solid var(--border);
+    display: none;
+  }
+
+  .contact-section.visible { display: block; }
+
+  .contact-eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .contact-eyebrow::before {
+    content: '';
+    width: 24px;
+    height: 1px;
+    background: var(--gold);
+  }
+
+  .contact-heading {
+    font-family: var(--serif);
+    font-size: clamp(30px, 4vw, 44px);
+    font-weight: 500;
+    line-height: 1.1;
+    margin-bottom: 16px;
+  }
+
+  .contact-heading em { font-style: italic; color: var(--gold); font-weight: 400; }
+
+  .contact-sub {
+    font-size: 16px;
+    color: var(--text-muted);
+    max-width: 520px;
+    line-height: 1.7;
+    margin-bottom: 44px;
+  }
+
+  .contact-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 32px;
+    max-width: 680px;
+  }
+
+  .cf-field label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+  }
+
+  .cf-field .optional {
+    font-size: 10px;
+    opacity: 0.6;
+    text-transform: lowercase;
+    letter-spacing: 0;
+  }
+
+  .cf-field input {
+    width: 100%;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    outline: none;
+    transition: all 0.2s ease;
+  }
+
+  .cf-field input:focus {
+    border-color: var(--gold);
+    background: var(--surface-raised);
+    box-shadow: 0 0 0 1px rgba(201, 169, 97, 0.12);
+  }
+
+  .cf-field input::placeholder { color: var(--text-dim); }
+
+  .contact-submit {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .contact-confirm {
+    display: none;
+    align-items: center;
+    gap: 28px;
+    padding: 32px 36px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    max-width: 560px;
+    animation: fadeIn 0.5s ease;
+  }
+
+  .contact-confirm.visible { display: flex; }
+
+  .contact-confirm-text h4 {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--gold);
+    margin-bottom: 8px;
+  }
+
+  .contact-confirm-text p {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  .contact-confirm-text strong { color: var(--text); }
+
+  /* ============ LEAD CARDS (Admin) ============ */
+  .lead-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 20px 24px;
+    margin-bottom: 12px;
+    animation: fadeIn 0.4s ease;
+  }
+
+  .lead-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+    gap: 16px;
+  }
+
+  .lead-name {
+    font-family: var(--serif);
+    font-size: 19px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .lead-timestamp {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 3px;
+  }
+
+  .lead-contact {
+    display: flex;
+    gap: 20px;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+
+  .lead-email { color: var(--gold); }
+
+  .lead-brief {
+    font-size: 13px;
+    color: var(--text-dim);
+    font-style: italic;
+    font-family: var(--serif);
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+
+  .leads-empty {
+    color: var(--text-dim);
+    font-style: italic;
+    padding: 12px 0;
+    font-size: 14px;
+  }
+
+  @media (max-width: 780px) {
+    .contact-fields { grid-template-columns: 1fr; }
+    .contact-submit { flex-direction: column; align-items: flex-start; }
+  }
+
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 5px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--gold-dim); }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="brand" onclick="showView('brief')">
+    <img src="data:image/png;base64,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" alt="TalentKnight" style="height:80px;width:80px;display:block;border-radius:10px;border:none;outline:none;">
+  </div>
+  <div class="nav-right">
+    <div class="ai-indicator" id="aiIndicator">
+      <span class="dot"></span>AI Live
+    </div>
+    <div class="scenario-indicator" id="scenarioIndicator" style="display:none">
+      <span class="dot"></span><span id="scenarioIndicatorText">No scenario active</span>
+    </div>
+    <button class="admin-toggle" onclick="toggleAdmin()" id="adminToggle">Admin</button>
+  </div>
+</nav>
+
+<main>
+
+  <!-- ============ SCREEN 1: BRIEF ============ -->
+  <section id="screen-brief" class="view active">
+    <div class="eyebrow">Step one of three</div>
+    <h1 class="headline">Describe who you're <em>looking for</em>.</h1>
+    <p class="sub">Tell us about the role in plain English. The more context you give, the sharper the match. Don't worry about formatting — write it the way you'd say it aloud.</p>
+
+    <div class="brief-field">
+      <label for="briefInput">Your brief</label>
+      <textarea id="briefInput" placeholder="e.g. I need a part-time bookkeeper in Southend, 3 days a week, Xero experience, ideally within a month..."></textarea>
+    </div>
+
+    <div class="brief-actions">
+      <button class="primary" onclick="submitBrief()">Find candidates</button>
+      <span class="brief-hint">Press <kbd>⌘</kbd> + <kbd>Enter</kbd> to submit</span>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN 2: LOADING ============ -->
+  <section id="screen-loading" class="view">
+    <div class="loader-mark">
+      <svg viewBox="0 0 60 60" fill="none" stroke="#c9a961" stroke-width="1">
+        <circle cx="30" cy="30" r="28" stroke-dasharray="4 4" opacity="0.3"/>
+        <circle cx="30" cy="30" r="20" stroke-dasharray="2 6"/>
+        <circle cx="30" cy="30" r="3" fill="#c9a961"/>
+      </svg>
+    </div>
+    <ul class="loader-stages" id="loaderStages">
+      <li data-stage="0"><span class="stage-marker"></span>Reading the role</li>
+      <li data-stage="1"><span class="stage-marker"></span>Searching candidate signals</li>
+      <li data-stage="2"><span class="stage-marker"></span>Ranking matches by fit</li>
+    </ul>
+  </section>
+
+  <!-- ============ SCREEN 3: RESULTS ============ -->
+  <section id="screen-results" class="view">
+    <div class="results-header">
+      <div>
+        <h2 class="results-title"><em id="resultsCount">5</em> candidates matched to your brief</h2>
+        <div class="results-subtitle" id="resultsSubtitle">Ranked by fit score. Click anyone to register interest.</div>
+      </div>
+      <button class="new-search" onclick="showView('brief')">← New search</button>
+    </div>
+    <div class="error-notice" id="errorNotice">
+      AI is warming up — showing pre-loaded results for this search.
+    </div>
+    <div class="candidates-grid" id="candidatesGrid"></div>
+
+    <!-- Contact form -->
+    <div class="contact-section" id="contactSection">
+      <div class="contact-eyebrow">Next step</div>
+      <h3 class="contact-heading">Want the <em>full shortlist?</em></h3>
+      <p class="contact-sub">Leave your details and we'll send you complete candidate profiles within 24 hours — no commitment required.</p>
+
+      <form id="contactForm" onsubmit="submitContact(event)">
+        <div class="contact-fields">
+          <div class="cf-field">
+            <label>Your name</label>
+            <input type="text" id="cf-name" placeholder="e.g. Sarah Johnson" required>
+          </div>
+          <div class="cf-field">
+            <label>Company</label>
+            <input type="text" id="cf-company" placeholder="e.g. Johnson & Co">
+          </div>
+          <div class="cf-field">
+            <label>Email address</label>
+            <input type="email" id="cf-email" placeholder="sarah@company.com" required>
+          </div>
+          <div class="cf-field">
+            <label>Phone <span class="optional">(optional)</span></label>
+            <input type="tel" id="cf-phone" placeholder="+44 7700 000000">
+          </div>
+        </div>
+        <div class="contact-submit">
+          <button type="submit" class="primary">Request the full shortlist</button>
+          <span class="brief-hint">We'll be in touch within 24 hours</span>
+        </div>
+      </form>
+
+      <div class="contact-confirm" id="contactConfirm">
+        <svg viewBox="0 0 48 48" fill="none" stroke="var(--gold)" stroke-width="1.5" width="44" height="44" flex-shrink="0" style="flex-shrink:0">
+          <circle cx="24" cy="24" r="20"/>
+          <path d="M15 24 L21 30 L33 18" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="contact-confirm-text">
+          <h4>You're on the list.</h4>
+          <p>We'll send the full shortlist to <strong id="confirmEmail"></strong> within 24 hours. One of our team will be in touch shortly.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN: FALLBACK ============ -->
+  <section id="screen-fallback" class="view">
+    <div class="fallback-state">
+      <svg class="crest" viewBox="0 0 48 48" fill="none" stroke="#c9a961" stroke-width="1.5">
+        <path d="M24 4 L38 12 V28 C38 36 32 42 24 44 C16 42 10 36 10 28 V12 Z"/>
+        <path d="M24 16 V32 M18 24 H30" opacity="0.5"/>
+      </svg>
+      <h3>Your brief is with our team</h3>
+      <p>We've received the role and our sourcing team is building your shortlist now. You'll see matches in your dashboard within 24 hours — usually much sooner.</p>
+      <button class="new-search" onclick="showView('brief')">← New search</button>
+    </div>
+  </section>
+
+  <!-- ============ ADMIN VIEW ============ -->
+  <section id="admin-view" class="view">
+    <div class="admin-header">
+      <h2>Back-of-<em>house</em></h2>
+      <p>Prepare override scenarios for key meetings, or let the live AI handle every search automatically.</p>
+    </div>
+
+    <div class="admin-notice">
+      <strong>AI is live.</strong> By default, every search now calls Claude AI and generates real candidates on the spot. Use the "Lock scenario" option below only when you want guaranteed results for a specific meeting — for example, if you've already prepared candidates for a particular client.
+    </div>
+
+    <div class="admin-section">
+      <h3 class="admin-section-title">Leads captured</h3>
+      <p class="admin-section-desc">Contact details submitted through the demo. These are potential clients who expressed interest — click Email to open a new message to them.</p>
+      <div id="leadsList"></div>
+    </div>
+
+    <div class="admin-section">
+      <h3 class="admin-section-title">Lock a scenario for your next demo</h3>
+      <p class="admin-section-desc">Locking a scenario overrides the AI. Any brief typed on the front page will show these specific candidates, regardless of what was written.</p>
+      <div class="active-scenario-row">
+        <label>Next demo</label>
+        <select class="scenario-select" id="activeScenarioSelect" onchange="setActiveScenario(this.value)">
+          <option value="">— No scenario locked (AI generates live results) —</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="admin-section">
+      <h3 class="admin-section-title">Your saved scenarios</h3>
+      <p class="admin-section-desc">Pre-built candidate sets you can lock in before a meeting. Each one has trigger keywords — if you lock it, those keywords are ignored and the scenario always shows.</p>
+      <div class="scenarios-list" id="scenariosList"></div>
+      <button class="btn-add" onclick="openScenarioEditor()">+ Add new scenario</button>
+    </div>
+
+    <div class="admin-section">
+      <h3 class="admin-section-title" style="color: var(--text-muted)">If AI is unavailable</h3>
+      <p class="admin-section-desc">If the AI can't respond (no connection, API issue), the app falls back to your saved scenarios using keyword matching. If nothing matches those either, the client sees a polite "your brief is with our team" message.</p>
+    </div>
+  </section>
+</main>
+
+<!-- ============ SCENARIO EDITOR MODAL ============ -->
+<div class="modal-backdrop" id="editorModal">
+  <div class="modal">
+    <h3 id="editorTitle">New scenario</h3>
+    <p class="modal-desc" id="editorDesc">Give this scenario a name, trigger keywords, and your candidates.</p>
+
+    <div class="field">
+      <label>Scenario name</label>
+      <input type="text" id="fldName" placeholder="e.g. Southend Bookkeeper">
+    </div>
+
+    <div class="field">
+      <label>Trigger keywords</label>
+      <input type="text" id="fldKeywords" placeholder="e.g. bookkeeper, accounts, xero, accounting, southend">
+      <div class="field-hint">Comma-separated. Used for fallback matching only — not needed if you plan to lock the scenario manually.</div>
+    </div>
+
+    <div class="field">
+      <label>Candidates</label>
+      <div id="candidatesEditor"></div>
+      <button class="btn-small" style="margin-top:8px" onclick="addCandidateEditor()">+ Add candidate</button>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeEditor()">Cancel</button>
+      <button class="primary" onclick="saveScenario()">Save scenario</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//              TALENTKNIGHT — AI-POWERED DEMO APP
+//              Live Claude AI candidate generation
+// ============================================================
+
+// --- Storage helpers ---
+async function loadState() {
+  try {
+    if (window.storage) {
+      const res = await window.storage.get('tk_state_v2');
+      return res ? JSON.parse(res.value) : null;
+    } else {
+      const val = localStorage.getItem('tk_state_v2');
+      return val ? JSON.parse(val) : null;
+    }
+  } catch { return null; }
+}
+
+async function saveState() {
+  try {
+    if (window.storage) {
+      await window.storage.set('tk_state_v2', JSON.stringify(state));
+    } else {
+      localStorage.setItem('tk_state_v2', JSON.stringify(state));
+    }
+  } catch (e) { console.warn('Save failed', e); }
+}
+
+// --- Seed data: kept as backup scenarios only ---
+const SEED = {
+  activeScenarioId: '',
+  scenarios: [{"id": "s_cfo", "name": "Chief Financial Officer", "keywords": ["cfo", "chief financial", "finance director", "fd", "financial director"], "candidates": [{"name": "Priya S.", "headline": "CFO · 18 yrs · FTSE 50 · Ex-HSBC & Diageo · London", "score": 96, "why": "Led three consecutive years of double-digit margin improvement at Diageo. Managed £4.2bn P&L. Stepped down after acquisition and actively seeking her next FTSE-level role."}, {"name": "James O.", "headline": "Finance Director · 14 yrs · AstraZeneca & GlaxoSmithKline · Oxford", "score": 91, "why": "Deep pharma sector expertise with strong M&A track record. Oversaw $1.1bn R&D budget allocation at AZ. ACA qualified, Oxford educated, board-ready."}, {"name": "Amara D.", "headline": "CFO · 12 yrs · Private Equity backed scale-ups · Manchester", "score": 87, "why": "Three successful exits under her belt. Excellent at building finance functions from scratch. CIMA qualified, strong on FP&A and investor relations."}, {"name": "Tom B.", "headline": "Group FD · 20 yrs · Barclays & Standard Chartered · London", "score": 82, "why": "Deep financial services background. Strong regulatory and compliance expertise. Currently consulting but open to a permanent CFO role in financial services or adjacent sector."}, {"name": "Ling C.", "headline": "Deputy CFO · 10 yrs · Unilever · Rotterdam/London", "score": 76, "why": "Ready for her first CFO role. Exceptional at driving cost transformation programmes. Dual UK/Netherlands experience, ACCA qualified."}]}, {"id": "s_ceo", "name": "Chief Executive Officer", "keywords": ["ceo", "chief executive", "managing director", "md", "group ceo"], "candidates": [{"name": "Marcus L.", "headline": "CEO · 22 yrs · FTSE 100 & Private Equity · London", "score": 97, "why": "Delivered £800m revenue turnaround at a major UK retailer. Known for transformational leadership and stakeholder management at board level. Available following strategic exit."}, {"name": "Fatima A.", "headline": "MD · 16 yrs · Vodafone & BT Group · London", "score": 92, "why": "Led UK Consumer division at Vodafone, a £3.2bn revenue unit. Strong digital transformation and P&L credentials. Ready for a Group CEO role in tech or telecoms."}, {"name": "David C.", "headline": "CEO · 18 yrs · BP & Shell downstream · Aberdeen", "score": 88, "why": "Deep energy sector expertise. Led Shell's UK retail network of 900+ stations. Comfortable in regulated, capital-intensive environments. Non-exec experience on two boards."}, {"name": "Sunita P.", "headline": "Group MD · 14 yrs · Tesco & Sainsbury's · London", "score": 83, "why": "P&L responsibility for £1.8bn grocery division. Strong operational and people leadership. Has navigated complex union and supply chain environments with measurable results."}, {"name": "Ryan M.", "headline": "Divisional CEO · 12 yrs · Media & Publishing · London", "score": 77, "why": "Led digital transformation of a national media brand, growing digital revenue 4x in 3 years. Younger profile — ideal for a scale-up or digital-first business needing vision and pace."}]}, {"id": "s_cto", "name": "Chief Technology Officer", "keywords": ["cto", "chief technology", "chief digital", "head of technology", "technology director"], "candidates": [{"name": "Aisha K.", "headline": "CTO · 15 yrs · FinTech & Lloyds Banking Group · London", "score": 95, "why": "Rebuilt Lloyds' core banking platform serving 26m customers. Expert in cloud migration, microservices and regulated tech environments. Now seeking a CTO role in scale-up or FTSE tech."}, {"name": "Wei Z.", "headline": "VP Engineering · 13 yrs · BT & Amazon Web Services · London", "score": 90, "why": "Extensive cloud infrastructure expertise. Led 400-person engineering org at BT Digital. Strong on DevOps, platform engineering and AI/ML integration."}, {"name": "Raj N.", "headline": "CTO · 11 yrs · InsurTech & Legal & General · London", "score": 86, "why": "Built tech stack from Series A to £200m ARR at a leading InsurTech. Deep understanding of legacy modernisation within insurance. Strong hiring and culture track record."}, {"name": "Sophie T.", "headline": "Chief Digital Officer · 14 yrs · Marks & Spencer & Next · London", "score": 81, "why": "Spearheaded M&S's digital replatforming and the Sparks loyalty app reaching 8m users. Outstanding at blending retail intuition with tech delivery. Board-level presenter."}, {"name": "Leon F.", "headline": "Head of Engineering · 9 yrs · Sky & DAZN · London", "score": 75, "why": "Strong streaming and media tech background. Led real-time data pipeline handling 40m concurrent users. Ready for first CTO appointment."}]}, {"id": "s_hr", "name": "HR Director / Chief People Officer", "keywords": ["hr director", "chief people", "cpo", "human resources director", "people director", "chro"], "candidates": [{"name": "Nadine W.", "headline": "CPO · 17 yrs · Unilever & Rolls-Royce · London", "score": 94, "why": "Oversaw global people strategy across 45 countries at Unilever. Expert in DEI, succession planning and executive development. CIPD Fellow, board-level experience."}, {"name": "James A.", "headline": "HR Director · 13 yrs · HSBC & Standard Life · Edinburgh", "score": 89, "why": "Redesigned performance frameworks across HSBC's UK retail workforce of 22,000. Strong ER and trade union experience. Passionate about inclusive culture and wellbeing."}, {"name": "Blessing O.", "headline": "People Director · 11 yrs · Retail & Kingfisher Group · London", "score": 85, "why": "Scaled B&Q's people team through major restructure and hybrid transition. Highly regarded for frontline manager development and engagement transformation."}, {"name": "Clara H.", "headline": "Head of People · 9 yrs · Tech & FinTech · London", "score": 80, "why": "Built people functions from scratch at three VC-backed companies. Strong on talent acquisition, comp benchmarking and culture in high-growth environments."}, {"name": "Omar S.", "headline": "HR Business Partner (Senior) · 7 yrs · BAE Systems · Preston", "score": 73, "why": "Deep experience in unionised, engineering-heavy environments. Excellent track record in complex ER cases. Ready to step into his first HR Director role."}]}, {"id": "s_ops", "name": "Operations Director / COO", "keywords": ["operations director", "coo", "chief operating", "head of operations", "ops director"], "candidates": [{"name": "Diane F.", "headline": "COO · 19 yrs · Tesco Supply Chain & Amazon Logistics · Coventry", "score": 95, "why": "Ran Tesco's ambient supply chain — £6bn annual throughput, 14 DCs, 40,000 SKUs. Lean Six Sigma Black Belt. Exceptional at cost optimisation without compromising service."}, {"name": "Patrick N.", "headline": "Operations Director · 15 yrs · DHL & Royal Mail · London", "score": 90, "why": "Transformed last-mile delivery operations across 3,000 routes. Led automation of 4 fulfilment centres. Strong people leader with a safety-first culture."}, {"name": "Yemi A.", "headline": "COO · 13 yrs · Pharma Manufacturing · AstraZeneca · Macclesfield", "score": 86, "why": "Managed GMP-compliant manufacturing at scale. Delivered £120m in operational savings across 5 years. Deep regulatory expertise in pharmaceutical operations."}, {"name": "Sarah W.", "headline": "Head of Operations · 11 yrs · Hospitality & Whitbread · London", "score": 81, "why": "Oversaw Premier Inn's operational standards across 250 UK hotels. Outstanding at franchise-style accountability and multi-site management. NPS champion."}, {"name": "Kieran B.", "headline": "Operations Manager · 8 yrs · FMCG & Reckitt · Hull", "score": 74, "why": "Strong production planning and continuous improvement background. Ready to step up. Has driven 18% throughput gains using lean methodology."}]}, {"id": "s_sales", "name": "Sales Director / VP Sales", "keywords": ["sales director", "vp sales", "head of sales", "commercial director", "revenue director"], "candidates": [{"name": "Karl M.", "headline": "Sales Director · 16 yrs · B2B SaaS & BT Enterprise · London", "score": 96, "why": "Built and led 120-person enterprise sales team at BT. £380m annual quota, consistently 110%+ attainment. Expert in strategic account management and complex deal structures."}, {"name": "Ayana R.", "headline": "VP Sales · 12 yrs · FinTech & Sage · London", "score": 91, "why": "Doubled Sage's mid-market ARR in 3 years. Strong at building high-performing cultures in competitive environments. Coach and mentor as well as top performer."}, {"name": "Peter O.", "headline": "Commercial Director · 18 yrs · FMCG & Unilever · London", "score": 87, "why": "Led Unilever's UK key accounts — Tesco, Asda, Morrisons. Managed £900m trade spend. Highly commercial, data-driven and well respected across the sector."}, {"name": "Mei L.", "headline": "Head of Sales · 10 yrs · Legal & Compliance SaaS · London", "score": 82, "why": "Grew revenue from £8m to £42m in 4 years. Exceptional at consultative selling in regulated industries. Strong network across GCs and compliance leaders."}, {"name": "Ade B.", "headline": "Senior Sales Manager · 7 yrs · Pharmaceuticals · GSK · London", "score": 75, "why": "Consistent top 5% performer across UK pharma sales. Ready for directorship. Strong clinical knowledge and KOL relationships across primary care."}]}, {"id": "s_marketing", "name": "Marketing Director / CMO", "keywords": ["marketing director", "cmo", "chief marketing", "head of marketing", "brand director"], "candidates": [{"name": "Tanya S.", "headline": "CMO · 15 yrs · Consumer & Diageo · London", "score": 94, "why": "Stewarded Johnnie Walker and Tanqueray brands through global repositioning. Managed £200m+ media budgets. IPA Excellence award winner. Board-level strategic communicator."}, {"name": "Ravi P.", "headline": "Marketing Director · 13 yrs · Retail & Marks & Spencer · London", "score": 89, "why": "Led M&S's brand reset campaign — most successful in a decade by NPS measures. Expert in brand, performance marketing and data-driven segmentation. Strong agency management."}, {"name": "Hannah J.", "headline": "Head of Marketing · 10 yrs · FinTech & Monzo · London", "score": 85, "why": "Grew Monzo's customer base from 1m to 7m as Head of Growth. Deep product marketing and CRM expertise. Strong on lifecycle and retention marketing."}, {"name": "Kofi A.", "headline": "Brand Director · 12 yrs · FMCG & Reckitt · London", "score": 80, "why": "Launched Dettol's post-COVID positioning globally. Exceptional at managing brand equity through crisis. MBA from LBS. Strong cross-functional leadership."}, {"name": "Grace T.", "headline": "Digital Marketing Manager · 6 yrs · eCommerce · ASOS · London", "score": 73, "why": "Managed £40m paid media budget across search, social and affiliates. Strong on attribution and incrementality testing. Ready for her first director-level position."}]}, {"id": "s_legal", "name": "General Counsel / Legal Director", "keywords": ["general counsel", "gc", "legal director", "chief legal", "head of legal", "company secretary"], "candidates": [{"name": "Victoria H.", "headline": "GC · 18 yrs · FTSE 100 · Rio Tinto & Anglo American · London", "score": 95, "why": "Led legal strategy through two major M&A transactions and a hostile takeover defence. Extensive international arbitration experience. Qualified in England, Australia, and South Africa."}, {"name": "Emmanuel O.", "headline": "Legal Director · 14 yrs · Financial Services · Barclays · London", "score": 90, "why": "Deep regulatory and financial crime expertise. Led PRA/FCA interactions for Barclays' retail arm. AMLCO experience. Respected across the sector for pragmatic legal counsel."}, {"name": "Sasha B.", "headline": "Head of Legal · 11 yrs · Technology & Intellectual Property · London", "score": 86, "why": "Built the legal function at a tech unicorn from 2 to 18 lawyers. Expert in SaaS contracting, data privacy and cross-border licensing. Strong board communication."}, {"name": "Fatou D.", "headline": "Senior Legal Counsel · 9 yrs · Employment Law · KPMG · London", "score": 80, "why": "Employment law specialist with tribunal and senior executive exits expertise. Ready for Head of Legal or GC step. Excellent relationship builder and communicator."}, {"name": "Neil R.", "headline": "Company Secretary · 13 yrs · FTSE 250 · London", "score": 74, "why": "Deep corporate governance, AGM and board secretariat experience. ICSA qualified. Particularly strong on listed company obligations and regulatory compliance."}]}, {"id": "s_finance", "name": "Finance Manager / Financial Controller", "keywords": ["finance manager", "financial controller", "controller", "management accountant", "head of finance"], "candidates": [{"name": "Preethi R.", "headline": "Financial Controller · 10 yrs · Manufacturing · Rolls-Royce · Derby", "score": 93, "why": "Full ownership of month-end close, statutory accounts and audit for a £600m division. ACA qualified, Big 4 trained. Meticulous, fast and well-liked by FP&A and commercial teams."}, {"name": "Leon A.", "headline": "Finance Manager · 8 yrs · Retail · Tesco · Welwyn Garden City", "score": 88, "why": "Business partnering across 12 buying categories. Strong at flash reporting and variance analysis. CIMA finalist. Known for translating finance into language that non-finance teams act on."}, {"name": "Zara M.", "headline": "Head of Finance · 11 yrs · Housing Association · London", "score": 84, "why": "End-to-end finance responsibility including treasury, VAT and regulatory reporting. Experienced with grant funding and social housing compliance. ACCA qualified."}, {"name": "Jack T.", "headline": "Management Accountant · 5 yrs · FMCG · Unilever · London", "score": 78, "why": "Strong budgeting, forecasting and cost centre management. CIMA studying, almost qualified. Known for his Excel and Power BI skills, which have automated several manual processes."}, {"name": "Nneka B.", "headline": "Finance Business Partner · 7 yrs · NHS & Public Sector · London", "score": 72, "why": "Excellent at stakeholder management in complex organisations. Transitioning from public sector — brings strong governance skills and a fresh perspective."}]}, {"id": "s_project", "name": "Project Manager / Programme Director", "keywords": ["project manager", "programme director", "programme manager", "pmo", "delivery manager", "project director"], "candidates": [{"name": "Oluwaseun F.", "headline": "Programme Director · 16 yrs · Financial Services · HSBC · London", "score": 94, "why": "Delivered HSBC's ring-fencing programme — a £1.3bn regulatory change initiative. PgMP and Prince2 certified. Exceptional at managing multi-workstream complexity and executive reporting."}, {"name": "Karen S.", "headline": "Senior PM · 12 yrs · IT Transformation · BT · London", "score": 89, "why": "Led BT's ERP migration — 18 months, on time, 3% under budget. Strong Agile and waterfall hybrid. Brilliant at risk management and stakeholder alignment across engineering teams."}, {"name": "Tariq H.", "headline": "Programme Manager · 10 yrs · Construction · Balfour Beatty · Birmingham", "score": 85, "why": "Delivered infrastructure projects from £20m to £400m. APM qualified. Comfortable in NEC contract environments. Strong on safety, community engagement and supply chain management."}, {"name": "Ingrid L.", "headline": "Delivery Manager · 8 yrs · Digital · Government & HMRC · London", "score": 80, "why": "Led GDS-standard digital delivery across multiple HMRC services. SAFe Agile practitioner. Strong on user research integration into delivery and OKR-based planning."}, {"name": "Chris N.", "headline": "Project Manager · 6 yrs · Pharma · GSK · Stevenage", "score": 74, "why": "Managed clinical trial site setup and CRO coordination across 12 countries. Prince2 certified, PMP in progress. Excellent communicator across scientific and commercial stakeholders."}]}, {"id": "s_data", "name": "Data Scientist / Head of Data", "keywords": ["data scientist", "head of data", "data director", "data analyst", "machine learning", "ai engineer", "data engineering"], "candidates": [{"name": "Yuki T.", "headline": "Head of Data Science · 11 yrs · FinTech & Barclays · London", "score": 96, "why": "Built Barclays' fraud detection ML model — saved £38m in year one. Python, R, SQL expert. Published researcher, strong at translating model outputs into board-level narratives."}, {"name": "Adebayo F.", "headline": "Senior Data Scientist · 8 yrs · Retail & ASOS · London", "score": 91, "why": "Recommendation engine and demand forecasting specialist. Reduced overstock by 22% at ASOS. Deep expertise in PyTorch, Spark and Databricks. MSc Machine Learning, UCL."}, {"name": "Rosa M.", "headline": "Data Engineer · 7 yrs · Energy & National Grid · London", "score": 87, "why": "Architected National Grid's real-time grid monitoring data platform. Strong on cloud-native pipelines, dbt and Snowflake. Excellent communicator across engineering and operations."}, {"name": "Ben K.", "headline": "Analytics Lead · 9 yrs · FMCG & Reckitt · Hull", "score": 82, "why": "Built self-serve analytics capability across Reckitt's supply chain function. Power BI and Tableau expert. Skilled at change management alongside technical delivery."}, {"name": "Chiamaka O.", "headline": "Data Analyst · 4 yrs · Consulting · Deloitte · London", "score": 75, "why": "Strong SQL, Python and visualisation skills. Client-facing experience across retail and utilities. Ambitious — looking for in-house role with clear data leadership pathway."}]}, {"id": "s_product", "name": "Product Manager / Head of Product", "keywords": ["product manager", "head of product", "product director", "product owner", "vp product"], "candidates": [{"name": "Nina P.", "headline": "Head of Product · 12 yrs · FinTech & Revolut · London", "score": 95, "why": "Launched Revolut's Business Accounts product — now 500k+ customers. Deep PLG and B2B SaaS experience. Exceptional at discovery, roadmapping and working with distributed engineering teams."}, {"name": "Kwame B.", "headline": "Senior PM · 9 yrs · eCommerce · Kingfisher · London", "score": 90, "why": "Owns B&Q's trade portal — £180m GMV. Strong on experimentation, A/B testing and data-informed prioritisation. Ex-McKinsey consultant turned product leader."}, {"name": "Ellie S.", "headline": "Product Director · 14 yrs · Media & Sky · London", "score": 86, "why": "Led Sky Q and Sky Glass product evolution. Exceptional at hardware/software product integration. Strong design thinking background and cross-functional leadership."}, {"name": "Arjun M.", "headline": "Product Manager · 6 yrs · HealthTech · London", "score": 81, "why": "Launched patient-facing app used by 400k NHS patients. GDPR, IG toolkit and CQC-compliant delivery experience. Highly user-centred, strong on qualitative research methods."}, {"name": "Caitlin H.", "headline": "Product Owner · 5 yrs · Logistics & DHL · London", "score": 74, "why": "Agile product ownership across parcel tracking and customer portal. Strong stakeholder management. Ready for Senior PM or Head of Product step up."}]}, {"id": "s_engineer", "name": "Software Engineer / Engineering Manager", "keywords": ["software engineer", "engineer", "developer", "engineering manager", "software developer", "full stack", "backend engineer", "frontend engineer"], "candidates": [{"name": "Damilola A.", "headline": "Engineering Manager · 11 yrs · FinTech & Monzo · London", "score": 94, "why": "Manages 14-person backend squad at Monzo. Expert in Go, Kubernetes and distributed systems. Strong engineering culture builder — promoted 6 engineers to senior in 2 years."}, {"name": "Maria C.", "headline": "Senior Software Engineer · 8 yrs · BT & Vodafone · London", "score": 89, "why": "Full-stack engineer with deep Java and React expertise. Led migration from monolith to microservices for a 12m-user telecoms platform. Strong on testing culture and code review."}, {"name": "Haruto S.", "headline": "Backend Engineer · 6 yrs · Retail & ASOS · London", "score": 85, "why": "Python and Node.js specialist. Key contributor to ASOS's real-time inventory system. Strong on API design and event-driven architecture. Open source contributor."}, {"name": "Zoe W.", "headline": "Frontend Engineer · 5 yrs · Media & Reach PLC · Manchester", "score": 80, "why": "React and TypeScript specialist. Built high-traffic news article experiences for 8m monthly users. Accessibility champion, strong on web performance and Core Web Vitals."}, {"name": "Ife O.", "headline": "Graduate Engineer · 2 yrs · Consulting · Accenture · London", "score": 73, "why": "Strong fundamentals in Java and Python. High potential — on Accenture's leadership track. Looking for a product-focused engineering role with a clear senior pathway."}]}, {"id": "s_accountant", "name": "Accountant / Bookkeeper", "keywords": ["accountant", "senior accountant", "audit", "auditor", "tax accountant", "xero", "sage", "quickbooks", "bookkeeper", "accounts"], "candidates": [{"name": "Sandra O.", "headline": "Senior Accountant · 12 yrs · Big 4 trained · PwC & Deloitte · London", "score": 93, "why": "ACA qualified, trained at PwC. Strong technical accounting and IFRS expertise. Excellent client relationship skills and a proven mentor for junior team members."}, {"name": "Rajan P.", "headline": "Tax Accountant · 9 yrs · HMRC & KPMG · London", "score": 88, "why": "Corporate tax specialist with deep R&D tax credit and transfer pricing knowledge. Pragmatic and commercially minded. ATT and CTA qualified."}, {"name": "Amina H.", "headline": "Accounts Manager · 8 yrs · SME Practice · Manchester", "score": 84, "why": "End-to-end accounts management for 40+ SME clients. Xero certified advisor, QuickBooks expert. Brilliant with owner-managers, explains complex financials in plain language."}, {"name": "Tom F.", "headline": "Audit Senior · 6 yrs · Grant Thornton · Birmingham", "score": 78, "why": "ACA finalist. Strong on group audits, subsidiary consolidations and reporting to audit committees. Looking to transition from practice into industry."}, {"name": "Chinyere A.", "headline": "Bookkeeper · 7 yrs · Xero & Sage · Essex", "score": 72, "why": "Reliable, accurate and experienced across payroll, VAT returns and management accounts preparation. AATQB qualified. Excellent references from longstanding clients."}]}, {"id": "s_supply", "name": "Supply Chain / Procurement", "keywords": ["supply chain", "procurement", "purchasing", "logistics", "sourcing", "category manager", "buyer"], "candidates": [{"name": "Rachel K.", "headline": "Supply Chain Director · 15 yrs · FMCG · Unilever · London", "score": 95, "why": "Managed Unilever's European ambient supply network — £2.4bn spend. CIPS Fellow. Led supplier dual-sourcing strategy that reduced supply risk by 40%. Board-level presenter."}, {"name": "Ahmed M.", "headline": "Procurement Manager · 10 yrs · Energy · BP · Aberdeen", "score": 90, "why": "Category manager for subsea equipment — £180m annual spend. Expert at complex supplier negotiations and contract risk. MCIPS qualified. Strong sustainability sourcing credentials."}, {"name": "Laura P.", "headline": "Category Manager · 8 yrs · Retail · Tesco · Welwyn", "score": 86, "why": "Managed ambient grocery buying for a £300m category. Strong supplier relationship management and NPD launch experience. Data-driven, commercially sharp."}, {"name": "Kelvin O.", "headline": "Logistics Manager · 9 yrs · 3PL & DHL · Coventry", "score": 81, "why": "Managed 600-person warehouse operation and carrier network across 12 sites. Strong on WMS implementation and cost-per-unit KPI management. CILT qualified."}, {"name": "Priya J.", "headline": "Junior Buyer · 3 yrs · Fashion · ASOS · London", "score": 74, "why": "Strong trend analysis and supplier negotiation experience. CIPS studying. Ambitious — looking for category manager step up in a fast-paced buying environment."}]}, {"id": "s_risk", "name": "Risk & Compliance", "keywords": ["risk", "compliance", "risk manager", "compliance manager", "risk director", "head of compliance", "aml", "regulatory"], "candidates": [{"name": "Kweku A.", "headline": "Chief Risk Officer · 17 yrs · Financial Services · Lloyds · London", "score": 95, "why": "Held CRO accountability for Lloyds' Commercial Banking division — £9bn loan book. Extensive FCA/PRA engagement. Expert in ICAAP, stress testing and credit risk modelling."}, {"name": "Natasha B.", "headline": "Head of Compliance · 13 yrs · Asset Management · Legal & General · London", "score": 90, "why": "Led compliance function through SM&CR implementation. Deep COBS and MiFID II expertise. Highly regarded by FCA and internally as a pragmatic, business-enabling compliance leader."}, {"name": "Ibrahim S.", "headline": "AML Director · 11 yrs · Banking · Standard Chartered · London", "score": 86, "why": "Global AML programme lead. Oversaw derisking of correspondent banking portfolio. Deep financial crime, SARs and PEP/sanctions expertise. ICA International Diploma qualified."}, {"name": "Claire D.", "headline": "Risk Manager · 8 yrs · Insurance · Aviva · London", "score": 81, "why": "Solvency II reporting, ORSA and actuarial liaison experience. Strong on operational risk and scenario analysis. Part-qualified actuary. Clear and confident board presenter."}, {"name": "Yusuf H.", "headline": "Compliance Analyst · 5 yrs · FinTech · London", "score": 74, "why": "FCA regulatory horizon scanning and policy implementation experience in a fast-moving FinTech. Ambitious, analytically sharp. Ready for a compliance manager step-up."}]}, {"id": "s_retail", "name": "Retail Manager / Store Manager", "keywords": ["store manager", "retail manager", "branch manager", "shop manager", "area manager", "retail director"], "candidates": [{"name": "Sharon B.", "headline": "Regional Manager · 14 yrs · Marks & Spencer · London", "score": 94, "why": "Oversaw 18 M&S Simply Food stores, £120m combined turnover. Outstanding at developing store managers and embedding retail standards. Consistently top 5% regionally on NPS."}, {"name": "Dominic F.", "headline": "Store Manager · 10 yrs · Tesco Extra · Birmingham", "score": 89, "why": "Managed 450-person team and £45m turnover Tesco Extra. Reduced shrink by 30% and improved colleague engagement score to highest in district. Strong on community engagement."}, {"name": "Afia M.", "headline": "Area Manager · 11 yrs · Boots · Manchester", "score": 85, "why": "Managed 22 Boots pharmacies across Greater Manchester. Excellent on dispensing compliance and healthcare service delivery alongside commercial performance."}, {"name": "Lee P.", "headline": "Store Manager · 7 yrs · Sports Direct & JD Sports · Leeds", "score": 80, "why": "High-volume, high-footfall retail experience. Strong on visual merchandising, conversion and stock management. Track record of developing young talent into supervisory roles."}, {"name": "Chinara O.", "headline": "Deputy Manager · 5 yrs · Primark · London", "score": 73, "why": "Excellent floor operations and stock replenishment experience. Stepped in as acting manager for 4 months. Ready for her first Store Manager appointment."}]}, {"id": "s_cyber", "name": "Cybersecurity / Information Security", "keywords": ["cybersecurity", "information security", "ciso", "cyber", "security engineer", "security analyst", "penetration testing", "infosec"], "candidates": [{"name": "Marcus T.", "headline": "CISO · 16 yrs · FTSE 100 · BAE Systems & GCHQ · London", "score": 96, "why": "Former GCHQ analyst turned enterprise CISO. Led BAE's cyber transformation and ISO 27001 certification across 12 business units. CISSP, CISM. Board-level communicator."}, {"name": "Pooja V.", "headline": "Head of Security · 12 yrs · FinTech & Barclays · London", "score": 91, "why": "Built SOC capability and led Barclays' threat intelligence programme. Deep in SIEM, EDR and zero-trust architecture. SANS GIAC certified. Strong at translating cyber risk into business language."}, {"name": "Luca M.", "headline": "Security Architect · 10 yrs · Cloud & Azure · Vodafone · London", "score": 87, "why": "Designed secure cloud architecture for Vodafone's pan-European network. Azure Security Engineer certified. Expert in identity, PAM and network segmentation at scale."}, {"name": "Abena K.", "headline": "Penetration Tester · 7 yrs · NCSC accredited · London", "score": 82, "why": "CREST certified penetration tester. Conducted red team exercises for two FTSE 50 clients. Strong web app and infrastructure testing background. CEH and OSCP qualified."}, {"name": "Daniel R.", "headline": "SOC Analyst · 4 yrs · MSSP · London", "score": 75, "why": "Tier 2 analyst with incident response and threat hunting experience. Splunk and CrowdStrike certified. Looking for in-house security role to deepen ownership and specialisation."}]}, {"id": "s_strategy", "name": "Strategy Director / Head of Strategy", "keywords": ["strategy director", "head of strategy", "strategy manager", "chief strategy", "corporate strategy", "business development"], "candidates": [{"name": "Isabella N.", "headline": "Strategy Director · 14 yrs · McKinsey & Shell · London", "score": 95, "why": "7 years at McKinsey before joining Shell's group strategy team. Led Shell's low-carbon transition strategy, advising the ExCo. Expert in scenario planning, M&A thesis development and stakeholder alignment."}, {"name": "Kofi M.", "headline": "Head of Strategy · 11 yrs · FMCG · Reckitt · London", "score": 90, "why": "Owns Reckitt's 3-year strategic planning cycle. Deep portfolio strategy and market entry experience across emerging markets. MBA from INSEAD. Board-ready."}, {"name": "Alice T.", "headline": "Corporate Development Manager · 9 yrs · M&A · HSBC · London", "score": 86, "why": "Led 12 completed M&A transactions ranging from £50m to £800m. Strong financial modelling, diligence and integration planning experience. CFA charterholder."}, {"name": "Tarun S.", "headline": "Strategy Manager · 7 yrs · Consulting · BCG · London", "score": 81, "why": "Top-rated BCG consultant in financial services and healthcare verticals. Looking to transition in-house. Exceptional structurer and communicator. Strong at influencing without authority."}, {"name": "Nkechi O.", "headline": "Business Analyst (Strategy) · 5 yrs · Telecoms · BT · London", "score": 74, "why": "Strong on market analysis, competitive intelligence and investment case preparation. Ready for Strategy Manager step-up. Has presented to VP level on multiple occasions."}]}, {"id": "s_admin", "name": "EA / PA / Office Manager", "keywords": ["executive assistant", "ea", "pa", "personal assistant", "office manager", "administrator", "admin", "receptionist"], "candidates": [{"name": "Rebecca S.", "headline": "EA to CEO · 12 yrs · FTSE 100 · Vodafone & BP · London", "score": 93, "why": "Supported Group CEOs at both Vodafone and BP. Highly discreet, exceptionally organised. Expert board and investor event management. Fluent in French and Spanish."}, {"name": "Daniel F.", "headline": "Office Manager · 9 yrs · Professional Services · London", "score": 88, "why": "Ran a 250-person London office for a leading law firm. Managed facilities, suppliers and front-of-house. Calm under pressure, brilliant with people at all levels."}, {"name": "Nisha R.", "headline": "PA to CFO · 7 yrs · Financial Services · HSBC · London", "score": 84, "why": "Managed highly complex diary across 14 time zones, board packs and confidential investor communications. Calm, proactive and impeccably professional."}, {"name": "Oliver T.", "headline": "Team Administrator · 5 yrs · NHS · London", "score": 78, "why": "Organised, reliable and discreet. Strong with diary management, minute taking and document production. Ready to step into an EA role supporting a senior leader."}, {"name": "Fatima G.", "headline": "Receptionist & Administrator · 4 yrs · Retail Head Office · London", "score": 71, "why": "Warm, well-presented and efficient. Excellent first impression and visitor experience skills. Looking to grow into an office management or PA role."}]}, {"id": "s_civil", "name": "Civil / Structural Engineer", "keywords": ["civil engineer", "structural engineer", "structural", "civil", "site engineer", "chartered engineer"], "candidates": [{"name": "Hugh M.", "headline": "Structural Engineer · 14 yrs · Arup & Atkins · London", "score": 94, "why": "CEng MIStructE. Delivered structural design for major London mixed-use developments including two Crossrail stations. Expert in complex concrete and steel design. Strong BIM Level 2 skills."}, {"name": "Amara J.", "headline": "Civil Engineer · 11 yrs · Highways England & HS2 · Birmingham", "score": 89, "why": "Led earthworks and drainage design for 14km of HS2 enabling works. Strong NEC4 contract experience. CEng MICE. Excellent communicator with local authority stakeholders."}, {"name": "Kieran P.", "headline": "Site Engineer · 8 yrs · Balfour Beatty · Manchester", "score": 85, "why": "Hands-on delivery of bridge substructure works and retaining walls. Strong setting out, QA and subcontractor management. IEng MICE, working toward CEng."}, {"name": "Sunita K.", "headline": "Graduate Civil Engineer · 3 yrs · WSP · London", "score": 79, "why": "Progressing quickly through graduate scheme. Strong on drainage modelling and AutoCAD. ICE accredited. Clear ambition and ability — developing into a promising design engineer."}, {"name": "Emeka N.", "headline": "BIM Coordinator · 6 yrs · Mace · London", "score": 73, "why": "Revit and Navisworks specialist. Coordinated clash detection across M&E, structural and architectural models on a £200m office development. Ready to step into an engineering management role."}]}, {"id": "s_nurse", "name": "Registered Nurse / Clinical Lead", "keywords": ["nurse", "registered nurse", "clinical lead", "ward manager", "nursing", "rn", "band 6", "band 7", "healthcare"], "candidates": [{"name": "Grace O.", "headline": "Ward Manager · 14 yrs · NHS Acute · London", "score": 94, "why": "Band 7 ward manager leading 28-bed surgical ward at a major London NHS Trust. Exceptional CQC inspection outcomes. Strong clinical leadership, mentoring and workforce planning skills."}, {"name": "Rajan B.", "headline": "Clinical Lead · 11 yrs · ICU · Manchester Royal Infirmary", "score": 89, "why": "ICU Band 7. Led implementation of sepsis six protocol that reduced mortality by 14%. Postgraduate critical care diploma. Outstanding educator and clinical supervisor."}, {"name": "Chloe H.", "headline": "Registered Nurse · 7 yrs · Community Health · London", "score": 85, "why": "DN-qualified community nurse managing complex wound care caseload. Strong independent practitioner. Excellent patient-centred communication and family liaison skills."}, {"name": "Emeka O.", "headline": "Theatre Nurse · 9 yrs · Private & NHS · London", "score": 80, "why": "Scrub nurse specialising in orthopaedic and spinal surgery. Experienced across both NHS and private settings. Calm, precise and well-regarded by surgical teams."}, {"name": "Fatima S.", "headline": "Staff Nurse · 4 yrs · A&E · Sheffield Teaching Hospitals", "score": 73, "why": "Energetic, resilient A&E nurse with triage qualification. Excellent under pressure. Keen to develop into a Band 6 specialist or senior nurse role."}]}, {"id": "s_teacher", "name": "Teacher / Head of Department", "keywords": ["teacher", "head of department", "hod", "secondary teacher", "primary teacher", "sen", "senco", "headteacher", "deputy head", "school"], "candidates": [{"name": "Michael O.", "headline": "Head of Maths · 13 yrs · Outstanding Ofsted School · London", "score": 93, "why": "Led Maths department from Requires Improvement to Outstanding in 3 years. Exceptional at data-driven teaching and intervention. NPQ Headship qualified. Ready for Deputy Head step."}, {"name": "Amara W.", "headline": "English Teacher · 9 yrs · Secondary · Manchester", "score": 88, "why": "GCSE results consistently above national average. Strong on literacy across the curriculum strategies. Mentors NQTs and has led whole-school CPD sessions on reading for pleasure."}, {"name": "Priti S.", "headline": "SENCo · 11 yrs · Primary · West Midlands", "score": 84, "why": "NASENCo qualified. Reduced EHC plan backlog from 18 to 4 months in her school. Expert in SEMH, autism and communication needs. Excellent parent and multi-agency communicator."}, {"name": "Ben T.", "headline": "Science Teacher · 7 yrs · Secondary · Yorkshire", "score": 79, "why": "Chemistry specialist. Strong A-level results — 85% A/B at last inspection. Runs a popular after-school STEM club. Early-career but highly effective classroom practitioner."}, {"name": "Chidi N.", "headline": "Primary Teacher · 5 yrs · KS2 · London", "score": 72, "why": "Enthusiastic, creative teacher with strong phonics and maths mastery background. Good early data — pupil progress in top quartile for two consecutive years."}]}, {"id": "s_construction", "name": "Construction Manager / Quantity Surveyor", "keywords": ["construction manager", "site manager", "quantity surveyor", "qs", "site agent", "contracts manager", "surveyor", "construction"], "candidates": [{"name": "John B.", "headline": "Senior Site Manager · 16 yrs · Balfour Beatty & Laing O'Rourke · London", "score": 94, "why": "Delivered residential and commercial schemes up to £80m. SMSTS, CSCS Black Card, First Aid. Excellent safety record — zero LTIs across 8 consecutive projects."}, {"name": "Oluchi E.", "headline": "Quantity Surveyor · 10 yrs · Mace & Turner & Townsend · London", "score": 89, "why": "MRICS qualified. Led cost management on a £220m life sciences fit-out. Expert in NEC3/4 and JCT contracts. Strong final account negotiation track record."}, {"name": "Sam P.", "headline": "Contracts Manager · 12 yrs · Social Housing · Lovell · Birmingham", "score": 85, "why": "Managed pipeline of £45m refurbishment and newbuild contracts annually. Deep housing association client relationship skills. Strong on defects, DLP and resident liaison."}, {"name": "Maria G.", "headline": "Assistant QS · 4 yrs · Kier · London", "score": 79, "why": "RICS APC in progress. Strong with measurement, subcontract packages and application for payment processing. Ambitious and picking up CVR management responsibilities."}, {"name": "Tariq B.", "headline": "Site Engineer · 6 yrs · Highways · Amey · Birmingham", "score": 73, "why": "Strong setting-out, QA and traffic management experience. HND Civil Engineering. Looking to move into a site manager role with the right contractor."}]}, {"id": "s_hospitality", "name": "Hotel / Hospitality Manager", "keywords": ["hotel manager", "hospitality", "restaurant manager", "f&b", "food and beverage", "gm", "general manager", "front of house"], "candidates": [{"name": "Sofia R.", "headline": "General Manager · 14 yrs · Marriott & Hilton · London", "score": 93, "why": "GM of a 4-star, 280-room London hotel — TripAdvisor #12 in city. Strong on rooms revenue, F&B P&L and team retention. Opened two new hotel properties from pre-opening stage."}, {"name": "James K.", "headline": "F&B Director · 11 yrs · Whitbread & Accor · London", "score": 88, "why": "Led food and beverage strategy across 14 branded restaurants. Expert in menu engineering, COGS management and supplier negotiation. Increased F&B EBITDA by 28% over 3 years."}, {"name": "Abiola F.", "headline": "Restaurant Manager · 8 yrs · Gordon Ramsay Restaurants · London", "score": 85, "why": "Front of house operations manager at a 2-AA-rosette restaurant. Outstanding service standards, high staff retention in a demanding environment. Strong cellar and wine knowledge."}, {"name": "Lucy P.", "headline": "Operations Manager · 7 yrs · Travelodge · Midlands", "score": 79, "why": "Multi-site operations across 6 Travelodge properties. Excellent on cost control, housekeeping standards and guest satisfaction scores. Promoted twice in 3 years."}, {"name": "Emre T.", "headline": "Duty Manager · 5 yrs · Premier Inn · Manchester", "score": 72, "why": "Strong front desk, reservations and guest resolution experience. Developing revenue management skills. Ready for first Hotel Manager role in a leaner, independent property."}]}, {"id": "s_creative", "name": "Creative Director / Designer", "keywords": ["creative director", "designer", "graphic designer", "ux designer", "art director", "brand designer", "ui designer", "head of design"], "candidates": [{"name": "Yemi S.", "headline": "Creative Director · 14 yrs · BBH & Ogilvy · London", "score": 95, "why": "Campaign credits include Barclays, Diageo and British Airways. D&AD Pencil winner. Expert at integrating brand strategy with award-winning execution across all media channels."}, {"name": "Lara C.", "headline": "Head of Design · 11 yrs · FinTech & Monzo · London", "score": 90, "why": "Built Monzo's in-house design team from 3 to 22. Owns brand, product and motion design. Expert at scaling design systems. Strong on research, accessibility and inclusive design."}, {"name": "Nnamdi A.", "headline": "UX Designer · 8 yrs · Retail & John Lewis · London", "score": 86, "why": "Led UX redesign of John Lewis's checkout flow — increased conversion by 18%. Deep expertise in user research, Figma prototyping and usability testing. Strong collaborator with engineering teams."}, {"name": "Harriet M.", "headline": "Brand Designer · 6 yrs · Agency · London", "score": 81, "why": "Strong identity, packaging and digital design portfolio across FMCG and tech brands. Proficient in Adobe Creative Suite and Figma. Ready to step into an in-house senior designer role."}, {"name": "Jae-won K.", "headline": "UI Designer · 4 yrs · App Development · London", "score": 74, "why": "Mobile-first UI design with a strong eye for typography and interaction design. Published apps in App Store with strong user ratings. Keen to grow into a product design leadership role."}]}, {"id": "s_investment", "name": "Investment Banking / Private Equity", "keywords": ["investment banking", "private equity", "pe", "m&a analyst", "associate", "deal", "fund", "asset management", "investment analyst", "ib"], "candidates": [{"name": "Charlotte W.", "headline": "VP · Investment Banking · Goldman Sachs · London", "score": 96, "why": "EMEA TMT coverage at Goldman. Executed 9 M&A transactions and 4 ECM mandates. Oxford PPE, MBA from Wharton. Strong modeller and client relationship manager. Seeking buy-side move."}, {"name": "Kemi A.", "headline": "Investment Manager · PE · Bridgepoint · London", "score": 91, "why": "3 exits and 5 active portfolio companies across healthcare and B2B services. Origination, diligence, 100-day planning and exit execution experience. CFA charterholder."}, {"name": "Hugo L.", "headline": "Associate · M&A · Rothschild & Co · London", "score": 87, "why": "Strong execution experience on mid-market sellside mandates. Exceptional financial modelling and information memorandum writing. LBS MBA. Looking for Principal or VP step."}, {"name": "Zainab M.", "headline": "Investment Analyst · Asset Management · Legal & General · London", "score": 82, "why": "Equity research analyst covering UK mid-cap consumer. CFA Level 3 passed. Strong on fundamental analysis, earnings models and ESG integration frameworks."}, {"name": "Sam T.", "headline": "Analyst · Venture Capital · London", "score": 75, "why": "Early stage VC analyst with deal sourcing and initial screening experience across fintech and deeptech. Strong at founder relationship building. Oxford Maths, Imperial MSc."}]}, {"id": "s_sustainability", "name": "Sustainability / ESG Director", "keywords": ["sustainability", "esg", "environment", "net zero", "climate", "csr", "corporate responsibility", "sustainability manager"], "candidates": [{"name": "Amara P.", "headline": "Chief Sustainability Officer · 14 yrs · BP & Shell · London", "score": 95, "why": "Architect of Shell's net zero roadmap for UK operations. Deep Scope 1, 2 and 3 emissions expertise. TCFD reporting specialist. Board-level ESG communicator with investor relations experience."}, {"name": "Declan F.", "headline": "Head of ESG · 11 yrs · Asset Management · Schroders · London", "score": 90, "why": "Leads ESG integration across £85bn AUM. TCFD, SFDR and UNPRI reporting expert. Strong on active stewardship and voting policy. Recognised by PRI as sector leader."}, {"name": "Adaeze O.", "headline": "Sustainability Manager · 8 yrs · Retail · Marks & Spencer · London", "score": 86, "why": "Owns Plan A carbon reporting and supplier engagement programme. Deep in Scope 3, supply chain deforestation and packaging commitments. Strong at stakeholder communication and NGO engagement."}, {"name": "Tom R.", "headline": "Environmental Manager · 9 yrs · Manufacturing · Rolls-Royce · Derby", "score": 81, "why": "ISO 14001 lead auditor. Delivered 35% reduction in site energy intensity. EIA coordination experience. Passionate advocate for circular economy principles in industrial operations."}, {"name": "Leila N.", "headline": "ESG Analyst · 4 yrs · Consulting · EY · London", "score": 74, "why": "TCFD gap analysis and materiality assessment experience across financial services and energy clients. Strong on data collection, GHG accounting and assurance readiness."}]}, {"id": "s_pr", "name": "PR / Communications Director", "keywords": ["pr", "public relations", "communications director", "head of communications", "corporate comms", "media relations", "comms manager"], "candidates": [{"name": "Serena B.", "headline": "Director of Communications · 15 yrs · FTSE 100 · BT & Aviva · London", "score": 94, "why": "Led all internal and external comms through BT's £12.5bn EE acquisition. Expert crisis communicator. Strong media contacts across national broadcast and print. Board advisor on reputation."}, {"name": "Theo A.", "headline": "Head of PR · 12 yrs · Consumer · Diageo & Burberry · London", "score": 89, "why": "Luxury and premium brand communications specialist. Strong trade, lifestyle and international media relationships. Led comms for Burberry's B Corp certification — covered in 200+ outlets."}, {"name": "Chioma O.", "headline": "Corporate Affairs Manager · 9 yrs · Energy · National Grid · London", "score": 85, "why": "Government relations, planning inquiry and community engagement experience. Expert at navigating hostile public environments. Strong drafter and spokesperson trainer."}, {"name": "Nick S.", "headline": "Internal Comms Lead · 8 yrs · FMCG · Unilever · London", "score": 80, "why": "Built internal comms capability for a 10,000-person UK workforce. Strong on leadership communications, town halls and intranet strategy. Excellent writer and video content producer."}, {"name": "Blessing A.", "headline": "PR Executive · 4 yrs · Agency · London", "score": 73, "why": "Consumer and B2B PR experience across tech and lifestyle brands. Strong media list builder and media trainer. Ready for in-house comms manager step up."}]}, {"id": "s_property", "name": "Property / Real Estate Manager", "keywords": ["property manager", "real estate", "asset manager", "facilities", "facilities manager", "estate manager", "property director", "surveyor"], "candidates": [{"name": "Joanna P.", "headline": "Head of Property · 15 yrs · Retail · Kingfisher & Hammerson · London", "score": 94, "why": "Managed £1.4bn UK retail property portfolio. Expert in lease negotiations, dilapidations and estate rationalisation. MRICS qualified. Strong landlord and local authority relationships."}, {"name": "Olu A.", "headline": "Asset Manager · 11 yrs · Commercial Property · British Land · London", "score": 89, "why": "Managed mixed-use city centre assets — offices, retail and leisure. Strong on rent reviews, tenant retention and ESG-aligned refurbishment planning. RICS qualified."}, {"name": "Emma S.", "headline": "Facilities Director · 13 yrs · CBRE & Mitie · London", "score": 85, "why": "Led integrated FM contracts across 3.2m sq ft of managed workspace. Deep TFM, hard and soft services experience. BIFM qualified. Strong P&L and client retention track record."}, {"name": "Ade L.", "headline": "Property Manager · 8 yrs · Residential · Grainger · London", "score": 80, "why": "Portfolio of 450 residential units. Strong on AST compliance, disrepair management and service charge accounting. ARLA PropertyMark qualified."}, {"name": "Caitlin R.", "headline": "Graduate Surveyor · 3 yrs · JLL · London", "score": 73, "why": "APC in progress — due to qualify next cycle. Strong commercial property agency background and valuation fundamentals. Ambitious, client-facing and well-regarded by mentors."}]}],
+  leads: []
+};
+
+let state = { activeScenarioId: '', scenarios: [] };
+let editingId = null;
+let lastBrief = '';
+
+// ============ INIT ============
+async function init() {
+  const stored = await loadState();
+  state = stored || structuredClone(SEED);
+  if (!stored) await saveState();
+  renderAdmin();
+  updateScenarioIndicator();
+  showAIIndicator();
+}
+
+// ============ VIEW SWITCHING ============
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const idMap = {
+    brief: 'screen-brief',
+    loading: 'screen-loading',
+    results: 'screen-results',
+    fallback: 'screen-fallback',
+    admin: 'admin-view'
+  };
+  document.getElementById(idMap[name]).classList.add('active');
+  document.getElementById('adminToggle').textContent = name === 'admin' ? 'Back to app' : 'Admin';
+  if (name === 'brief') {
+    document.getElementById('briefInput').value = '';
+    document.getElementById('errorNotice').style.display = 'none';
+    document.getElementById('contactSection').classList.remove('visible');
+    document.getElementById('contactForm').style.display = '';
+    document.getElementById('contactConfirm').classList.remove('visible');
+    document.getElementById('cf-name').value = '';
+    document.getElementById('cf-company').value = '';
+    document.getElementById('cf-email').value = '';
+    document.getElementById('cf-phone').value = '';
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function toggleAdmin() {
+  const isAdmin = document.getElementById('admin-view').classList.contains('active');
+  showView(isAdmin ? 'brief' : 'admin');
+}
+
+function showAIIndicator() {
+  document.getElementById('aiIndicator').style.display = 'inline-block';
+}
+
+// ============ CLAUDE AI CALL ============
+async function callClaudeAPI(brief) {
+  const response = await fetch("/api/ai", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1000,
+      system: `You are a recruitment matching AI for TalentKnight. When given a job brief, generate 5 realistic candidate profiles that match the role.
+
+Return ONLY a valid JSON object in this exact format — no other text, no markdown, no preamble:
+{
+  "candidates": [
+    {
+      "name": "First L.",
+      "headline": "Job Title · X yrs · Key Skills · Location",
+      "score": 95,
+      "why": "2-3 sentences explaining specifically why this person fits the brief."
+    }
+  ]
+}
+
+Rules:
+- Exactly 5 candidates
+- Names: first name + last initial only (e.g. "Sarah M.", "James T.")
+- Scores: range from 68 to 97, listed highest first
+- Headline format: "Role Title · Years experience · Key skills · Location"
+- If a location is mentioned in the brief, candidates should be from that area or nearby
+- Mix seniority: lead with the strongest match, include one mid-level, end with a stretch or junior option
+- Why text: specific and confident — reference actual details from the brief
+- Make candidates feel real and diverse in background, gender, and experience level
+- For UK locations: use realistic UK place names and salary expectations in GBP`,
+      messages: [
+        { role: "user", content: `Job brief: ${brief}` }
+      ]
+    })
+  });
+
+  if (!response.ok) throw new Error(`API error: ${response.status}`);
+
+  const data = await response.json();
+  const text = data.content.map(b => b.text || '').join('');
+  const clean = text.replace(/```json|```/g, '').trim();
+  const parsed = JSON.parse(clean);
+
+  if (!parsed.candidates || !Array.isArray(parsed.candidates)) {
+    throw new Error('Invalid response structure');
+  }
+
+  return parsed.candidates;
+}
+
+// ============ CLIENT FLOW ============
+async function submitBrief() {
+  const brief = document.getElementById('briefInput').value.trim();
+  if (!brief) { document.getElementById('briefInput').focus(); return; }
+  lastBrief = brief;
+
+  showView('loading');
+  setStage(0, 'active');
+
+  // If admin has locked a specific scenario, use it directly (override mode)
+  if (state.activeScenarioId) {
+    await sleep(1400);
+    setStage(0, 'done'); setStage(1, 'active');
+    await sleep(1800);
+    setStage(1, 'done'); setStage(2, 'active');
+    await sleep(1400);
+    setStage(2, 'done');
+    await sleep(500);
+    const active = state.scenarios.find(s => s.id === state.activeScenarioId);
+    if (active) {
+      renderCandidates(active.candidates, false);
+      showView('results');
+    } else {
+      showView('fallback');
+    }
+    [0,1,2].forEach(i => setStage(i, ''));
+    return;
+  }
+
+  // Start Claude AI call immediately in the background
+  const apiPromise = callClaudeAPI(brief);
+
+  // Animate loading stages while Claude thinks
+  await sleep(1200);
+  setStage(0, 'done'); setStage(1, 'active');
+  await sleep(1000);
+  setStage(1, 'done'); setStage(2, 'active');
+
+  try {
+    // Wait for Claude to finish
+    const candidates = await apiPromise;
+    setStage(2, 'done');
+    await sleep(400);
+
+    if (candidates && candidates.length) {
+      renderCandidates(candidates, true);
+      showView('results');
+    } else {
+      showView('fallback');
+    }
+  } catch(e) {
+    console.warn('Claude API unavailable, falling back to scenarios:', e.message);
+
+    // Silently fall back to keyword-matched scenarios
+    const match = findKeywordMatch(brief);
+    setStage(2, 'done');
+    await sleep(400);
+
+    if (match) {
+      document.getElementById('errorNotice').style.display = 'block';
+      renderCandidates(match.candidates, false);
+      showView('results');
+    } else {
+      showView('fallback');
+    }
+  }
+
+  [0,1,2].forEach(i => setStage(i, ''));
+}
+
+function setStage(i, cls) {
+  const li = document.querySelector(`#loaderStages li[data-stage="${i}"]`);
+  li.classList.remove('active', 'done');
+  if (cls) li.classList.add(cls);
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ============ KEYWORD FALLBACK MATCHING ============
+function findKeywordMatch(brief) {
+  const text = brief.toLowerCase();
+  const scored = state.scenarios.map(s => ({
+    scenario: s,
+    score: s.keywords.reduce((n, k) => n + (text.includes(k.toLowerCase()) ? 1 : 0), 0)
+  })).filter(x => x.score > 0).sort((a,b) => b.score - a.score);
+
+  return scored.length ? scored[0].scenario : null;
+}
+
+// ============ RENDERING ============
+function renderCandidates(candidates, isAI) {
+  const grid = document.getElementById('candidatesGrid');
+  grid.innerHTML = '';
+
+  const sorted = [...candidates].sort((a, b) => b.score - a.score);
+  document.getElementById('resultsCount').textContent = sorted.length;
+
+  const subtitle = document.getElementById('resultsSubtitle');
+  if (isAI) {
+    subtitle.innerHTML = 'Ranked by fit score. Click anyone to register interest. <span class="ai-badge">Generated by AI</span>';
+  } else {
+    subtitle.innerHTML = 'Ranked by fit score. Click anyone to register interest.';
+  }
+
+  sorted.forEach((c) => {
+    const initials = c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+    const fitClass = c.score >= 85 ? '' : c.score >= 75 ? 'sage' : 'amber';
+
+    const el = document.createElement('div');
+    el.className = 'candidate';
+    el.innerHTML = `
+      <div class="avatar">${initials}</div>
+      <div class="candidate-body">
+        <div class="candidate-name">${escapeHtml(c.name)}</div>
+        <div class="candidate-headline">${escapeHtml(c.headline)}</div>
+        <div class="candidate-why">${escapeHtml(c.why)}</div>
+      </div>
+      <div class="candidate-right">
+        <div class="fit-score">
+          <div class="fit-score-label">Fit score</div>
+          <div class="fit-score-value">${c.score}<span class="max">/100</span></div>
+          <div class="fit-bar"><div class="fit-bar-fill ${fitClass}" data-fill="${c.score}"></div></div>
+        </div>
+        <div class="candidate-actions">
+          <button class="btn-pass" onclick="passCandidate(this)">Not a fit</button>
+          <button class="btn-interest" onclick="showInterest(this)">I'm interested</button>
+        </div>
+      </div>
+      <div class="interest-confirm">Noted — we'll reach out to ${escapeHtml(c.name)} on your behalf and be in touch within 24 hours.</div>
+    `;
+    grid.appendChild(el);
+  });
+
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      document.querySelectorAll('.fit-bar-fill').forEach(bar => {
+        bar.style.width = bar.dataset.fill + '%';
+      });
+      document.getElementById('contactSection').classList.add('visible');
+    }, 300);
+  });
+}
+
+function showInterest(btn) {
+  btn.closest('.candidate').classList.add('interested');
+}
+
+function passCandidate(btn) {
+  btn.closest('.candidate').classList.add('passed');
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ============ CONTACT FORM ============
+async function submitContact(e) {
+  e.preventDefault();
+  const name = document.getElementById('cf-name').value.trim();
+  const company = document.getElementById('cf-company').value.trim();
+  const email = document.getElementById('cf-email').value.trim();
+  const phone = document.getElementById('cf-phone').value.trim();
+
+  const lead = {
+    id: 'l' + Date.now(),
+    name, company, email, phone,
+    brief: lastBrief,
+    timestamp: new Date().toISOString()
+  };
+
+  state.leads = state.leads || [];
+  state.leads.push(lead);
+  await saveState();
+
+  document.getElementById('contactForm').style.display = 'none';
+  document.getElementById('contactConfirm').classList.add('visible');
+  document.getElementById('confirmEmail').textContent = email;
+}
+
+// ============ LEADS ============
+function renderLeads() {
+  const container = document.getElementById('leadsList');
+  if (!container) return;
+  const leads = state.leads || [];
+
+  if (!leads.length) {
+    container.innerHTML = '<p class="leads-empty">No leads yet. When someone submits their details during the demo, they\'ll appear here.</p>';
+    return;
+  }
+
+  container.innerHTML = '';
+  [...leads].reverse().forEach(lead => {
+    const el = document.createElement('div');
+    el.className = 'lead-card';
+    const date = new Date(lead.timestamp).toLocaleDateString('en-GB', {
+      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+    el.innerHTML = `
+      <div class="lead-head">
+        <div>
+          <div class="lead-name">${escapeHtml(lead.name)}${lead.company ? ' · ' + escapeHtml(lead.company) : ''}</div>
+          <div class="lead-timestamp">${date}</div>
+        </div>
+        <a href="mailto:${escapeHtml(lead.email)}?subject=Your TalentKnight shortlist&body=Hi ${escapeHtml(lead.name)}," class="btn-small">Email ↗</a>
+      </div>
+      <div class="lead-contact">
+        <span class="lead-email">${escapeHtml(lead.email)}</span>
+        ${lead.phone ? `<span>${escapeHtml(lead.phone)}</span>` : ''}
+      </div>
+      ${lead.brief ? `<div class="lead-brief">"${escapeHtml(lead.brief.slice(0, 120))}${lead.brief.length > 120 ? '…' : ''}"</div>` : ''}
+    `;
+    container.appendChild(el);
+  });
+
+  const clearBtn = document.createElement('button');
+  clearBtn.className = 'btn-small danger';
+  clearBtn.style.marginTop = '16px';
+  clearBtn.textContent = 'Clear all leads';
+  clearBtn.onclick = clearLeads;
+  container.appendChild(clearBtn);
+}
+
+async function clearLeads() {
+  if (!confirm('Clear all leads? This cannot be undone.')) return;
+  state.leads = [];
+  await saveState();
+  renderLeads();
+}
+
+// ============ ADMIN ============
+function renderAdmin() {
+  renderLeads();
+  renderScenariosList();
+  renderActiveScenarioSelect();
+}
+
+function renderScenariosList() {
+  const container = document.getElementById('scenariosList');
+  container.innerHTML = state.scenarios.length
+    ? ''
+    : '<p style="color:var(--text-dim);font-style:italic;padding:12px 0">No saved scenarios yet. The AI handles everything automatically.</p>';
+  state.scenarios.forEach(s => container.appendChild(scenarioCardEl(s)));
+}
+
+function scenarioCardEl(s) {
+  const el = document.createElement('div');
+  el.className = 'scenario-card';
+  el.innerHTML = `
+    <div class="scenario-card-head">
+      <div>
+        <div class="scenario-card-title">${escapeHtml(s.name)}</div>
+        <div class="scenario-card-meta">${s.candidates.length} candidates · ${s.keywords.length} keywords</div>
+      </div>
+      <div class="scenario-card-actions">
+        <button class="btn-small" onclick="editScenario('${s.id}')">Edit</button>
+        <button class="btn-small danger" onclick="deleteScenario('${s.id}')">Delete</button>
+      </div>
+    </div>
+    <div class="keywords">
+      ${s.keywords.map(k => `<span class="keyword">${escapeHtml(k)}</span>`).join('')}
+    </div>
+  `;
+  return el;
+}
+
+function renderActiveScenarioSelect() {
+  const sel = document.getElementById('activeScenarioSelect');
+  sel.innerHTML = '<option value="">— No scenario locked (AI generates live results) —</option>';
+  state.scenarios.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = s.name;
+    if (s.id === state.activeScenarioId) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function updateScenarioIndicator() {
+  const ind = document.getElementById('scenarioIndicator');
+  const text = document.getElementById('scenarioIndicatorText');
+  const aiInd = document.getElementById('aiIndicator');
+  if (state.activeScenarioId) {
+    const s = state.scenarios.find(x => x.id === state.activeScenarioId);
+    if (s) {
+      ind.style.display = 'inline-block';
+      aiInd.style.display = 'none';
+      text.textContent = s.name + ' locked';
+      return;
+    }
+  }
+  ind.style.display = 'none';
+  aiInd.style.display = 'inline-block';
+}
+
+async function setActiveScenario(id) {
+  state.activeScenarioId = id;
+  await saveState();
+  updateScenarioIndicator();
+}
+
+function deleteScenario(id) {
+  if (!confirm('Delete this scenario? This cannot be undone.')) return;
+  state.scenarios = state.scenarios.filter(s => s.id !== id);
+  if (state.activeScenarioId === id) state.activeScenarioId = '';
+  saveState();
+  renderAdmin();
+  updateScenarioIndicator();
+}
+
+// ============ SCENARIO EDITOR ============
+function openScenarioEditor(id = null) {
+  editingId = id;
+  document.getElementById('editorTitle').textContent = id ? 'Edit scenario' : 'New scenario';
+  document.getElementById('editorDesc').textContent = 'Saved scenarios can be locked before a meeting to override the live AI.';
+
+  let scenario;
+  if (id) {
+    scenario = state.scenarios.find(s => s.id === id);
+  } else {
+    scenario = { name: '', keywords: [], candidates: [] };
+  }
+
+  document.getElementById('fldName').value = scenario.name;
+  document.getElementById('fldKeywords').value = scenario.keywords.join(', ');
+
+  const editor = document.getElementById('candidatesEditor');
+  editor.innerHTML = '';
+  const list = scenario.candidates.length
+    ? scenario.candidates
+    : [blankCandidate(), blankCandidate(), blankCandidate(), blankCandidate(), blankCandidate()];
+  list.forEach(c => editor.appendChild(candidateEditorEl(c)));
+  relabelCandidates();
+
+  document.getElementById('editorModal').classList.add('active');
+}
+
+function editScenario(id) { openScenarioEditor(id); }
+
+function closeEditor() {
+  document.getElementById('editorModal').classList.remove('active');
+  editingId = null;
+}
+
+function blankCandidate() { return { name: '', headline: '', score: 85, why: '' }; }
+
+function candidateEditorEl(c) {
+  const el = document.createElement('div');
+  el.className = 'candidate-editor';
+  el.innerHTML = `
+    <div class="candidate-editor-head">
+      <div class="candidate-editor-title">Candidate</div>
+      <button class="remove-candidate" onclick="this.closest('.candidate-editor').remove(); relabelCandidates();">Remove</button>
+    </div>
+    <div class="cand-grid">
+      <input type="text" class="cf-name" placeholder="Name (e.g. Sarah M.)" value="${escapeHtml(c.name)}">
+      <input type="text" class="cf-headline" placeholder="Headline (role · years · skills · location)" value="${escapeHtml(c.headline)}">
+      <input type="number" class="cf-score" min="0" max="100" placeholder="Fit /100" value="${c.score}">
+    </div>
+    <textarea class="cf-why" placeholder="Why this match — 2-3 sentences explaining the fit">${escapeHtml(c.why)}</textarea>
+  `;
+  return el;
+}
+
+function addCandidateEditor() {
+  document.getElementById('candidatesEditor').appendChild(candidateEditorEl(blankCandidate()));
+  relabelCandidates();
+}
+
+function relabelCandidates() {
+  document.querySelectorAll('#candidatesEditor .candidate-editor-title').forEach((el, i) => {
+    el.textContent = `Candidate ${i + 1}`;
+  });
+}
+
+async function saveScenario() {
+  const name = document.getElementById('fldName').value.trim();
+  const keywords = document.getElementById('fldKeywords').value.split(',').map(s => s.trim()).filter(Boolean);
+
+  if (!name) { alert('Scenario needs a name.'); return; }
+
+  const cards = Array.from(document.querySelectorAll('#candidatesEditor .candidate-editor'));
+  const candidates = cards.map(el => ({
+    name: el.querySelector('.cf-name').value.trim(),
+    headline: el.querySelector('.cf-headline').value.trim(),
+    score: Math.max(0, Math.min(100, parseInt(el.querySelector('.cf-score').value) || 0)),
+    why: el.querySelector('.cf-why').value.trim()
+  })).filter(c => c.name);
+
+  if (!candidates.length) { alert('Add at least one candidate.'); return; }
+
+  const payload = {
+    id: editingId || 's' + Date.now(),
+    name,
+    keywords: keywords.length ? keywords : [],
+    candidates
+  };
+
+  if (editingId) {
+    const idx = state.scenarios.findIndex(s => s.id === editingId);
+    state.scenarios[idx] = payload;
+  } else {
+    state.scenarios.push(payload);
+  }
+
+  await saveState();
+  renderAdmin();
+  updateScenarioIndicator();
+  closeEditor();
+}
+
+// ============ KEYBOARD ============
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    if (document.getElementById('screen-brief').classList.contains('active')) submitBrief();
+  }
+  if (e.key === 'Escape') {
+    if (document.getElementById('editorModal').classList.contains('active')) closeEditor();
+  }
+});
+
+document.getElementById('editorModal').addEventListener('click', (e) => {
+  if (e.target.id === 'editorModal') closeEditor();
+});
+
+// ============ BOOT ============
+init();
+</script>
+</body>
+</html>
