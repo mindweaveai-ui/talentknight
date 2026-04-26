@@ -607,11 +607,10 @@ footer {
 .pricing-card.featured {
   background: var(--surface-raised);
   border-color: var(--border-strong);
-  transform: translateY(-8px);
   box-shadow: 0 32px 64px rgba(0,0,0,0.5), 0 0 0 1px rgba(201,169,97,0.2);
 }
 .pricing-card.featured:hover {
-  transform: translateY(-11px);
+  transform: translateY(-3px);
 }
 .pricing-card.featured::before {
   content: "";
@@ -657,12 +656,6 @@ footer {
   display: inline-block;
   color: var(--gold);
   font-weight: 400;
-}
-.pricing-price-range {
-  font-family: var(--serif);
-  font-size: 22px;
-  color: var(--text-muted);
-  margin-bottom: 4px;
 }
 .pricing-cadence {
   font-size: 12px;
@@ -711,9 +704,7 @@ footer {
   background: none;
   opacity: 0.4;
 }
-.pricing-features li.dim {
-  opacity: 0.45;
-}
+.pricing-features li.dim { opacity: 0.45; }
 .pricing-cta {
   display: block;
   text-align: center;
@@ -730,10 +721,7 @@ footer {
   text-decoration: none;
   transition: all 0.25s;
 }
-.pricing-cta:hover {
-  border-color: var(--gold);
-  color: var(--gold);
-}
+.pricing-cta:hover { border-color: var(--gold); color: var(--gold); }
 .pricing-cta.featured-cta {
   background: var(--gold);
   border-color: var(--gold);
@@ -765,21 +753,15 @@ footer {
   flex-shrink: 0;
 }
 .pricing-note-icon svg {
-  width: 16px;
-  height: 16px;
-  stroke: var(--gold);
-  fill: none;
-  stroke-width: 1.5;
+  width: 16px; height: 16px;
+  stroke: var(--gold); fill: none; stroke-width: 1.5;
 }
 .pricing-note-text {
   font-size: 14px;
   color: var(--text-muted);
   line-height: 1.7;
 }
-.pricing-note-text strong {
-  color: var(--gold);
-  font-weight: 600;
-}
+.pricing-note-text strong { color: var(--gold); font-weight: 600; }
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 900px) {
@@ -801,8 +783,6 @@ footer {
   .audience-grid { grid-template-columns: 1fr; }
   .pricing-section { padding: 80px 24px; }
   .pricing-grid { grid-template-columns: 1fr; }
-  .pricing-card.featured { transform: none; }
-  .pricing-card.featured:hover { transform: translateY(-3px); }
   .contact-grid { grid-template-columns: 1fr; }
   .step { padding: 36px 28px; }
   .feature { padding: 32px 28px; }
@@ -822,6 +802,7 @@ footer {
     <a href="#for-who" class="nav-link">Who it's for</a>
     <a href="#pricing" class="nav-link">Pricing</a>
     <a href="#contact" class="nav-link">Contact</a>
+    <a href="client.html" class="nav-link" style="color:var(--gold)">Client login</a>
   </div>
   <a href="demo.html" class="nav-cta">See it in action</a>
 </nav>
@@ -977,9 +958,7 @@ footer {
     <div class="section-eyebrow reveal">Pricing</div>
     <h2 class="section-h2 reveal reveal-delay-1">Simple pricing,<br><em>serious results.</em></h2>
     <p class="section-sub reveal reveal-delay-2">Three tiers built for where you are right now — whether you're testing the water or scaling across a portfolio.</p>
-
     <div class="pricing-grid">
-
       <!-- STARTER -->
       <div class="pricing-card reveal">
         <span class="pricing-tier">Starter</span>
@@ -999,7 +978,6 @@ footer {
         </ul>
         <a href="#contact" class="pricing-cta">Get started</a>
       </div>
-
       <!-- PROFESSIONAL -->
       <div class="pricing-card featured reveal reveal-delay-1">
         <div class="pricing-badge">Most popular</div>
@@ -1020,7 +998,6 @@ footer {
         </ul>
         <a href="#contact" class="pricing-cta featured-cta">Book a demo</a>
       </div>
-
       <!-- ENTERPRISE -->
       <div class="pricing-card reveal reveal-delay-2">
         <span class="pricing-tier">Enterprise</span>
@@ -1040,10 +1017,7 @@ footer {
         </ul>
         <a href="#contact" class="pricing-cta">Talk to us</a>
       </div>
-
     </div>
-
-    <!-- Early adopter note -->
     <div class="pricing-note reveal">
       <div class="pricing-note-icon">
         <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -1052,7 +1026,6 @@ footer {
         <strong>Early adopter offer — setup fees waived.</strong> We're offering the first 5–10 clients free onboarding (normally £500–£1,000) in exchange for a testimonial once you've seen results. Prices shown exclude VAT. All plans billed monthly with no long-term contract required.
       </p>
     </div>
-
   </div>
 </section>
 
