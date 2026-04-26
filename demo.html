@@ -1130,6 +1130,109 @@
   }
   .btn-ghost:hover { border-color: var(--text-muted); color: var(--text); }
 
+  /* ============ CV UPLOAD ============ */
+  .cv-upload-section {
+    display: none;
+    margin: 40px 0 0;
+    padding: 32px 36px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--surface);
+    animation: fadeUp 0.5s ease;
+  }
+  .cv-upload-section.visible { display: block; }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .cv-upload-eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 10px;
+  }
+  .cv-upload-heading {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 400;
+    margin-bottom: 6px;
+    line-height: 1.2;
+  }
+  .cv-upload-heading em { font-style: italic; color: var(--gold); }
+  .cv-upload-sub {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    line-height: 1.6;
+  }
+  .cv-drop-zone {
+    border: 1px dashed var(--border-strong);
+    border-radius: 3px;
+    padding: 32px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    position: relative;
+    background: rgba(201,169,97,0.02);
+  }
+  .cv-drop-zone:hover, .cv-drop-zone.dragover {
+    border-color: var(--gold);
+    background: rgba(201,169,97,0.05);
+  }
+  .cv-drop-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+  .cv-drop-icon {
+    width: 36px; height: 36px;
+    border: 1px solid var(--border-strong);
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 12px;
+  }
+  .cv-drop-icon svg { width: 16px; height: 16px; stroke: var(--gold); fill: none; stroke-width: 1.5; }
+  .cv-drop-label { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+  .cv-drop-label strong { color: var(--gold); font-weight: 500; }
+  .cv-drop-types { font-size: 11px; color: var(--text-dim); margin-top: 6px; letter-spacing: 0.06em; }
+  .cv-uploading { display: none; text-align: center; padding: 20px 0 8px; font-size: 13px; color: var(--text-muted); }
+  .cv-uploading.visible { display: block; }
+  .cv-uploading-dots::after {
+    content: '';
+    animation: cvdots 1.2s steps(4, end) infinite;
+  }
+  @keyframes cvdots {
+    0%, 20% { content: ''; }
+    40% { content: '.'; }
+    60% { content: '..'; }
+    80%, 100% { content: '...'; }
+  }
+  .cv-error { display: none; margin-top: 12px; font-size: 12px; color: var(--rose); text-align: center; }
+  .cv-error.visible { display: block; }
+  .candidate.cv-upload-card {
+    border-color: rgba(201,169,97,0.35);
+    background: linear-gradient(135deg, rgba(201,169,97,0.06), rgba(201,169,97,0.01));
+  }
+  .cv-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--gold);
+    border: 1px solid rgba(201,169,97,0.3);
+    border-radius: 2px;
+    padding: 2px 7px;
+    margin-bottom: 6px;
+  }
+
   /* ============ RESPONSIVE ============ */
   @media (max-width: 780px) {
     nav { padding: 14px 20px; gap: 10px; }
@@ -1433,6 +1536,25 @@
     </div>
     <div class="candidates-grid" id="candidatesGrid"></div>
 
+    <!-- CV Upload -->
+    <div class="cv-upload-section" id="cvUploadSection">
+      <div class="cv-upload-eyebrow">Got a candidate in mind?</div>
+      <h3 class="cv-upload-heading">Upload a CV and <em>we'll score it</em></h3>
+      <p class="cv-upload-sub">Already have someone you're considering? Drop their CV here and we'll score them against your brief — ranked alongside the AI shortlist.</p>
+      <div class="cv-drop-zone" id="cvDropZone">
+        <input type="file" id="cvFileInput" accept=".pdf,.txt,.doc,.docx" onchange="handleCVFile(this.files[0])">
+        <div class="cv-drop-icon">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+        </div>
+        <div class="cv-drop-label"><strong>Click to upload</strong> or drag and drop</div>
+        <div class="cv-drop-types">PDF, DOC, DOCX or TXT — max 5MB</div>
+      </div>
+      <div class="cv-uploading" id="cvUploading">
+        Reading CV and scoring against your brief<span class="cv-uploading-dots"></span>
+      </div>
+      <div class="cv-error" id="cvError">Something went wrong scoring this CV. Please try again.</div>
+    </div>
+
     <!-- Contact form -->
     <div class="contact-section" id="contactSection">
       <div class="contact-eyebrow">Next step</div>
@@ -1628,6 +1750,7 @@ function showView(name) {
     document.getElementById('briefInput').value = '';
     document.getElementById('errorNotice').style.display = 'none';
     document.getElementById('contactSection').classList.remove('visible');
+    document.getElementById('cvUploadSection').classList.remove('visible');
     document.getElementById('contactForm').style.display = '';
     document.getElementById('contactConfirm').classList.remove('visible');
     document.getElementById('cf-name').value = '';
@@ -1842,6 +1965,7 @@ function renderCandidates(candidates, isAI) {
         bar.style.width = bar.dataset.fill + '%';
       });
       document.getElementById('contactSection').classList.add('visible');
+      document.getElementById('cvUploadSection').classList.add('visible');
     }, 300);
   });
 }
@@ -1866,6 +1990,185 @@ function requestProfile(btn, name) {
     const input = contact.querySelector('input[type="text"]');
     if (input) setTimeout(() => input.focus(), 600);
   }
+}
+
+// ============ CV UPLOAD & SCORING ============
+const cvDropZone = document.getElementById('cvDropZone');
+if (cvDropZone) {
+  cvDropZone.addEventListener('dragover', e => { e.preventDefault(); cvDropZone.classList.add('dragover'); });
+  cvDropZone.addEventListener('dragleave', () => cvDropZone.classList.remove('dragover'));
+  cvDropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    cvDropZone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) handleCVFile(file);
+  });
+}
+
+async function handleCVFile(file) {
+  if (!file) return;
+  const maxSize = 5 * 1024 * 1024;
+  if (file.size > maxSize) { showCVError('File too large — please upload a CV under 5MB.'); return; }
+
+  const uploading = document.getElementById('cvUploading');
+  const dropZone = document.getElementById('cvDropZone');
+  const errorEl = document.getElementById('cvError');
+
+  dropZone.style.display = 'none';
+  uploading.classList.add('visible');
+  errorEl.classList.remove('visible');
+
+  try {
+    const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    let candidate;
+
+    if (isPDF) {
+      const base64 = await readFileAsBase64(file);
+      candidate = await scoreCVPDF(base64, lastBrief || 'general recruitment');
+    } else {
+      const text = await readFileAsText(file);
+      candidate = await scoreCVText(text, lastBrief || 'general recruitment');
+    }
+
+    uploading.classList.remove('visible');
+    dropZone.style.display = 'block';
+    document.getElementById('cvFileInput').value = '';
+
+    injectCVCandidate(candidate, file.name);
+  } catch (err) {
+    console.error('CV scoring error:', err);
+    uploading.classList.remove('visible');
+    dropZone.style.display = 'block';
+    showCVError('Something went wrong scoring this CV. Please try again.');
+  }
+}
+
+function showCVError(msg) {
+  const el = document.getElementById('cvError');
+  el.textContent = msg;
+  el.classList.add('visible');
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsText(file);
+  });
+}
+
+async function scoreCVPDF(base64Data, brief) {
+  const response = await fetch('/api/ai', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 600,
+      system: `You are a recruitment AI. Score a CV against a job brief and return ONLY valid JSON — no markdown, no preamble:\n{"name":"Full Name","headline":"Role · X yrs · Key skills · Location","score":82,"why":"2-3 sentences on fit."}`,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64Data } },
+          { type: 'text', text: `Job brief: ${brief}\n\nScore this CV against the brief. Use the candidate's real name from the CV. Score 0-100.` }
+        ]
+      }]
+    })
+  });
+  if (!response.ok) throw new Error(`API ${response.status}`);
+  const data = await response.json();
+  const text = data.content.map(b => b.text || '').join('');
+  return JSON.parse(text.replace(/```json|```/g, '').trim());
+}
+
+async function scoreCVText(cvText, brief) {
+  const truncated = cvText.slice(0, 6000);
+  const response = await fetch('/api/ai', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 600,
+      system: `You are a recruitment AI. Score a CV against a job brief and return ONLY valid JSON — no markdown, no preamble:\n{"name":"Full Name","headline":"Role · X yrs · Key skills · Location","score":82,"why":"2-3 sentences on fit."}`,
+      messages: [{
+        role: 'user',
+        content: `CV:\n${truncated}\n\nJob brief: ${brief}\n\nScore this CV against the brief. Use the candidate's real name from the CV. Score 0-100.`
+      }]
+    })
+  });
+  if (!response.ok) throw new Error(`API ${response.status}`);
+  const data = await response.json();
+  const text = data.content.map(b => b.text || '').join('');
+  return JSON.parse(text.replace(/```json|```/g, '').trim());
+}
+
+function injectCVCandidate(c, filename) {
+  const grid = document.getElementById('candidatesGrid');
+  const initials = c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  const fitClass = c.score >= 85 ? '' : c.score >= 75 ? 'sage' : 'amber';
+
+  const el = document.createElement('div');
+  el.className = 'candidate cv-upload-card';
+  el.style.animation = 'candidateIn 0.4s ease forwards';
+  el.innerHTML = `
+    <div class="avatar">${initials}</div>
+    <div class="candidate-body">
+      <div class="cv-badge">Uploaded CV</div>
+      <div class="candidate-name">${escapeHtml(c.name)}</div>
+      <div class="candidate-headline">${escapeHtml(c.headline)}</div>
+      <div class="candidate-why">${escapeHtml(c.why)}</div>
+    </div>
+    <div class="candidate-right">
+      <div class="fit-score">
+        <div class="fit-score-label">Fit score</div>
+        <div class="fit-score-value">${c.score}<span class="max">/100</span></div>
+        <div class="fit-bar"><div class="fit-bar-fill ${fitClass}" data-fill="${c.score}"></div></div>
+      </div>
+      <div class="candidate-actions">
+        <button class="btn-pass" onclick="passCandidate(this)">Not a fit</button>
+        <button class="btn-interest" onclick="showInterest(this)">I'm interested</button>
+      </div>
+    </div>
+    <div class="interest-confirm">Noted — we'll reach out to ${escapeHtml(c.name)} on your behalf and be in touch within 24 hours.</div>
+  `;
+
+  // Insert at position based on score
+  const cards = Array.from(grid.querySelectorAll('.candidate:not(.cv-upload-card)'));
+  let inserted = false;
+  for (const card of cards) {
+    const scoreEl = card.querySelector('.fit-score-value');
+    if (scoreEl) {
+      const existingScore = parseInt(scoreEl.textContent);
+      if (c.score > existingScore) {
+        grid.insertBefore(el, card);
+        inserted = true;
+        break;
+      }
+    }
+  }
+  if (!inserted) grid.appendChild(el);
+
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      el.querySelectorAll('.fit-bar-fill').forEach(bar => {
+        bar.style.width = bar.dataset.fill + '%';
+      });
+    }, 100);
+  });
+
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  const count = grid.querySelectorAll('.candidate').length;
+  document.getElementById('resultsCount').textContent = count;
 }
 
 function escapeHtml(s) {
