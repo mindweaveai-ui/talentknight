@@ -131,6 +131,41 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14
 .cvc-score span{font-size:12px;color:var(--text-dim)}
 .cvc-time{font-size:11px;color:var(--text-dim);text-align:right;margin-top:4px}
 
+
+/* GDPR PANEL */
+.gdpr-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:28px}
+.gdpr-stat{background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:18px 20px}
+.gdpr-stat-lbl{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px}
+.gdpr-stat-val{font-family:var(--serif);font-size:32px;font-weight:300;line-height:1;color:var(--gold)}
+.gdpr-stat-val.rose{color:var(--rose)}
+.sar-card{background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:18px 22px;margin-bottom:10px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start}
+.sar-card.pending{border-left:3px solid var(--amber)}
+.sar-card.complete{border-left:3px solid var(--sage);opacity:.6}
+.sar-name{font-size:14px;color:var(--text);font-weight:500;margin-bottom:3px}
+.sar-type{font-size:12px;color:var(--gold);margin-bottom:4px}
+.sar-email{font-size:12px;color:var(--text-dim)}
+.sar-actions{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.btn-sar-action{font-size:10px;letter-spacing:.12em;text-transform:uppercase;padding:6px 12px;border-radius:2px;cursor:pointer;font-family:var(--sans);transition:all .2s;border:1px solid var(--border);background:none;color:var(--text-muted)}
+.btn-sar-action:hover{border-color:var(--gold);color:var(--gold)}
+.btn-sar-done{border-color:var(--sage);color:var(--sage)}
+.btn-sar-done:hover{border-color:var(--sage);color:var(--sage);background:rgba(138,166,131,.1)}
+.retention-box{background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:24px 28px;margin-bottom:16px}
+.retention-box h4{font-family:var(--serif);font-size:17px;font-weight:400;margin-bottom:12px}
+.retention-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-top:1px solid var(--border)}
+.retention-label{font-size:13px;color:var(--text-muted)}
+.retention-val{font-size:12px;color:var(--text-dim)}
+.btn-purge{font-size:10px;letter-spacing:.12em;text-transform:uppercase;padding:6px 14px;border-radius:2px;cursor:pointer;font-family:var(--sans);border:1px solid var(--rose);background:none;color:var(--rose);transition:all .2s}
+.btn-purge:hover{background:rgba(184,122,111,.1)}
+.btn-export{font-size:10px;letter-spacing:.12em;text-transform:uppercase;padding:6px 14px;border-radius:2px;cursor:pointer;font-family:var(--sans);border:1px solid var(--border-strong);background:none;color:var(--text-muted);transition:all .2s}
+.btn-export:hover{border-color:var(--gold);color:var(--gold)}
+.erasure-box{background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:24px 28px;margin-bottom:16px}
+.erasure-box h4{font-family:var(--serif);font-size:17px;font-weight:400;margin-bottom:12px}
+.erasure-row{display:flex;gap:10px;align-items:center}
+.erasure-input{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--sans);font-size:14px;padding:11px 14px;border-radius:2px;outline:none;transition:border-color .2s}
+.erasure-input:focus{border-color:var(--rose)}
+.erasure-input::placeholder{color:var(--text-dim)}
+.gdpr-notice{font-size:12px;color:var(--text-dim);margin-top:10px;line-height:1.6}
+
 /* OVERVIEW ACTIVITY */
 .activity-feed{display:flex;flex-direction:column;gap:2px}
 .af-item{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--surface);border:1px solid var(--border);border-radius:2px}
@@ -192,6 +227,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         <span>CV Uploads</span>
         <span class="nb" id="nb-cvs">0</span>
+      </div>
+      <div class="nav-item" onclick="showPanel('gdpr')">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>GDPR</span>
+        <span class="nb" id="nb-sars">0</span>
       </div>
     </div>
     <div class="sb-footer">
@@ -255,6 +295,72 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14
         </div>
       </div>
 
+      <!-- GDPR -->
+      <div class="panel" id="panel-gdpr">
+        <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
+          <div class="stat-card"><div class="sc-label">Pending SARs</div><div class="sc-val rose" id="gdpr-pending">0</div><div class="sc-sub">within 30-day window</div></div>
+          <div class="stat-card"><div class="sc-label">Completed SARs</div><div class="sc-val sage" id="gdpr-done">0</div><div class="sc-sub">actioned requests</div></div>
+          <div class="stat-card"><div class="sc-label">Data records</div><div class="sc-val" id="gdpr-records">0</div><div class="sc-sub">across all stores</div></div>
+        </div>
+
+        <!-- SAR REQUESTS -->
+        <div class="sh"><h3>Data <em>requests (SARs)</em></h3><span class="sh-count" id="sar-count"></span></div>
+        <div id="sar-list" style="margin-bottom:32px">
+          <div class="empty"><strong>No data requests yet</strong>Subject access requests submitted via the privacy page will appear here.</div>
+        </div>
+
+        <!-- RIGHT TO ERASURE -->
+        <div class="sh"><h3>Right to <em>erasure</em></h3></div>
+        <div class="erasure-box">
+          <h4>Delete a person's data</h4>
+          <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.6">Enter the email address of the individual whose data you want to erase. This will remove them from all lead stores. Required under UK GDPR Article 17 — must be actioned within 30 days of request.</p>
+          <div class="erasure-row">
+            <input class="erasure-input" id="erasure-email" type="email" placeholder="person@example.com">
+            <button class="btn-purge" onclick="eraseByEmail()">Erase data</button>
+          </div>
+          <div class="gdpr-notice" id="erasure-result"></div>
+        </div>
+
+        <!-- DATA RETENTION -->
+        <div class="sh"><h3>Data <em>retention</em></h3></div>
+        <div class="retention-box">
+          <h4>Retention schedule</h4>
+          <div class="retention-row"><span class="retention-label">Landing page leads</span><span class="retention-val">12 months</span></div>
+          <div class="retention-row"><span class="retention-label">Demo app leads</span><span class="retention-val">12 months</span></div>
+          <div class="retention-row"><span class="retention-label">Client search history</span><span class="retention-val">6 months</span></div>
+          <div class="retention-row"><span class="retention-label">CV uploads</span><span class="retention-val">30 days</span></div>
+          <div class="retention-row"><span class="retention-label">SAR records</span><span class="retention-val">3 years</span></div>
+        </div>
+        <div class="retention-box">
+          <h4>Manual purge</h4>
+          <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;line-height:1.6">Run these manually to stay within your retention schedule, or when a deletion request has been received.</p>
+          <div class="retention-row"><span class="retention-label">Landing page leads older than 12 months</span><button class="btn-purge" onclick="purgeOld('tk_lp_leads',365)">Purge</button></div>
+          <div class="retention-row"><span class="retention-label">Demo leads older than 12 months</span><button class="btn-purge" onclick="purgeOld('tk_demo_leads',365)">Purge</button></div>
+          <div class="retention-row"><span class="retention-label">All client search history older than 6 months</span><button class="btn-purge" onclick="purgeSearches(180)">Purge</button></div>
+          <div class="gdpr-notice" id="purge-result"></div>
+        </div>
+
+        <!-- DATA EXPORT -->
+        <div class="sh"><h3>Data <em>export</em></h3></div>
+        <div class="retention-box">
+          <h4>Export all data (Subject Access Request response)</h4>
+          <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.6">Export all stored data as JSON. Use this to respond to a Subject Access Request — send the exported file to the individual within 30 days of their request.</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn-export" onclick="exportData('tk_lp_leads','lp-leads')">Export LP leads</button>
+            <button class="btn-export" onclick="exportData('tk_demo_leads','demo-leads')">Export demo leads</button>
+            <button class="btn-export" onclick="exportAllSearches()">Export all searches</button>
+            <button class="btn-export" onclick="exportAllData()">Export everything</button>
+          </div>
+        </div>
+
+        <div style="margin-top:24px;padding:20px 24px;background:var(--surface);border:1px solid var(--border);border-radius:3px">
+          <p style="font-size:13px;color:var(--text-muted);line-height:1.7">
+            <strong style="color:var(--gold)">Your obligations:</strong> Under UK GDPR you must respond to Subject Access Requests within <strong style="color:var(--text)">30 days</strong>, action erasure requests within <strong style="color:var(--text)">30 days</strong>, and notify the ICO of a data breach within <strong style="color:var(--text)">72 hours</strong>. 
+            For more information visit <strong style="color:var(--text)">ico.org.uk</strong> or contact your data protection adviser.
+          </p>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -307,6 +413,7 @@ function showPanel(id) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('panel-' + id).classList.add('active');
+  if (id === 'gdpr') loadGDPR();
   event.currentTarget.classList.add('active');
 }
 
@@ -332,6 +439,7 @@ function loadAll() {
   renderClients(allSearches, allCVs);
   renderSearches(allSearches);
   renderCVs(allCVs);
+  loadGDPR();
 }
 
 // DATA FETCHING
@@ -476,6 +584,143 @@ function renderCVs(cvs) {
         <div class="cvc-time">${fmtDate(c.date)}</div>
       </div>
     </div>`).join('')}</div>`;
+}
+
+
+// ===== GDPR FUNCTIONS =====
+function loadGDPR() {
+  const sars = JSON.parse(localStorage.getItem('tk_sars') || '[]');
+  const pending = sars.filter(s => s.status === 'pending');
+  const done = sars.filter(s => s.status === 'complete');
+
+  const lpLeads = getLP();
+  const demoLeads = getDemo();
+  const totalRecords = lpLeads.length + demoLeads.length;
+
+  document.getElementById('gdpr-pending').textContent = pending.length;
+  document.getElementById('gdpr-done').textContent = done.length;
+  document.getElementById('gdpr-records').textContent = totalRecords;
+  document.getElementById('nb-sars').textContent = pending.length;
+  document.getElementById('sar-count').textContent = sars.length + ' requests';
+
+  const sarList = document.getElementById('sar-list');
+  if (!sars.length) {
+    sarList.innerHTML = '<div class="empty"><strong>No data requests yet</strong>Subject access requests from the privacy page will appear here.</div>';
+  } else {
+    sarList.innerHTML = sars.slice().reverse().map((s, i) => {
+      const idx = sars.length - 1 - i;
+      const daysLeft = s.status === 'pending' ? Math.max(0, 30 - Math.floor((Date.now() - new Date(s.date)) / 86400000)) : null;
+      return `<div class="sar-card ${s.status}">
+        <div>
+          <div class="sar-name">${esc(s.name)}</div>
+          <div class="sar-type">${esc(s.type)}</div>
+          <div class="sar-email">${esc(s.email)}${s.detail ? ' · ' + esc(s.detail) : ''}</div>
+          ${s.status === 'pending' ? `<div style="font-size:11px;color:var(--amber);margin-top:6px">⚠ ${daysLeft} days remaining to respond</div>` : '<div style="font-size:11px;color:var(--sage);margin-top:6px">✓ Completed</div>'}
+        </div>
+        <div class="sar-actions">
+          <div class="td-time">${fmtDate(s.date)}</div>
+          ${s.status === 'pending' ? `<button class="btn-sar-action btn-sar-done" onclick="completeSAR(${idx})">Mark complete</button>` : ''}
+          <button class="btn-export" onclick="exportSAR(${idx})" style="margin-top:4px">Export data</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
+function completeSAR(idx) {
+  const sars = JSON.parse(localStorage.getItem('tk_sars') || '[]');
+  if (sars[idx]) { sars[idx].status = 'complete'; sars[idx].completedDate = new Date().toISOString(); }
+  localStorage.setItem('tk_sars', JSON.stringify(sars));
+  loadGDPR();
+}
+
+function exportSAR(idx) {
+  const sars = JSON.parse(localStorage.getItem('tk_sars') || '[]');
+  const sar = sars[idx];
+  if (!sar) return;
+  const email = sar.email.toLowerCase();
+  const lpLeads = getLP().filter(l => (l.email||'').toLowerCase() === email);
+  const demoLeads = getDemo().filter(l => (l.email||'').toLowerCase() === email);
+  const data = { request: sar, dataHeld: { landingPageLeads: lpLeads, demoLeads: demoLeads }, exportedAt: new Date().toISOString(), note: 'This export contains all personal data held by TalentKnight relating to the email address in the request.' };
+  downloadJSON(data, `sar-export-${email}.json`);
+}
+
+function eraseByEmail() {
+  const email = document.getElementById('erasure-email').value.trim().toLowerCase();
+  if (!email) { document.getElementById('erasure-result').textContent = 'Please enter an email address.'; return; }
+
+  let removed = 0;
+  ['tk_lp_leads','tk_demo_leads'].forEach(key => {
+    const items = JSON.parse(localStorage.getItem(key) || '[]');
+    const filtered = items.filter(i => (i.email||'').toLowerCase() !== email);
+    removed += items.length - filtered.length;
+    localStorage.setItem(key, JSON.stringify(filtered));
+  });
+
+  // Log the erasure
+  const log = JSON.parse(localStorage.getItem('tk_erasure_log') || '[]');
+  log.push({ email, recordsDeleted: removed, date: new Date().toISOString() });
+  localStorage.setItem('tk_erasure_log', JSON.stringify(log));
+
+  document.getElementById('erasure-email').value = '';
+  document.getElementById('erasure-result').textContent = removed > 0
+    ? `✓ Erased ${removed} record(s) for ${email}. Logged for audit purposes.`
+    : `No records found for ${email}.`;
+  loadAll();
+}
+
+function purgeOld(key, days) {
+  const items = JSON.parse(localStorage.getItem(key) || '[]');
+  const cutoff = Date.now() - (days * 86400000);
+  const filtered = items.filter(i => new Date(i.timestamp || i.date) > cutoff);
+  const removed = items.length - filtered.length;
+  localStorage.setItem(key, JSON.stringify(filtered));
+  document.getElementById('purge-result').textContent = `✓ Removed ${removed} record(s) older than ${days} days from ${key}.`;
+  loadAll();
+}
+
+function purgeSearches(days) {
+  const cutoff = Date.now() - (days * 86400000);
+  let total = 0;
+  Object.keys(CLIENTS).forEach(key => {
+    const h = JSON.parse(localStorage.getItem(`tk_history_${key}`) || '[]');
+    const filtered = h.filter(i => new Date(i.date) > cutoff);
+    total += h.length - filtered.length;
+    localStorage.setItem(`tk_history_${key}`, JSON.stringify(filtered));
+  });
+  document.getElementById('purge-result').textContent = `✓ Removed ${total} search record(s) older than ${days} days.`;
+  loadAll();
+}
+
+function exportData(key, filename) {
+  const data = JSON.parse(localStorage.getItem(key) || '[]');
+  downloadJSON({ key, exportedAt: new Date().toISOString(), records: data }, filename + '.json');
+}
+
+function exportAllSearches() {
+  const all = getAllSearches();
+  downloadJSON({ type: 'all-searches', exportedAt: new Date().toISOString(), records: all }, 'all-searches.json');
+}
+
+function exportAllData() {
+  const data = {
+    exportedAt: new Date().toISOString(),
+    exportedBy: 'TalentKnight Admin',
+    landingPageLeads: getLP(),
+    demoLeads: getDemo(),
+    clientSearches: getAllSearches(),
+    sarRequests: JSON.parse(localStorage.getItem('tk_sars') || '[]'),
+    erasureLog: JSON.parse(localStorage.getItem('tk_erasure_log') || '[]'),
+  };
+  downloadJSON(data, 'talentknight-full-export.json');
+}
+
+function downloadJSON(data, filename) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
 }
 
 // UTILS
