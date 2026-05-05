@@ -7,27 +7,27 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0b0a08;
-    --bg-soft: #13110e;
-    --surface: #1a1613;
-    --surface-raised: #221d18;
-    --border: rgba(201, 169, 97, 0.14);
-    --border-strong: rgba(201, 169, 97, 0.28);
-    --gold: #c9a961;
-    --gold-bright: #e8c878;
-    --gold-dim: #8a7641;
+    --bg: #ffffff;
+    --bg-soft: #f8fafc;
+    --surface: #f1f5f9;
+    --surface-raised: #e2e8f0;
+    --border: #e2e8f0;
+    --border-strong: #cbd5e1;
+    --gold: #2563eb;
+    --gold-bright: #3b82f6;
+    --gold-dim: #1d4ed8;
     --text: #f5f0e6;
-    --text-muted: #a8a097;
-    --text-dim: #6d665d;
+    --text-muted: #64748b;
+    --text-dim: #94a3b8;
     --sage: #8aa683;
     --amber: #d4a55a;
     --rose: #b87a6f;
     --shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-    --serif: 'Cormorant Garamond', Georgia, serif;
-    --sans: 'Manrope', -apple-system, sans-serif;
+    --serif: 'Inter',-apple-system,sans-serif;
+    --sans: 'Inter',-apple-system,sans-serif;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -49,22 +49,13 @@
     position: fixed;
     inset: 0;
     background:
-      radial-gradient(ellipse at 20% 0%, rgba(201, 169, 97, 0.06) 0%, transparent 50%),
-      radial-gradient(ellipse at 80% 100%, rgba(201, 169, 97, 0.04) 0%, transparent 50%);
+      radial-gradient(ellipse at 20% 0%, rgba(37,99,235,0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 100%, rgba(37,99,235,0.04) 0%, transparent 50%);
     pointer-events: none;
     z-index: 0;
   }
 
-  body::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    opacity: 0.5;
-    pointer-events: none;
-    z-index: 1;
-    mix-blend-mode: overlay;
-  }
+  
 
   /* ============ NAVIGATION ============ */
   nav {
@@ -75,7 +66,7 @@
     align-items: center;
     padding: 14px 48px;
     border-bottom: 1px solid var(--border);
-    background: rgba(11, 10, 8, 0.7);
+    background: rgba(255,255,255,0.95);
     backdrop-filter: blur(12px);
   }
 
@@ -93,7 +84,7 @@
     justify-content: center;
     border: 1px solid var(--border-strong);
     border-radius: 3px;
-    background: linear-gradient(135deg, rgba(201, 169, 97, 0.12), rgba(201, 169, 97, 0.02));
+    background: linear-gradient(135deg, rgba(37,99,235,0.12), rgba(37,99,235,0.02));
   }
 
   .brand-mark svg {
@@ -140,7 +131,7 @@
     padding: 6px 14px;
     border: 1px solid var(--border);
     border-radius: 2px;
-    background: rgba(201, 169, 97, 0.03);
+    background: rgba(37,99,235,0.03);
   }
 
   .scenario-indicator .dot {
@@ -194,7 +185,7 @@
   .admin-toggle:hover {
     border-color: var(--gold);
     color: var(--gold);
-    background: rgba(201, 169, 97, 0.05);
+    background: rgba(37,99,235,0.05);
   }
 
   /* ============ LAYOUT ============ */
@@ -300,7 +291,7 @@
   textarea#briefInput:focus {
     border-color: var(--gold);
     background: var(--surface-raised);
-    box-shadow: 0 0 0 1px rgba(201, 169, 97, 0.15), 0 20px 40px rgba(0,0,0,0.3);
+    box-shadow: 0 0 0 1px rgba(37,99,235,0.15), 0 20px 40px rgba(0,0,0,0.3);
   }
 
   .brief-actions {
@@ -313,7 +304,7 @@
   button.primary {
     background: var(--gold);
     border: none;
-    color: #1a1410;
+    color: #ffffff;
     font-family: var(--sans);
     font-weight: 600;
     font-size: 13px;
@@ -330,7 +321,7 @@
   button.primary:hover {
     background: var(--gold-bright);
     transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(201, 169, 97, 0.25);
+    box-shadow: 0 8px 24px rgba(37,99,235,0.25);
   }
 
   button.primary:active { transform: translateY(0); }
@@ -342,7 +333,7 @@
   }
 
   .brief-hint kbd {
-    background: rgba(201, 169, 97, 0.08);
+    background: rgba(37,99,235,0.08);
     border: 1px solid var(--border);
     padding: 2px 8px;
     border-radius: 2px;
@@ -439,8 +430,8 @@
     content: '';
     width: 8px;
     height: 4px;
-    border-left: 1.5px solid #1a1410;
-    border-bottom: 1.5px solid #1a1410;
+    border-left: 1.5px solid #ffffff;
+    border-bottom: 1.5px solid #ffffff;
     transform: rotate(-45deg) translate(1px, -1px);
   }
 
@@ -566,7 +557,7 @@
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background: linear-gradient(135deg, rgba(201, 169, 97, 0.2), rgba(201, 169, 97, 0.05));
+    background: linear-gradient(135deg, rgba(37,99,235,0.2), rgba(37,99,235,0.05));
     border: 1px solid var(--border-strong);
     display: flex;
     align-items: center;
@@ -649,7 +640,7 @@
   .fit-bar {
     width: 140px;
     height: 3px;
-    background: rgba(201, 169, 97, 0.1);
+    background: rgba(37,99,235,0.1);
     border-radius: 2px;
     overflow: hidden;
     margin-top: 8px;
@@ -685,7 +676,7 @@
   .btn-interest {
     background: var(--gold);
     border: 1px solid var(--gold);
-    color: #1a1410;
+    color: #ffffff;
   }
 
   .btn-interest:hover {
@@ -736,7 +727,7 @@
 
   .candidate.interested {
     border-color: var(--gold);
-    background: linear-gradient(135deg, rgba(201, 169, 97, 0.08), rgba(201, 169, 97, 0.02));
+    background: linear-gradient(135deg, rgba(37,99,235,0.08), rgba(37,99,235,0.02));
   }
 
   .interest-confirm {
@@ -940,7 +931,7 @@
   .keyword {
     font-size: 11px;
     padding: 4px 10px;
-    background: rgba(201, 169, 97, 0.08);
+    background: rgba(37,99,235,0.08);
     border: 1px solid var(--border);
     border-radius: 2px;
     color: var(--text-muted);
@@ -987,7 +978,7 @@
 
   .btn-add:hover {
     border-color: var(--gold);
-    background: rgba(201, 169, 97, 0.04);
+    background: rgba(37,99,235,0.04);
   }
 
   /* ============ MODAL ============ */
@@ -1174,11 +1165,11 @@
     cursor: pointer;
     transition: all 0.25s;
     position: relative;
-    background: rgba(201,169,97,0.02);
+    background: rgba(37,99,235,0.02);
   }
   .cv-drop-zone:hover, .cv-drop-zone.dragover {
     border-color: var(--gold);
-    background: rgba(201,169,97,0.05);
+    background: rgba(37,99,235,0.05);
   }
   .cv-drop-zone input[type="file"] {
     position: absolute;
@@ -1216,8 +1207,8 @@
   .cv-error { display: none; margin-top: 12px; font-size: 12px; color: var(--rose); text-align: center; }
   .cv-error.visible { display: block; }
   .candidate.cv-upload-card {
-    border-color: rgba(201,169,97,0.35);
-    background: linear-gradient(135deg, rgba(201,169,97,0.06), rgba(201,169,97,0.01));
+    border-color: rgba(37,99,235,0.35);
+    background: linear-gradient(135deg, rgba(37,99,235,0.06), rgba(37,99,235,0.01));
   }
   .cv-badge {
     display: inline-flex;
@@ -1227,7 +1218,7 @@
     letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--gold);
-    border: 1px solid rgba(201,169,97,0.3);
+    border: 1px solid rgba(37,99,235,0.3);
     border-radius: 2px;
     padding: 2px 7px;
     margin-bottom: 6px;
@@ -1358,7 +1349,7 @@
   .cf-field input:focus {
     border-color: var(--gold);
     background: var(--surface-raised);
-    box-shadow: 0 0 0 1px rgba(201, 169, 97, 0.12);
+    box-shadow: 0 0 0 1px rgba(37,99,235,0.12);
   }
 
   .cf-field input::placeholder { color: var(--text-dim); }
@@ -1509,10 +1500,10 @@
   <!-- ============ SCREEN 2: LOADING ============ -->
   <section id="screen-loading" class="view">
     <div class="loader-mark">
-      <svg viewBox="0 0 60 60" fill="none" stroke="#c9a961" stroke-width="1">
+      <svg viewBox="0 0 60 60" fill="none" stroke="#2563eb" stroke-width="1">
         <circle cx="30" cy="30" r="28" stroke-dasharray="4 4" opacity="0.3"/>
         <circle cx="30" cy="30" r="20" stroke-dasharray="2 6"/>
-        <circle cx="30" cy="30" r="3" fill="#c9a961"/>
+        <circle cx="30" cy="30" r="3" fill="#2563eb"/>
       </svg>
     </div>
     <ul class="loader-stages" id="loaderStages">
@@ -1602,7 +1593,7 @@
   <!-- ============ SCREEN: FALLBACK ============ -->
   <section id="screen-fallback" class="view">
     <div class="fallback-state">
-      <svg class="crest" viewBox="0 0 48 48" fill="none" stroke="#c9a961" stroke-width="1.5">
+      <svg class="crest" viewBox="0 0 48 48" fill="none" stroke="#2563eb" stroke-width="1.5">
         <path d="M24 4 L38 12 V28 C38 36 32 42 24 44 C16 42 10 36 10 28 V12 Z"/>
         <path d="M24 16 V32 M18 24 H30" opacity="0.5"/>
       </svg>
