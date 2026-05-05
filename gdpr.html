@@ -4,279 +4,102 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TalentKnight — Privacy & Data</title>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,400&family=Manrope:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg:#0b0a08;--surface:#161410;--surface-raised:#1e1b16;
-  --border:rgba(201,169,97,0.12);--border-strong:rgba(201,169,97,0.25);
-  --gold:#c9a961;--gold-bright:#e8c878;--text:#f0ebe0;
-  --text-muted:#9e9488;--text-dim:#5c564d;--rose:#b87a6f;--sage:#8aa683;
-  --serif:"Cormorant Garamond",Georgia,serif;--sans:"Manrope",system-ui,sans-serif;
+  --bg:#ffffff;--surface:#f8fafc;--surface-raised:#f1f5f9;
+  --border:#e2e8f0;--border-strong:#cbd5e1;
+  --accent:#2563eb;--accent-bright:#3b82f6;--accent-dim:#1d4ed8;
+  --text:#0f172a;--text-muted:#64748b;--text-dim:#94a3b8;
+  --green:#10b981;--red:#ef4444;
+  --sans:'Inter',-apple-system,sans-serif;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
-body::before{content:"";position:fixed;inset:0;background:radial-gradient(ellipse 80% 60% at 10% 0%,rgba(201,169,97,0.05) 0%,transparent 60%);pointer-events:none;z-index:0}
-
-nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:14px 48px;border-bottom:1px solid var(--border);background:rgba(11,10,8,0.9);backdrop-filter:blur(16px)}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:14px 48px;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.95);backdrop-filter:blur(16px)}
 .nav-brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text)}
-.nav-brand-name{font-family:var(--serif);font-size:18px}
-.nav-back{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted);text-decoration:none;transition:color .2s}
-.nav-back:hover{color:var(--gold)}
-
-.wrap{max-width:800px;margin:0 auto;padding:120px 48px 80px;position:relative;z-index:5}
-
-.page-eyebrow{font-size:10px;letter-spacing:.28em;text-transform:uppercase;color:var(--gold);margin-bottom:12px}
-.page-title{font-family:var(--serif);font-size:clamp(36px,5vw,58px);font-weight:400;line-height:1.08;margin-bottom:16px}
-.page-title em{font-style:italic;color:var(--gold)}
-.page-sub{font-size:15px;color:var(--text-muted);line-height:1.7;margin-bottom:48px;max-width:580px}
-.last-updated{font-size:12px;color:var(--text-dim);margin-bottom:64px;padding-bottom:32px;border-bottom:1px solid var(--border)}
-
+.nav-brand-mark{width:28px;height:28px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;letter-spacing:-0.02em}
+.nav-brand-name{font-size:16px;font-weight:700;color:var(--text);letter-spacing:-0.02em}
+.nav-back{font-size:13px;color:var(--text-muted);text-decoration:none;transition:color .2s;font-weight:500}
+.nav-back:hover{color:var(--accent)}
+.wrap{max-width:800px;margin:0 auto;padding:120px 48px 80px;position:relative}
+.page-eyebrow{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--accent);letter-spacing:.04em;margin-bottom:16px}
+.page-eyebrow::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.page-title{font-size:clamp(36px,5vw,54px);font-weight:800;line-height:1.08;letter-spacing:-0.03em;margin-bottom:16px;color:var(--text)}
+.page-sub{font-size:16px;color:var(--text-muted);line-height:1.7;margin-bottom:40px;max-width:580px}
+.last-updated{font-size:12px;color:var(--text-dim);margin-bottom:64px;padding-bottom:28px;border-bottom:1px solid var(--border)}
 .policy-section{margin-bottom:48px}
-.policy-section h2{font-family:var(--serif);font-size:26px;font-weight:400;margin-bottom:16px;color:var(--text)}
-.policy-section h2 em{font-style:italic;color:var(--gold)}
+.policy-section h2{font-size:22px;font-weight:700;letter-spacing:-0.02em;margin-bottom:14px;color:var(--text)}
 .policy-section p{font-size:15px;color:var(--text-muted);line-height:1.75;margin-bottom:14px}
 .policy-section ul{padding-left:0;list-style:none;margin-bottom:14px}
-.policy-section ul li{font-size:15px;color:var(--text-muted);padding:6px 0 6px 20px;position:relative;line-height:1.65}
-.policy-section ul li::before{content:"";position:absolute;left:0;top:14px;width:5px;height:5px;border-radius:50%;background:var(--gold)}
+.policy-section ul li{font-size:15px;color:var(--text-muted);padding:6px 0 6px 22px;position:relative;line-height:1.65}
+.policy-section ul li::before{content:'';position:absolute;left:0;top:14px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
 .policy-section strong{color:var(--text);font-weight:600}
-
 .rights-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:24px 0}
-.right-card{background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:22px 24px}
-.right-card h3{font-family:var(--serif);font-size:17px;font-weight:400;margin-bottom:8px}
+.right-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px 24px}
+.right-card h3{font-size:15px;font-weight:700;margin-bottom:8px;color:var(--text)}
 .right-card p{font-size:13px;color:var(--text-muted);line-height:1.6}
-
-.sar-box{background:var(--surface);border:1px solid var(--border-strong);border-radius:3px;padding:32px;margin:32px 0}
-.sar-box h3{font-family:var(--serif);font-size:22px;font-weight:400;margin-bottom:8px}
-.sar-box p{font-size:14px;color:var(--text-muted);margin-bottom:20px;line-height:1.7}
+.sar-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px;margin:32px 0}
+.sar-box h3{font-size:20px;font-weight:700;margin-bottom:8px;color:var(--text);letter-spacing:-0.02em}
+.sar-box p{font-size:14px;color:var(--text-muted);margin-bottom:24px;line-height:1.7}
 .sar-field{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
-.sar-field label{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--text-dim)}
-.sar-field input,.sar-field select{background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--sans);font-size:14px;padding:12px 14px;border-radius:2px;outline:none;transition:border-color .2s}
-.sar-field input:focus,.sar-field select:focus{border-color:var(--gold)}
+.sar-field label{font-size:12px;font-weight:600;color:var(--text);letter-spacing:.02em}
+.sar-field input,.sar-field select{background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--sans);font-size:14px;padding:12px 14px;border-radius:8px;outline:none;transition:border-color .2s}
+.sar-field input:focus,.sar-field select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.08)}
 .sar-field input::placeholder{color:var(--text-dim)}
-.sar-field select option{background:var(--surface)}
-.btn-sar{background:var(--gold);color:#1a1410;font-family:var(--sans);font-weight:600;font-size:11px;letter-spacing:.18em;text-transform:uppercase;padding:13px 28px;border:none;border-radius:2px;cursor:pointer;transition:background .2s}
-.btn-sar:hover{background:var(--gold-bright)}
-.sar-confirm{display:none;margin-top:16px;padding:16px 20px;background:rgba(138,166,131,0.1);border:1px solid rgba(138,166,131,0.3);border-radius:2px;font-size:13px;color:var(--sage)}
+.btn-sar{background:var(--accent);color:#fff;font-family:var(--sans);font-weight:600;font-size:14px;padding:13px 28px;border:none;border-radius:999px;cursor:pointer;transition:background .2s}
+.btn-sar:hover{background:var(--accent-dim)}
+.sar-confirm{display:none;margin-top:16px;padding:16px 20px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:8px;font-size:13px;color:var(--green)}
 .sar-confirm.show{display:block}
-
-.contact-box{background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:28px 32px;margin-top:48px}
-.contact-box h3{font-family:var(--serif);font-size:20px;font-weight:400;margin-bottom:10px}
+.contact-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px 32px;margin-top:48px}
+.contact-box h3{font-size:18px;font-weight:700;margin-bottom:10px;color:var(--text)}
 .contact-box p{font-size:14px;color:var(--text-muted);line-height:1.7}
-.contact-box a{color:var(--gold);text-decoration:none}
+.contact-box a{color:var(--accent);text-decoration:none}
 .contact-box a:hover{text-decoration:underline}
-
-@media(max-width:640px){
-  nav{padding:12px 20px}
-  .wrap{padding:100px 20px 60px}
-  .rights-grid{grid-template-columns:1fr}
-}
+@media(max-width:640px){nav{padding:12px 20px}.wrap{padding:100px 20px 60px}.rights-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-
 <nav>
   <a href="index.html" class="nav-brand">
-    <div style="width:28px;height:28px;background:var(--gold);border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:13px;font-weight:600;color:#1a1410">TK</div>
+    <div class="nav-brand-mark">TK</div>
     <span class="nav-brand-name">TalentKnight</span>
   </a>
   <a href="index.html" class="nav-back">← Back to site</a>
 </nav>
-
 <div class="wrap">
   <div class="page-eyebrow">Legal & Privacy</div>
-  <h1 class="page-title">Your data,<br><em>your rights.</em></h1>
+  <h1 class="page-title">Your data,<br>your rights.</h1>
   <p class="page-sub">TalentKnight is committed to handling personal data responsibly, transparently, and in compliance with UK GDPR. This page explains what we collect, why, and what you can do about it.</p>
   <div class="last-updated">Last updated: April 2025 &nbsp;·&nbsp; TalentKnight Ltd &nbsp;·&nbsp; Southend-on-Sea, Essex</div>
-
-  <!-- WHO WE ARE -->
-  <div class="policy-section">
-    <h2>Who <em>we are</em></h2>
-    <p>TalentKnight is an AI-powered recruitment matching platform operated by TalentKnight Ltd, based in Southend-on-Sea, Essex, United Kingdom. We act as a <strong>data controller</strong> for personal data collected through our website, demo platform, and client portal.</p>
-    <p>For any data-related enquiries, contact us at: <strong>privacy@talentknight.com</strong></p>
-  </div>
-
-  <!-- WHAT WE COLLECT -->
-  <div class="policy-section">
-    <h2>What we <em>collect</em></h2>
-    <p>We collect personal data in the following contexts:</p>
-    <ul>
-      <li><strong>Contact form submissions</strong> — name, company, email address, phone number, and any message you provide when enquiring via our website or demo.</li>
-      <li><strong>Client portal usage</strong> — role briefs entered by clients, search history, and any CVs uploaded for AI scoring. CVs may contain personal data about third parties.</li>
-      <li><strong>Website analytics</strong> — anonymised usage data to understand how our site is used. We do not use third-party advertising trackers.</li>
-    </ul>
-    <p>We do not collect sensitive personal data (as defined under UK GDPR Article 9) unless explicitly provided to us.</p>
-  </div>
-
-  <!-- LAWFUL BASIS -->
-  <div class="policy-section">
-    <h2>Our lawful <em>basis</em></h2>
-    <p>We process personal data under the following lawful bases:</p>
-    <ul>
-      <li><strong>Legitimate interests</strong> — responding to enquiries, providing our service to clients, and improving our platform.</li>
-      <li><strong>Contract performance</strong> — processing data necessary to deliver the service to paying clients.</li>
-      <li><strong>Consent</strong> — where you have explicitly opted in to marketing communications.</li>
-    </ul>
-  </div>
-
-  <!-- HOW WE USE IT -->
-  <div class="policy-section">
-    <h2>How we <em>use your data</em></h2>
-    <ul>
-      <li>To respond to enquiries and provide information about TalentKnight</li>
-      <li>To onboard and service paying clients</li>
-      <li>To process role briefs and generate AI candidate shortlists</li>
-      <li>To score CVs uploaded by clients against role briefs</li>
-      <li>To send service-related communications (not marketing, unless you have opted in)</li>
-      <li>To maintain records for legal and contractual purposes</li>
-    </ul>
-    <p>We do not sell, rent, or share your personal data with third parties for marketing purposes.</p>
-  </div>
-
-  <!-- DATA RETENTION -->
-  <div class="policy-section">
-    <h2>How long we <em>keep it</em></h2>
-    <p>We apply the following retention periods:</p>
-    <ul>
-      <li><strong>Contact enquiries</strong> — retained for 12 months from submission, then deleted.</li>
-      <li><strong>Client account data</strong> — retained for the duration of the client relationship plus 6 months after contract end.</li>
-      <li><strong>Uploaded CVs</strong> — deleted within 30 days of upload unless the client has actively saved the record.</li>
-      <li><strong>Search history</strong> — retained for 6 months, then automatically purged.</li>
-    </ul>
-    <p>You may request earlier deletion at any time — see your rights below.</p>
-  </div>
-
-  <!-- YOUR RIGHTS -->
-  <div class="policy-section">
-    <h2>Your <em>rights</em></h2>
-    <p>Under UK GDPR, you have the following rights in relation to your personal data:</p>
-    <div class="rights-grid">
-      <div class="right-card">
-        <h3>Right of access</h3>
-        <p>Request a copy of all personal data we hold about you (Subject Access Request).</p>
-      </div>
-      <div class="right-card">
-        <h3>Right to erasure</h3>
-        <p>Request that we delete your personal data. We will action this within 30 days.</p>
-      </div>
-      <div class="right-card">
-        <h3>Right to rectification</h3>
-        <p>Request that we correct inaccurate or incomplete data we hold about you.</p>
-      </div>
-      <div class="right-card">
-        <h3>Right to portability</h3>
-        <p>Request your data in a structured, machine-readable format (CSV or JSON).</p>
-      </div>
-      <div class="right-card">
-        <h3>Right to object</h3>
-        <p>Object to processing of your data where we rely on legitimate interests.</p>
-      </div>
-      <div class="right-card">
-        <h3>Right to restrict</h3>
-        <p>Request that we limit how we use your data while a complaint is resolved.</p>
-      </div>
-    </div>
-    <p>To exercise any of these rights, use the form below or email us at <strong>privacy@talentknight.com</strong>. We will respond within <strong>30 days</strong> as required by UK GDPR.</p>
-  </div>
-
-  <!-- SAR FORM -->
-  <div class="sar-box">
-    <h3>Submit a data request</h3>
-    <p>Use this form to exercise any of your rights under UK GDPR — access, erasure, rectification, portability, objection, or restriction. We will acknowledge your request within 72 hours and respond in full within 30 days.</p>
-    <div class="sar-field">
-      <label>Your full name</label>
-      <input type="text" id="sar-name" placeholder="Sarah Johnson">
-    </div>
-    <div class="sar-field">
-      <label>Your email address</label>
-      <input type="email" id="sar-email" placeholder="sarah@company.com">
-    </div>
-    <div class="sar-field">
-      <label>Request type</label>
-      <select id="sar-type">
-        <option value="">Select a request type</option>
-        <option>Subject Access Request (view my data)</option>
-        <option>Right to Erasure (delete my data)</option>
-        <option>Right to Rectification (correct my data)</option>
-        <option>Right to Portability (export my data)</option>
-        <option>Right to Object (stop processing)</option>
-        <option>Right to Restrict (limit processing)</option>
-      </select>
-    </div>
-    <div class="sar-field">
-      <label>Additional details (optional)</label>
-      <input type="text" id="sar-detail" placeholder="Any additional context about your request">
-    </div>
-    <button class="btn-sar" onclick="submitSAR()">Submit request</button>
-    <div class="sar-confirm" id="sar-confirm">
-      ✓ Request received. We will acknowledge within 72 hours and respond in full within 30 days to the email address you provided.
-    </div>
-  </div>
-
-  <!-- COOKIES -->
-  <div class="policy-section">
-    <h2>Cookies &amp; <em>tracking</em></h2>
-    <p>TalentKnight uses only essential cookies required to operate the service:</p>
-    <ul>
-      <li><strong>Session storage</strong> — used to maintain your login state during a session. Cleared when you close your browser.</li>
-      <li><strong>Local storage</strong> — used to store your search history and preferences within the client portal. Stored only on your device.</li>
-    </ul>
-    <p>We do not use advertising cookies, cross-site tracking, or third-party analytics that identify individual users. You can clear all locally stored data at any time through your browser settings.</p>
-  </div>
-
-  <!-- THIRD PARTIES -->
-  <div class="policy-section">
-    <h2>Third parties &amp; <em>processors</em></h2>
-    <p>We use the following third-party services to operate TalentKnight:</p>
-    <ul>
-      <li><strong>Anthropic (Claude AI)</strong> — processes role briefs and CV content to generate candidate matches. Data is processed under Anthropic's data processing terms. Content is not used to train AI models.</li>
-      <li><strong>EmailJS</strong> — used to send email notifications when a lead submits a contact form. Email addresses are processed transiently and not stored by EmailJS beyond delivery.</li>
-      <li><strong>Vercel</strong> — our hosting provider. Infrastructure based in the EU/UK. Vercel processes server logs for security purposes only.</li>
-    </ul>
-    <p>We have Data Processing Agreements in place with all processors where required under UK GDPR.</p>
-  </div>
-
-  <!-- COMPLAINTS -->
-  <div class="policy-section">
-    <h2>Complaints &amp; <em>the ICO</em></h2>
-    <p>If you are unhappy with how we have handled your data, please contact us first at <strong>privacy@talentknight.com</strong> and we will do our best to resolve the issue.</p>
-    <p>If you remain unsatisfied, you have the right to lodge a complaint with the <strong>Information Commissioner's Office (ICO)</strong> — the UK's data protection authority.</p>
-    <ul>
-      <li>Website: <strong>ico.org.uk</strong></li>
-      <li>Helpline: 0303 123 1113</li>
-    </ul>
-  </div>
-
-  <div class="contact-box">
-    <h3>Data protection contact</h3>
-    <p>For any questions about this policy or how we handle your data:<br>
-    Email: <a href="mailto:privacy@talentknight.com">privacy@talentknight.com</a><br>
-    Post: TalentKnight Ltd, Southend-on-Sea, Essex, United Kingdom</p>
-  </div>
+  <div class="policy-section"><h2>Who we are</h2><p>TalentKnight is an AI-powered recruitment matching platform operated by TalentKnight Ltd, based in Southend-on-Sea, Essex, United Kingdom. We act as a <strong>data controller</strong> for personal data collected through our website, demo platform, and client portal.</p><p>For any data-related enquiries, contact us at: <strong>privacy@talentknight.com</strong></p></div>
+  <div class="policy-section"><h2>What we collect</h2><p>We collect personal data in the following contexts:</p><ul><li><strong>Contact form submissions</strong> — name, company, email address, phone number, and any message you provide when enquiring via our website or demo.</li><li><strong>Client portal usage</strong> — role briefs entered by clients, search history, and any CVs uploaded for AI scoring. CVs may contain personal data about third parties.</li><li><strong>Website analytics</strong> — anonymised usage data to understand how our site is used. We do not use third-party advertising trackers.</li></ul><p>We do not collect sensitive personal data (as defined under UK GDPR Article 9) unless explicitly provided to us.</p></div>
+  <div class="policy-section"><h2>Our lawful basis</h2><p>We process personal data under the following lawful bases:</p><ul><li><strong>Legitimate interests</strong> — responding to enquiries, providing our service to clients, and improving our platform.</li><li><strong>Contract performance</strong> — processing data necessary to deliver the service to paying clients.</li><li><strong>Consent</strong> — where you have explicitly opted in to marketing communications.</li></ul></div>
+  <div class="policy-section"><h2>How we use your data</h2><ul><li>To respond to enquiries and provide information about TalentKnight</li><li>To onboard and service paying clients</li><li>To process role briefs and generate AI candidate shortlists</li><li>To score CVs uploaded by clients against role briefs</li><li>To send service-related communications (not marketing, unless you have opted in)</li><li>To maintain records for legal and contractual purposes</li></ul><p>We do not sell, rent, or share your personal data with third parties for marketing purposes.</p></div>
+  <div class="policy-section"><h2>How long we keep it</h2><p>We apply the following retention periods:</p><ul><li><strong>Contact enquiries</strong> — retained for 12 months from submission, then deleted.</li><li><strong>Client account data</strong> — retained for the duration of the client relationship plus 6 months after contract end.</li><li><strong>Uploaded CVs</strong> — deleted within 30 days of upload unless the client has actively saved the record.</li><li><strong>Search history</strong> — retained for 6 months, then automatically purged.</li></ul><p>You may request earlier deletion at any time — see your rights below.</p></div>
+  <div class="policy-section"><h2>Your rights</h2><p>Under UK GDPR, you have the following rights in relation to your personal data:</p><div class="rights-grid"><div class="right-card"><h3>Right of access</h3><p>Request a copy of all personal data we hold about you (Subject Access Request).</p></div><div class="right-card"><h3>Right to erasure</h3><p>Request that we delete your personal data. We will action this within 30 days.</p></div><div class="right-card"><h3>Right to rectification</h3><p>Request that we correct inaccurate or incomplete data we hold about you.</p></div><div class="right-card"><h3>Right to portability</h3><p>Request your data in a structured, machine-readable format (CSV or JSON).</p></div><div class="right-card"><h3>Right to object</h3><p>Object to processing of your data where we rely on legitimate interests.</p></div><div class="right-card"><h3>Right to restrict</h3><p>Request that we limit how we use your data while a complaint is resolved.</p></div></div><p>To exercise any of these rights, use the form below or email us at <strong>privacy@talentknight.com</strong>. We will respond within <strong>30 days</strong> as required by UK GDPR.</p></div>
+  <div class="sar-box"><h3>Submit a data request</h3><p>Use this form to exercise any of your rights under UK GDPR. We will acknowledge your request within 72 hours and respond in full within 30 days.</p><div class="sar-field"><label>Your full name</label><input type="text" id="sar-name" placeholder="Sarah Johnson"></div><div class="sar-field"><label>Your email address</label><input type="email" id="sar-email" placeholder="sarah@company.com"></div><div class="sar-field"><label>Request type</label><select id="sar-type"><option value="">Select a request type</option><option>Subject Access Request (view my data)</option><option>Right to Erasure (delete my data)</option><option>Right to Rectification (correct my data)</option><option>Right to Portability (export my data)</option><option>Right to Object (stop processing)</option><option>Right to Restrict (limit processing)</option></select></div><div class="sar-field"><label>Additional details (optional)</label><input type="text" id="sar-detail" placeholder="Any additional context about your request"></div><button class="btn-sar" onclick="submitSAR()">Submit request</button><div class="sar-confirm" id="sar-confirm">✓ Request received. We will acknowledge within 72 hours and respond in full within 30 days to the email address you provided.</div></div>
+  <div class="policy-section"><h2>Cookies &amp; tracking</h2><p>TalentKnight uses only essential cookies required to operate the service:</p><ul><li><strong>Session storage</strong> — used to maintain your login state during a session. Cleared when you close your browser.</li><li><strong>Local storage</strong> — used to store your search history and preferences within the client portal. Stored only on your device.</li></ul><p>We do not use advertising cookies, cross-site tracking, or third-party analytics that identify individual users.</p></div>
+  <div class="policy-section"><h2>Third parties &amp; processors</h2><p>We use the following third-party services to operate TalentKnight:</p><ul><li><strong>Anthropic (Claude AI)</strong> — processes role briefs and CV content to generate candidate matches. Content is not used to train AI models.</li><li><strong>EmailJS</strong> — used to send email notifications when a lead submits a contact form.</li><li><strong>Vercel</strong> — our hosting provider. Infrastructure based in the EU/UK.</li></ul></div>
+  <div class="policy-section"><h2>Complaints &amp; the ICO</h2><p>If you are unhappy with how we have handled your data, please contact us first at <strong>privacy@talentknight.com</strong>.</p><p>You have the right to lodge a complaint with the <strong>Information Commissioner's Office (ICO)</strong>.</p><ul><li>Website: <strong>ico.org.uk</strong></li><li>Helpline: 0303 123 1113</li></ul></div>
+  <div class="contact-box"><h3>Data protection contact</h3><p>Email: <a href="mailto:privacy@talentknight.com">privacy@talentknight.com</a><br>Post: TalentKnight Ltd, Southend-on-Sea, Essex, United Kingdom</p></div>
 </div>
-
 <script>
 function submitSAR() {
   const name = document.getElementById('sar-name').value.trim();
   const email = document.getElementById('sar-email').value.trim();
   const type = document.getElementById('sar-type').value;
   const detail = document.getElementById('sar-detail').value.trim();
-
-  if (!name || !email || !type) {
-    alert('Please fill in your name, email and request type.');
-    return;
-  }
-
-  // Store the SAR locally for admin to see
+  if (!name || !email || !type) { alert('Please fill in your name, email and request type.'); return; }
   const sars = JSON.parse(localStorage.getItem('tk_sars') || '[]');
   sars.push({ name, email, type, detail, date: new Date().toISOString(), status: 'pending' });
   localStorage.setItem('tk_sars', JSON.stringify(sars));
-
-  // Clear form
   document.getElementById('sar-name').value = '';
   document.getElementById('sar-email').value = '';
   document.getElementById('sar-type').value = '';
   document.getElementById('sar-detail').value = '';
-
   document.getElementById('sar-confirm').classList.add('show');
 }
 </script>
