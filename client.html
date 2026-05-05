@@ -6,26 +6,26 @@
 <title>TalentKnight — Client Portal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Manrope:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #0b0a08;
-  --bg-soft: #111009;
-  --surface: #161410;
-  --surface-raised: #1e1b16;
-  --border: rgba(201,169,97,0.12);
-  --border-strong: rgba(201,169,97,0.25);
-  --gold: #c9a961;
-  --gold-bright: #e8c878;
-  --gold-dim: #7a6535;
-  --text: #f0ebe0;
-  --text-muted: #9e9488;
-  --text-dim: #5c564d;
-  --rose: #b87a6f;
-  --sage: #8aa683;
-  --amber: #d4a55a;
-  --serif: "Cormorant Garamond", Georgia, serif;
-  --sans: "Manrope", system-ui, sans-serif;
+  --bg: #ffffff;
+  --bg-soft: #f8fafc;
+  --surface: #f1f5f9;
+  --surface-raised: #e2e8f0;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --gold: #2563eb;
+  --gold-bright: #3b82f6;
+  --gold-dim: #1d4ed8;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+  --rose: #ef4444;
+  --sage: #10b981;
+  --amber: #f59e0b;
+  --serif: "Inter", system-ui, sans-serif;
+  --sans: "Inter", system-ui, sans-serif;
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
@@ -43,8 +43,8 @@ body::before {
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(ellipse 80% 60% at 10% 0%, rgba(201,169,97,0.06) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 50% at 90% 100%, rgba(201,169,97,0.03) 0%, transparent 60%);
+    radial-gradient(ellipse 80% 60% at 10% 0%, rgba(37,99,235,0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 90% 100%, rgba(37,99,235,0.02) 0%, transparent 60%);
   pointer-events: none;
   z-index: 0;
 }
@@ -68,7 +68,7 @@ nav {
   align-items: center;
   padding: 14px 32px;
   border-bottom: 1px solid var(--border);
-  background: rgba(11,10,8,0.9);
+  background: rgba(255,255,255,0.95);
   backdrop-filter: blur(16px);
   margin-bottom: 48px;
 }
@@ -169,7 +169,7 @@ nav {
 .btn-login {
   width: 100%;
   background: var(--gold);
-  color: #1a1410;
+  color: #ffffff;
   font-family: var(--sans);
   font-weight: 600;
   font-size: 11px;
@@ -279,7 +279,7 @@ nav {
 }
 .btn-primary {
   background: var(--gold);
-  color: #1a1410;
+  color: #ffffff;
   font-family: var(--sans);
   font-weight: 600;
   font-size: 11px;
@@ -381,7 +381,7 @@ nav {
   animation: cardIn 0.4s ease both;
 }
 .candidate-card:hover { border-color: var(--border-strong); }
-.candidate-card.cv-card { border-color: rgba(201,169,97,0.3); background: linear-gradient(135deg, rgba(201,169,97,0.05), rgba(201,169,97,0.01)); }
+.candidate-card.cv-card { border-color: rgba(37,99,235,0.25); background: linear-gradient(135deg, rgba(37,99,235,0.05), rgba(201,169,97,0.01)); }
 .candidate-card.passed { opacity: 0.3; }
 .candidate-card.interested { border-color: var(--sage); }
 
@@ -393,7 +393,7 @@ nav {
 .avatar {
   width: 42px; height: 42px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--gold-dim), rgba(201,169,97,0.3));
+  background: linear-gradient(135deg, var(--gold-dim), rgba(37,99,235,0.25));
   display: flex; align-items: center; justify-content: center;
   font-family: var(--serif);
   font-size: 15px;
@@ -409,7 +409,7 @@ nav {
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--gold);
-  border: 1px solid rgba(201,169,97,0.3);
+  border: 1px solid rgba(37,99,235,0.25);
   border-radius: 2px;
   padding: 2px 7px;
   margin-bottom: 6px;
@@ -529,9 +529,9 @@ nav {
   cursor: pointer;
   transition: all 0.2s;
   position: relative;
-  background: rgba(201,169,97,0.02);
+  background: rgba(37,99,235,0.02);
 }
-.cv-drop:hover, .cv-drop.dragover { border-color: var(--gold); background: rgba(201,169,97,0.05); }
+.cv-drop:hover, .cv-drop.dragover { border-color: var(--gold); background: rgba(37,99,235,0.05); }
 .cv-drop input[type="file"] {
   position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
 }
