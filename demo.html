@@ -1685,10 +1685,10 @@
 async function loadState() {
   try {
     if (window.storage) {
-      const res = await window.storage.get('tk_state_v2');
+      const res = await window.storage.get('tk_state_v3');
       return res ? JSON.parse(res.value) : null;
     } else {
-      const val = localStorage.getItem('tk_state_v2');
+      const val = localStorage.getItem('tk_state_v3');
       return val ? JSON.parse(val) : null;
     }
   } catch { return null; }
@@ -1697,9 +1697,9 @@ async function loadState() {
 async function saveState() {
   try {
     if (window.storage) {
-      await window.storage.set('tk_state_v2', JSON.stringify(state));
+      await window.storage.set('tk_state_v3', JSON.stringify(state));
     } else {
-      localStorage.setItem('tk_state_v2', JSON.stringify(state));
+      localStorage.setItem('tk_state_v3', JSON.stringify(state));
     }
   } catch (e) { console.warn('Save failed', e); }
 }
