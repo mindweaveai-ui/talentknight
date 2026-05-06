@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TalentKnight — Crypto Tax POC</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f8f7f4; --surface: #ffffff; --surface2: #f1f0ed;
+      --border: rgba(0,0,0,0.1); --border2: rgba(0,0,0,0.18);
+      --text: #1a1a18; --text2: #5f5e5a; --text3: #888780;
+      --amber-bg: #FAEEDA; --amber-text: #854F0B;
+      --teal-bg: #E1F5EE; --teal-text: #0F6E56;
+      --green-bg: #EAF3DE; --green-text: #3B6D11;
+      --radius-md: 8px; --radius-lg: 12px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1a1a18; --surface: #242422; --surface2: #2c2c2a;
+        --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.18);
+        --text: #f0ede8; --text2: #b4b2a9; --text3: #888780;
+        --amber-bg: #412402; --amber-text: #FAC775;
+        --teal-bg: #04342C; --teal-text: #9FE1CB;
+        --green-bg: #173404; --green-text: #C0DD97;
+      }
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 2rem 1rem; }
+    .container { max-width: 780px; margin: 0 auto; }
+    header { margin-bottom: 2rem; }
+    .wordmark { font-size: 13px; font-weight: 500; letter-spacing: 0.08em; color: var(--text3); text-transform: uppercase; margin-bottom: 4px; }
+    h1 { font-size: 24px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+    .subtitle { font-size: 14px; color: var(--text2); }
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 2rem; }
+    @media (max-width: 560px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+    .stat { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-md); padding: 1rem; text-align: center; }
+    .stat-label { font-size: 12px; color: var(--text2); margin-bottom: 4px; }
+    .stat-value { font-size: 28px; font-weight: 500; color: var(--text); }
+    .section-title { font-size: 11px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text3); margin: 1.75rem 0 0.75rem; }
+    .card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.25rem; margin-bottom: 12px; }
+    .match-card { border-left: 3px solid transparent; }
+    .match-card.amber { border-left-color: #EF9F27; }
+    .match-card.teal { border-left-color: #1D9E75; }
+    .match-card.gray { border-left-color: var(--border2); }
+    .match-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+    .match-title { font-size: 15px; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+    .match-sub { font-size: 13px; color: var(--text2); }
+    .badge { display: inline-block; font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 4px; white-space: nowrap; }
+    .badge-amber { background: var(--amber-bg); color: var(--amber-text); }
+    .badge-teal { background: var(--teal-bg); color: var(--teal-text); }
+    .badge-green { background: var(--green-bg); color: var(--green-text); }
+    .badge-muted { background: var(--surface2); color: var(--text2); }
+    .pills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .pill { font-size: 12px; padding: 3px 10px; border-radius: 12px; border: 0.5px solid var(--border2); color: var(--text2); }
+    .match-why { font-size: 13px; color: var(--text2); border-left: 2px solid var(--border2); padding-left: 10px; line-height: 1.6; margin-bottom: 12px; }
+    .row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 0.5px solid var(--border); font-size: 13px; gap: 12px; }
+    .row:last-child { border-bottom: none; }
+    .row-name { font-weight: 500; color: var(--text); }
+    .row-detail { color: var(--text2); text-align: right; font-size: 12px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .tag { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: var(--surface2); color: var(--text2); }
+    .tag-live { background: var(--green-bg); color: var(--green-text); }
+    footer { margin-top: 2.5rem; padding-top: 1.5rem; border-top: 0.5px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text3); }
+    a { color: var(--text2); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <p class="wordmark">TalentKnight</p>
+      <h1>Crypto Tax — Proof of Concept</h1>
+      <p class="subtitle">Phase 1 complete &nbsp;&middot;&nbsp; 5 May 2026 &nbsp;&middot;&nbsp; Global recruitment pipeline, crypto tax accountants</p>
+    </header>
+    <div class="stats-grid">
+      <div class="stat"><p class="stat-label">Live jobs</p><p class="stat-value">20</p></div>
+      <div class="stat"><p class="stat-label">Candidates</p><p class="stat-value">15</p></div>
+      <div class="stat"><p class="stat-label">Matches</p><p class="stat-value">3</p></div>
+      <div class="stat"><p class="stat-label">Outreach ready</p><p class="stat-value">2</p></div>
+    </div>
+    <p class="section-title">Top matches</p>
+    <div class="card match-card amber">
+      <div class="match-header"><div><p class="match-title">BDO UK &rarr; Irfan K.</p><p class="match-sub">Corporate &amp; M&amp;A Crypto Tax &mdash; London</p></div><span class="badge badge-amber">Top pick</span></div>
+      <div class="pills"><span class="pill">UK geography match</span><span class="pill">CPA credentialled</span><span class="pill">3,792 connections</span><span class="pill">Senior level</span></div>
+      <p class="match-why">UK-based crypto tax CPA currently at a specialist firm. BDO is hiring exactly this profile. Pitch: "We have a credentialled UK crypto tax CPA available now."</p>
+      <span class="badge badge-green">Outreach drafted &mdash; awaiting decision maker name from Clay</span>
+    </div>
+    <div class="card match-card teal">
+      <div class="match-header"><div><p class="match-title">Coinbase &rarr; Cassandra Grace Catuday</p><p class="match-sub">Accounting Manager, Crypto Assets &mdash; San Francisco</p></div><span class="badge badge-teal">Strong match</span></div>
+      <div class="pills"><span class="pill">Title alignment</span><span class="pill">CPA certified</span><span class="pill">Web3 native</span><span class="pill">Geography TBC</span></div>
+      <p class="match-why">Near-perfect title alignment. CPA is exactly what Coinbase needs. Confirm remote eligibility before sending &mdash; candidate is Philippines-based.</p>
+      <span class="badge badge-muted">Outreach drafted &mdash; confirm remote policy first</span>
+    </div>
+    <div class="card match-card gray">
+      <div class="match-header"><div><p class="match-title">Animoca / YZi Labs &rarr; Ela D. Aydin</p><p class="match-sub">Accounting Manager &mdash; APAC / Hong Kong</p></div><span class="badge badge-muted">Pending</span></div>
+      <div class="pills"><span class="pill">Accounting Manager level</span><span class="pill">Fintech background</span><span class="pill">Mobile / relocatable</span></div>
+      <p class="match-why">APAC roles open to remote or relocatable candidates. Accounting Manager level aligns with both Animoca and YZi Labs openings.</p>
+    </div>
+    <p class="section-title">Jobs pipeline</p>
+    <div class="card">
+      <div class="row"><span class="row-name">Coinbase</span><span class="row-detail">Accounting Manager, Crypto Assets &middot; San Francisco</span></div>
+      <div class="row"><span class="row-name">Andreessen Horowitz</span><span class="row-detail">Tax Manager, Crypto &middot; Menlo Park &middot; $600M funding</span></div>
+      <div class="row"><span class="row-name">BDO UK</span><span class="row-detail">Corporate &amp; M&amp;A Crypto Tax &middot; London</span></div>
+      <div class="row"><span class="row-name">FalconX</span><span class="row-detail">Head of Technical Accounting &middot; New York</span></div>
+      <div class="row"><span class="row-name">Animoca Brands</span><span class="row-detail">Senior Manager, Crypto Accounting &middot; Hong Kong</span></div>
+      <div class="row"><span class="row-name">YZi Labs</span><span class="row-detail">Finance Associate &ndash; Crypto Accounting &middot; APAC / Singapore</span></div>
+      <div class="row"><span class="row-name">BPM LLP (&times;2)</span><span class="row-detail">Tax Director &ndash; Corporate Crypto / Blockchain &middot; United States</span></div>
+      <div class="row"><span class="row-name">Myna</span><span class="row-detail">Crypto Tax Specialist &middot; United Kingdom</span></div>
+      <div class="row"><span class="row-name">RedCoin Capital</span><span class="row-detail">Crypto Tax Accountant &middot; San Diego, CA</span></div>
+      <div class="row"><span class="row-name">WhiteCap Search</span><span class="row-detail">Fund Accountant &ndash; Digital Assets &middot; Manhattan, NY</span></div>
+      <div class="row"><span class="row-name">EY (&times;2)</span><span class="row-detail">Junior International Tax &middot; Austria</span></div>
+      <div class="row"><span class="row-name">Regen Financial</span><span class="row-detail">Crypto Accounting Associate &middot; South Africa</span></div>
+      <div class="tags"><span class="tag">Company data enriched</span><span class="tag">Funding rounds</span><span class="tag tag-live">Decision maker search running</span></div>
+    </div>
+    <p class="section-title">Candidates pipeline</p>
+    <div class="card">
+      <div class="row"><span class="row-name">Irfan K.</span><span class="row-detail">Senior Crypto Tax Accountant &middot; UK &middot; CPA &middot; 3,792 connections</span></div>
+      <div class="row"><span class="row-name">Cassandra Grace Catuday</span><span class="row-detail">Web3 &amp; Crypto Accountant &middot; CPA &middot; Philippines &middot; 1,248 connections</span></div>
+      <div class="row"><span class="row-name">Ramsha Sattar</span><span class="row-detail">Crypto Tax Accountant &middot; TaxMiners &middot; Karachi &middot; 5,173 connections</span></div>
+      <div class="row"><span class="row-name">Hasnain Alam</span><span class="row-detail">Crypto Tax Accountant &middot; Fiverr &middot; Islamabad &middot; 5,306 connections</span></div>
+      <div class="row"><span class="row-name">Chirag Kotadiya</span><span class="row-detail">Global Crypto Tax Accountant &middot; Darien Advisors &middot; US</span></div>
+      <div class="row"><span class="row-name">Joseph Howe</span><span class="row-detail">Crypto Tax Manager &middot; Crypto Tax Girl &middot; Denver, CO</span></div>
+      <div class="row"><span class="row-name">Daniel Bedoya</span><span class="row-detail">Senior Crypto Tax Accountant &middot; Chainwise CPA &middot; Hollywood, FL</span></div>
+      <div class="row"><span class="row-name">Ela D. Aydin</span><span class="row-detail">Accounting Manager, Fintech &middot; Mimo &middot; T&uuml;rkiye</span></div>
+      <div class="row"><span class="row-name">Ethan C Pickett</span><span class="row-detail">Cryptocurrency Tax Accountant &middot; Polygon Advisory &middot; Louisville, KY</span></div>
+      <div class="row"><span class="row-name">Luke Carlassare</span><span class="row-detail">Cryptocurrency Tax Accountant &middot; Crypto Tax Australia</span></div>
+      <div class="row"><span class="row-name">Logan Berends</span><span class="row-detail">Crypto Tax &middot; WAGMI.Tax &middot; Las Vegas, NV</span></div>
+      <div class="row"><span class="row-name">+ 4 more</span><span class="row-detail">Zahid Karim, and others</span></div>
+      <div class="tags"><span class="tag">LinkedIn profiles enriched</span><span class="tag tag-live">Work emails running (6-provider waterfall)</span></div>
+    </div>
+    <p class="section-title">Next actions</p>
+    <div class="card">
+      <div class="row"><span class="row-name">Await Clay decision maker column &rarr; get BDO partner name</span><span class="badge badge-muted">Pending</span></div>
+      <div class="row"><span class="row-name">Send BDO UK outreach &mdash; Match 1, geography confirmed</span><span class="badge badge-green">Ready</span></div>
+      <div class="row"><span class="row-name">Confirm Coinbase remote policy &rarr; send Match 2</span><span class="badge badge-muted">TBC</span></div>
+      <div class="row"><span class="row-name">Scale candidates table to 50&ndash;100 with broader keyword set</span><span class="badge badge-muted">Phase 2</span></div>
+    </div>
+    <footer>
+      <span>TalentKnight &mdash; Phase 1 POC &mdash; Crypto Tax</span>
+      <a href="https://app.clay.com/workspaces/646472/workbooks/wb_0tekf8wFhpYrKkxkJF8" target="_blank">Open Clay workbook &rarr;</a>
+    </footer>
+  </div>
+</body>
+</html>
