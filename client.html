@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TalentKnight â Client Portal</title>
+<title>TalentKnight — Client Portal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -640,7 +640,7 @@ nav {
     <button class="btn-login" onclick="doLogin()">Access portal</button>
     <div class="login-error" id="loginError">Incorrect access code. Please check and try again.</div>
     <div class="login-footer">
-      Don't have an access code? <a href="index.html#contact">Contact TalentKnight â</a>
+      Don't have an access code? <a href="index.html#contact">Contact TalentKnight →</a>
     </div>
   </div>
 </div>
@@ -650,7 +650,7 @@ nav {
 
   <div class="portal-header">
     <div class="portal-eyebrow">Your recruitment portal</div>
-    <h2 class="portal-title">Good to have you back,<br><em id="welcomeName">â</em></h2>
+    <h2 class="portal-title">Good to have you back,<br><em id="welcomeName">—</em></h2>
     <p class="portal-sub" id="welcomeSub">Run a new search below or review your previous shortlists.</p>
   </div>
 
@@ -661,7 +661,7 @@ nav {
     <textarea class="brief-textarea" id="briefInput" placeholder="e.g. We need a Head of Finance for a Series B fintech in London. 10+ years experience, ideally from a Big 4 background. Must be comfortable with board-level reporting..."></textarea>
     <div class="brief-actions">
       <button class="btn-primary" id="searchBtn" onclick="runSearch()">Find candidates</button>
-      <span class="brief-hint" id="briefHint">AI-powered Â· results in seconds</span>
+      <span class="brief-hint" id="briefHint">AI-powered · results in seconds</span>
     </div>
   </div>
 
@@ -676,7 +676,7 @@ nav {
         <div class="results-title"><em id="resultsCount">0</em> candidates matched</div>
         <div class="results-meta" id="resultsMeta"></div>
       </div>
-      <button class="btn-new-search" onclick="clearResults()">â New search</button>
+      <button class="btn-new-search" onclick="clearResults()">← New search</button>
     </div>
     <div class="candidates-list" id="candidatesList"></div>
 
@@ -691,7 +691,7 @@ nav {
           <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
         </div>
         <div class="cv-drop-label"><strong>Click to upload</strong> or drag & drop</div>
-        <div class="cv-drop-types">PDF, DOC, DOCX or TXT Â· max 5MB</div>
+        <div class="cv-drop-types">PDF, DOC, DOCX or TXT · max 5MB</div>
       </div>
       <div class="cv-processing" id="cvProcessing">Scoring CV against your brief<span class="loading-dots"></span></div>
       <div class="cv-error" id="cvError"></div>
@@ -710,8 +710,8 @@ nav {
 
 <script>
 // ============================================================
-// CLIENT CONFIG â add/edit clients here
-// Password â client details
+// CLIENT CONFIG — add/edit clients here
+// Password → client details
 // ============================================================
 const CLIENTS = {
   'tk-acme-2024':      { name: 'Sarah Johnson',   company: 'Acme Recruitment' },
@@ -782,7 +782,7 @@ async function runSearch() {
   lastBrief = brief;
 
   document.getElementById('searchBtn').disabled = true;
-  document.getElementById('briefHint').textContent = 'Searchingâ¦';
+  document.getElementById('briefHint').textContent = 'Searching…';
   document.getElementById('loadingBar').classList.add('visible');
   document.getElementById('loadingText').classList.add('visible');
   document.getElementById('resultsSection').classList.remove('visible');
@@ -847,7 +847,7 @@ async function callClaudeAPI(brief) {
 function renderCandidates(candidates, brief) {
   const sorted = [...candidates].sort((a, b) => b.score - a.score);
   document.getElementById('resultsCount').textContent = sorted.length;
-  document.getElementById('resultsMeta').textContent = `Matched to: "${brief.slice(0,80)}${brief.length > 80 ? 'â¦' : ''}"`;
+  document.getElementById('resultsMeta').textContent = `Matched to: "${brief.slice(0,80)}${brief.length > 80 ? '…' : ''}"`;
 
   const list = document.getElementById('candidatesList');
   list.innerHTML = '';
@@ -858,7 +858,7 @@ function renderCandidates(candidates, brief) {
 
   document.getElementById('resultsSection').classList.add('visible');
   document.getElementById('cvSection').classList.add('visible');
-  document.getElementById('briefHint').textContent = 'AI-powered Â· results in seconds';
+  document.getElementById('briefHint').textContent = 'AI-powered · results in seconds';
 
   requestAnimationFrame(() => {
     setTimeout(() => {
@@ -894,7 +894,7 @@ function makeCandidateCard(c, idx, isCV = false) {
       </div>
       <div class="cand-actions">
         <button class="btn-pass" onclick="this.closest('.candidate-card').classList.add('passed')">Pass</button>
-        <button class="btn-interest" onclick="this.closest('.candidate-card').classList.add('interested'); this.closest('.candidate-card').querySelector('.interested-confirm').style.display='block'; this.closest('.cand-actions').style.display='none'">Shortlist â</button>
+        <button class="btn-interest" onclick="this.closest('.candidate-card').classList.add('interested'); this.closest('.candidate-card').querySelector('.interested-confirm').style.display='block'; this.closest('.cand-actions').style.display='none'">Shortlist ✓</button>
       </div>
       <div class="interested-confirm" style="display:none;font-size:12px;color:var(--sage);margin-top:4px">Added to shortlist</div>
     </div>
@@ -914,7 +914,7 @@ function clearResults() {
 // ===== CV UPLOAD =====
 async function handleCV(file) {
   if (!file) return;
-  if (file.size > 5 * 1024 * 1024) { showCVError('File too large â please upload a CV under 5MB.'); return; }
+  if (file.size > 5 * 1024 * 1024) { showCVError('File too large — please upload a CV under 5MB.'); return; }
 
   const drop = document.getElementById('cvDrop');
   const proc = document.getElementById('cvProcessing');
@@ -991,7 +991,7 @@ async function scoreCVPDF(b64, brief) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514', max_tokens: 600,
-      system: `You are a recruitment AI. Score a CV against a job brief and return ONLY valid JSON â no markdown:\n{"name":"Full Name","headline":"Role Â· X yrs Â· Key skills Â· Location","score":82,"why":"2-3 sentences on fit."}`,
+      system: `You are a recruitment AI. Score a CV against a job brief and return ONLY valid JSON — no markdown:\n{"name":"Full Name","headline":"Role · X yrs · Key skills · Location","score":82,"why":"2-3 sentences on fit."}`,
       messages: [{ role: 'user', content: [
         { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } },
         { type: 'text', text: `Job brief: ${brief}\n\nScore this CV. Use the candidate's real name. Score 0-100.` }
@@ -1008,7 +1008,7 @@ async function scoreCVText(txt, brief) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514', max_tokens: 600,
-      system: `You are a recruitment AI. Score a CV against a job brief and return ONLY valid JSON â no markdown:\n{"name":"Full Name","headline":"Role Â· X yrs Â· Key skills Â· Location","score":82,"why":"2-3 sentences on fit."}`,
+      system: `You are a recruitment AI. Score a CV against a job brief and return ONLY valid JSON — no markdown:\n{"name":"Full Name","headline":"Role · X yrs · Key skills · Location","score":82,"why":"2-3 sentences on fit."}`,
       messages: [{ role: 'user', content: `CV:\n${txt.slice(0,6000)}\n\nJob brief: ${brief}\n\nScore this CV. Score 0-100.` }]
     })
   });
@@ -1039,7 +1039,7 @@ function renderHistory() {
   }
   container.innerHTML = '<div class="history-list">' + history.map((item, i) =>
     `<div class="history-item" onclick="loadHistoryItem(${i})">
-      <div class="history-brief">${escHtml(item.brief.slice(0,120))}${item.brief.length > 120 ? 'â¦' : ''}</div>
+      <div class="history-brief">${escHtml(item.brief.slice(0,120))}${item.brief.length > 120 ? '…' : ''}</div>
       <div style="display:flex;align-items:center;gap:16px;flex-shrink:0">
         <div class="history-count">${item.candidates.length} matches</div>
         <div class="history-meta">${formatDate(item.date)}</div>
