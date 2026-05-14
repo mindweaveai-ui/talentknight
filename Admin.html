@@ -424,7 +424,7 @@ function renderSearches(searches) {
 function renderCVs(cvs) {
   document.getElementById('cvs-count').textContent = cvs.length + ' uploads';
   const wrap = document.getElementById('cvs-wrap');
-  if (!cvs.length) { wrap.innerHTML = '<div class="empty"><strong>No CVs uploaded yet</strong>CV uploads and AI scores will appear here.</div>'; return; }
+  if (!cvs.length) { wrap.innerHTML = '<div class="empty"><strong>No CVs uploaded yet</strong>CV uploads and Vesper scores will appear here.</div>'; return; }
   wrap.innerHTML = '<div class="cv-list">' + cvs.map(c => '<div class="cvc"><div><div class="sc2-client">' + esc(c.company) + '</div><div class="cvc-name">' + esc(c.candidate?.name||'Unknown') + '</div><div class="cvc-headline">' + esc(c.candidate?.headline||'—') + '</div></div><div><div class="cvc-score">' + (c.candidate?.score||'—') + '<span>/100</span></div><div class="cvc-time">' + fmtDate(c.date) + '</div></div></div>').join('') + '</div>';
 }
 function loadGDPR() {
