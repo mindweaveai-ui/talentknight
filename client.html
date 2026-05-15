@@ -661,7 +661,7 @@ nav {
     <textarea class="brief-textarea" id="briefInput" placeholder="e.g. We need a Head of Finance for a Series B fintech in London. 10+ years experience, ideally from a Big 4 background. Must be comfortable with board-level reporting..."></textarea>
     <div class="brief-actions">
       <button class="btn-primary" id="searchBtn" onclick="runSearch()">Find candidates</button>
-      <span class="brief-hint" id="briefHint">AI-powered · results in seconds</span>
+      <span class="brief-hint" id="briefHint">Powered by Vesper · results in seconds</span>
     </div>
   </div>
 
@@ -858,7 +858,7 @@ function renderCandidates(candidates, brief) {
 
   document.getElementById('resultsSection').classList.add('visible');
   document.getElementById('cvSection').classList.add('visible');
-  document.getElementById('briefHint').textContent = 'AI-powered · results in seconds';
+  document.getElementById('briefHint').textContent = 'Powered by Vesper · results in seconds';
 
   requestAnimationFrame(() => {
     setTimeout(() => {
