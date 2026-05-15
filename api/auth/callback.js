@@ -21,7 +21,7 @@ export default async function handler(req, res) {
   });
   const tokenData = await tokenRes.json();
   if (!tokenData.access_token) {
-    console.error('Token error:', tokenData);
+    console.error('Token error:', JSON.stringify(tokenData));
     return res.redirect(302, '/client?error=token_failed');
   }
 
@@ -31,15 +31,16 @@ export default async function handler(req, res) {
   });
   const user = await userRes.json();
 
-  // 3. Store name + email in a simple base64 cookie (no sensitive data)
+  // 3. Set a JS-readable cookie (no sensitive data — just name/email for display)
   const session = Buffer.from(JSON.stringify({
-    name:    user.name || ((user.given_name || '') + ' ' + (user.family_name || '')).trim(),
+    name:    user.name || ((user.given_name || '') + ' ' + (user.family_name || '')).trim() || 'User',
     email:   user.email || '',
     picture: user.picture || '',
   })).toString('base64');
 
+  // SameSite=Lax, no HttpOnly — JS needs to read this to show/hide the login gate
   res.setHeader('Set-Cookie',
-    'tk_user=' + session + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400'
+    'tk_user=' + session + '; Path=/; SameSite=Lax; Max-Age=86400'
   );
   res.redirect(302, '/client');
 }
