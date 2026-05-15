@@ -1147,24 +1147,41 @@ function escHtml(s) {
 }
 </script>
 <script>
-  // ── LinkedIn login gate ──
+  // ── LinkedIn login gate + auto-login ──
   (function() {
     function getCookie(name) {
-      return document.cookie.split(';').map(c=>c.trim()).find(c=>c.startsWith(name+'='));
+      const match = document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith(name + '='));
+      return match ? match.slice(name.length + 1) : null;
     }
-    function checkAuth() {
+    function showGate() {
       const gate = document.getElementById('login-gate');
-      if (!gate) return;
-      const hasCookie = getCookie('tk_user');
-      if (!hasCookie) {
-        gate.classList.add('visible');
-        document.body.style.overflow = 'hidden';
-      }
+      if (gate) { gate.classList.add('visible'); document.body.style.overflow = 'hidden'; }
     }
+    document.addEventListener('DOMContentLoaded', function() {
+      const cookieVal = getCookie('tk_user');
+      if (!cookieVal) { showGate(); return; }
+      try {
+        const user = JSON.parse(atob(cookieVal));
+        // Derive a friendly company name from email domain
+        const domain = (user.email || '').split('@')[1] || '';
+        const company = domain ? domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1) : 'TalentKnight';
+        // Set currentClient from LinkedIn identity — bypasses access code screen
+        window.currentClient = {
+          name:    user.name    || 'Welcome',
+          company: company,
+          email:   user.email   || '',
+          picture: user.picture || '',
+          key:     'linkedin',
+        };
+        sessionStorage.setItem('tk_client', JSON.stringify(window.currentClient));
+        if (typeof showPortal === 'function') showPortal();
+      } catch(e) {
+        showGate();
+      }
+    });
     // Check for error param
     const params = new URLSearchParams(window.location.search);
     if (params.get('error')) console.warn('Auth error:', params.get('error'));
-    document.addEventListener('DOMContentLoaded', checkAuth);
   })();</script>
 </body>
 </html>
