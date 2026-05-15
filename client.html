@@ -1174,42 +1174,16 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 </script>
-<script>
-  // ── LinkedIn login gate + auto-login ──
-  (function() {
-    function getCookie(name) {
-      const match = document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith(name + '='));
-      return match ? match.slice(name.length + 1) : null;
-    }
-    function showGate() {
-      const gate = document.getElementById('login-gate');
-      if (gate) { gate.classList.add('visible'); document.body.style.overflow = 'hidden'; }
-    }
-    document.addEventListener('DOMContentLoaded', function() {
-      const cookieVal = getCookie('tk_user');
-      if (!cookieVal) { showGate(); return; }
-      try {
-        const user = JSON.parse(atob(cookieVal));
-        // Derive a friendly company name from email domain
-        const domain = (user.email || '').split('@')[1] || '';
-        const company = domain ? domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1) : 'TalentKnight';
-        // Set currentClient from LinkedIn identity — bypasses access code screen
-        window.currentClient = {
-          name:    user.name    || 'Welcome',
-          company: company,
-          email:   user.email   || '',
-          picture: user.picture || '',
-          key:     'linkedin',
-        };
-        sessionStorage.setItem('tk_client', JSON.stringify(window.currentClient));
-        if (typeof showPortal === 'function') showPortal();
-      } catch(e) {
-        showGate();
-      }
-    });
-    // Check for error param
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('error')) console.warn('Auth error:', params.get('error'));
-  })();</script>
+<s<script>
+  // ── LinkedIn login gate ──
+  document.addEventListener('DOMContentLoaded', function() {
+    // Show gate only if NOT logged in via sessionStorage or incoming ?li= param
+    const loggedIn = sessionStorage.getItem('tk_client') 
+      || new URLSearchParams(window.location.search).get('li');
+    if (loggedIn) return;
+    const gate = document.getElementById('login-gate');
+    if (gate) { gate.classList.add('visible'); document.body.style.overflow = 'hidden'; }
+  });
+</script>
 </body>
 </html>
