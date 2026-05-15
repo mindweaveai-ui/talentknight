@@ -820,6 +820,21 @@ window.addEventListener('DOMContentLoaded', () => {
     } catch(e) {}
   }
 
+  // LinkedIn cookie auto-login — if tk_user cookie exists, bypass access code screen
+  if (!currentClient) {
+    const tkCookie = document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('tk_user='));
+    if (tkCookie) {
+      try {
+        const user = JSON.parse(atob(tkCookie.slice(8)));
+        const domain = (user.email || '').split('@')[1] || '';
+        const co = domain ? domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1) : 'TalentKnight';
+        currentClient = { name: user.name || 'Welcome', company: co, email: user.email || '', key: 'linkedin' };
+        sessionStorage.setItem('tk_client', JSON.stringify(currentClient));
+        showPortal();
+      } catch(e) { console.warn('LinkedIn cookie parse error:', e); }
+    }
+  }
+
   // CV drag and drop
   const drop = document.getElementById('cvDrop');
   drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
