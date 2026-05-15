@@ -609,9 +609,84 @@ nav {
   .login-card { padding: 36px 28px; }
   .cand-actions { flex-direction: row; }
 }
+
+  /* ── LinkedIn Login Gate ── */
+  #login-gate {
+    display: none;
+    position: fixed; inset: 0;
+    background: var(--surface, #f8fafc);
+    z-index: 9999;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+    font-family: 'Inter', sans-serif;
+  }
+  #login-gate.visible { display: flex; }
+  .login-card {
+    background: #fff;
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 16px;
+    padding: 48px 40px;
+    max-width: 400px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+  }
+  .login-logo {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--text, #0f172a);
+    margin-bottom: 6px;
+  }
+  .login-logo span { color: #6366f1; }
+  .login-tagline {
+    font-size: 13px;
+    color: var(--text-dim, #64748b);
+    margin-bottom: 36px;
+  }
+  .btn-linkedin {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: #0077B5;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 14px 24px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.2s;
+  }
+  .btn-linkedin:hover { background: #005f93; }
+  .btn-linkedin svg { width: 20px; height: 20px; flex-shrink: 0; }
+  .login-note {
+    font-size: 11px;
+    color: var(--text-dim, #94a3b8);
+    margin-top: 20px;
+    line-height: 1.6;
+  }
 </style>
 </head>
 <body>
+
+  <!-- LinkedIn Login Gate -->
+  <div id="login-gate">
+    <div class="login-card">
+      <div class="login-logo">Talent<span>Knight</span></div>
+      <div class="login-tagline">Client Portal — sign in to access your shortlists</div>
+      <a href="/api/auth/linkedin" class="btn-linkedin">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+        </svg>
+        Sign in with LinkedIn
+      </a>
+      <div class="login-note">We only use your name and email.<br>Your data is never shared or sold.</div>
+    </div>
+  </div>
 
 <!-- NAV -->
 <nav>
@@ -1071,5 +1146,25 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 </script>
+<script>
+  // ── LinkedIn login gate ──
+  (function() {
+    function getCookie(name) {
+      return document.cookie.split(';').map(c=>c.trim()).find(c=>c.startsWith(name+'='));
+    }
+    function checkAuth() {
+      const gate = document.getElementById('login-gate');
+      if (!gate) return;
+      const hasCookie = getCookie('tk_user');
+      if (!hasCookie) {
+        gate.classList.add('visible');
+        document.body.style.overflow = 'hidden';
+      }
+    }
+    // Check for error param
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('error')) console.warn('Auth error:', params.get('error'));
+    document.addEventListener('DOMContentLoaded', checkAuth);
+  })();</script>
 </body>
 </html>
