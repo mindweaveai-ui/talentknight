@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Join TalentKnight — Add Your Profile</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --surface-raised: #e2e8f0;
+    --border: #e2e8f0;
+    --text: #0f172a;
+    --text-dim: #64748b;
+    --text-faint: #94a3b8;
+    --accent: #6366f1;
+    --accent-dim: #eef2ff;
+    --green: #10b981;
+    --green-dim: #ecfdf5;
+    --red: #ef4444;
+    --red-dim: #fef2f2;
+  }
+
+  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ── Nav ── */
+  nav {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .nav-logo { font-size: 17px; font-weight: 700; letter-spacing: -0.4px; color: var(--text); text-decoration: none; }
+  .nav-logo span { color: var(--accent); }
+  .nav-back { font-size: 13px; color: var(--text-dim); text-decoration: none; display: flex; align-items: center; gap: 6px; }
+  .nav-back:hover { color: var(--text); }
+
+  /* ── Layout ── */
+  .page { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
+
+  /* ── Progress ── */
+  .progress-wrap { margin-bottom: 40px; }
+  .progress-steps { display: flex; gap: 0; margin-bottom: 12px; }
+  .progress-step {
+    flex: 1; height: 3px; background: var(--border); border-radius: 2px; margin-right: 4px; transition: background 0.3s;
+  }
+  .progress-step.active { background: var(--accent); }
+  .progress-step.done { background: var(--green); }
+  .progress-label { font-size: 12px; color: var(--text-dim); letter-spacing: 0.05em; }
+  .progress-label strong { color: var(--text); }
+
+  /* ── Cards ── */
+  .step-card { display: none; }
+  .step-card.active { display: block; }
+
+  .card-title { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 6px; }
+  .card-sub { font-size: 14px; color: var(--text-dim); margin-bottom: 36px; line-height: 1.6; }
+
+  /* ── Form fields ── */
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+  .field-grid.single { grid-template-columns: 1fr; }
+  @media (max-width: 560px) { .field-grid { grid-template-columns: 1fr; } }
+
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); }
+  .field input, .field select, .field textarea {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+  .field textarea { min-height: 120px; resize: vertical; line-height: 1.6; }
+  .field .hint { font-size: 11px; color: var(--text-faint); line-height: 1.5; }
+
+  /* ── Skills tags ── */
+  .skills-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; min-height: 48px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; cursor: text; }
+  .skills-wrap:focus-within { border-color: var(--accent); }
+  .skill-tag { background: var(--accent-dim); color: var(--accent); font-size: 12px; font-weight: 500; padding: 4px 10px; border-radius: 20px; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .skill-tag button { background: none; border: none; cursor: pointer; color: var(--accent); font-size: 14px; line-height: 1; padding: 0; }
+  .skills-wrap input { border: none; outline: none; font-size: 13px; font-family: 'Inter', sans-serif; color: var(--text); background: transparent; flex: 1; min-width: 120px; }
+
+  /* ── Buttons ── */
+  .btn-row { display: flex; gap: 12px; margin-top: 36px; }
+  .btn { padding: 13px 28px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; font-family: 'Inter', sans-serif; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #4f46e5; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text-dim); }
+  .btn-ghost:hover { border-color: var(--text-dim); color: var(--text); }
+
+  /* ── CV Preview ── */
+  .cv-preview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 40px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  }
+  .cv-header { border-bottom: 2px solid var(--accent); padding-bottom: 20px; margin-bottom: 24px; }
+  .cv-name { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; color: var(--text); }
+  .cv-role { font-size: 16px; color: var(--accent); font-weight: 500; margin-top: 4px; }
+  .cv-contacts { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; font-size: 13px; color: var(--text-dim); }
+  .cv-contacts span { display: flex; align-items: center; gap: 5px; }
+  .cv-section { margin-bottom: 24px; }
+  .cv-section-title { font-size: 10px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent); margin-bottom: 12px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+  .cv-company-block { margin-bottom: 16px; }
+  .cv-company-name { font-weight: 600; font-size: 15px; }
+  .cv-company-role { font-size: 14px; color: var(--text-dim); margin-top: 2px; }
+  .cv-bio-text { font-size: 14px; color: var(--text-dim); line-height: 1.7; }
+  .cv-skills-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cv-skill-pill { background: var(--accent-dim); color: var(--accent); font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 20px; }
+  .cv-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .cv-meta-item { }
+  .cv-meta-label { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.08em; }
+  .cv-meta-value { font-size: 14px; color: var(--text); font-weight: 500; margin-top: 2px; }
+
+  /* ── Success screen ── */
+  #step-success { text-align: center; padding: 40px 0; }
+  .success-icon { width: 64px; height: 64px; background: var(--green-dim); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; }
+  .success-icon svg { width: 32px; height: 32px; color: var(--green); }
+  .success-title { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 12px; }
+  .success-sub { font-size: 15px; color: var(--text-dim); line-height: 1.6; max-width: 480px; margin: 0 auto 32px; }
+
+  .error-msg { background: var(--red-dim); color: var(--red); font-size: 13px; padding: 12px 16px; border-radius: 8px; margin-top: 16px; display: none; }
+  .error-msg.visible { display: block; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">Talent<span>Knight</span></a>
+  <a href="/" class="nav-back">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    Back to site
+  </a>
+</nav>
+
+<div class="page">
+
+  <!-- Progress -->
+  <div class="progress-wrap">
+    <div class="progress-steps">
+      <div class="progress-step active" id="prog-1"></div>
+      <div class="progress-step" id="prog-2"></div>
+      <div class="progress-step" id="prog-3"></div>
+      <div class="progress-step" id="prog-4"></div>
+      <div class="progress-step" id="prog-5"></div>
+    </div>
+    <div class="progress-label" id="prog-label"><strong>Step 1 of 5</strong> — Personal details</div>
+  </div>
+
+  <!-- Step 1: Personal Details -->
+  <div class="step-card active" id="step-1">
+    <div class="card-title">Let's start with you</div>
+    <div class="card-sub">Your basic contact details. This is how clients and TalentKnight will reach you.</div>
+
+    <div class="field-grid">
+      <div class="field">
+        <label>Full name *</label>
+        <input type="text" id="f-name" placeholder="Jane Smith">
+      </div>
+      <div class="field">
+        <label>Email address *</label>
+        <input type="email" id="f-email" placeholder="jane@example.com">
+      </div>
+      <div class="field">
+        <label>Phone number</label>
+        <input type="tel" id="f-phone" placeholder="+44 7700 900000">
+      </div>
+      <div class="field">
+        <label>Location</label>
+        <input type="text" id="f-location" placeholder="London, UK">
+      </div>
+    </div>
+    <div class="field-grid single">
+      <div class="field">
+        <label>LinkedIn URL</label>
+        <input type="url" id="f-linkedin" placeholder="https://linkedin.com/in/janesmith">
+      </div>
+    </div>
+
+    <div class="error-msg" id="err-1">Please fill in your name and email to continue.</div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="next(1)">Continue →</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Current Role -->
+  <div class="step-card" id="step-2">
+    <div class="card-title">Your current role</div>
+    <div class="card-sub">Tell us where you are now and what kind of work you're looking for.</div>
+
+    <div class="field-grid">
+      <div class="field">
+        <label>Job title *</label>
+        <input type="text" id="f-role" placeholder="Senior Marketing Manager">
+      </div>
+      <div class="field">
+        <label>Current company</label>
+        <input type="text" id="f-company" placeholder="Acme Ltd">
+      </div>
+      <div class="field">
+        <label>Industry / sector</label>
+        <select id="f-sector">
+          <option value="">Select sector...</option>
+          <option>Accounting & Finance</option>
+          <option>Construction & Property</option>
+          <option>Creative & Design</option>
+          <option>Education</option>
+          <option>Engineering</option>
+          <option>Healthcare & Medical</option>
+          <option>Hospitality & Leisure</option>
+          <option>HR & Recruitment</option>
+          <option>IT & Technology</option>
+          <option>Legal</option>
+          <option>Logistics & Supply Chain</option>
+          <option>Marketing & PR</option>
+          <option>Operations & Admin</option>
+          <option>Retail & Consumer</option>
+          <option>Sales & Business Dev</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Employment type</label>
+        <select id="f-type">
+          <option value="">Select type...</option>
+          <option>Permanent</option>
+          <option>Contract</option>
+          <option>Freelance</option>
+          <option>Part-time</option>
+          <option>Interim</option>
+          <option>Open to anything</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="error-msg" id="err-2">Please enter your job title to continue.</div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="back(2)">← Back</button>
+      <button class="btn btn-primary" onclick="next(2)">Continue →</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Skills -->
+  <div class="step-card" id="step-3">
+    <div class="card-title">Skills & expertise</div>
+    <div class="card-sub">Add your key skills. Type a skill and press Enter or comma to add it.</div>
+
+    <div class="field-grid single">
+      <div class="field">
+        <label>Your skills</label>
+        <div class="skills-wrap" id="skills-wrap" onclick="document.getElementById('skill-input').focus()">
+          <input type="text" id="skill-input" placeholder="e.g. Project Management, Python, Sales..." autocomplete="off">
+        </div>
+        <div class="hint">Press Enter or comma after each skill. Add as many as you like.</div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="back(3)">← Back</button>
+      <button class="btn btn-primary" onclick="next(3)">Continue →</button>
+    </div>
+  </div>
+
+  <!-- Step 4: Bio -->
+  <div class="step-card" id="step-4">
+    <div class="card-title">About you</div>
+    <div class="card-sub">Write a short professional summary. This is what clients see first — make it count.</div>
+
+    <div class="field-grid single">
+      <div class="field">
+        <label>Professional summary *</label>
+        <textarea id="f-bio" placeholder="e.g. Experienced marketing leader with 10+ years driving growth for B2B SaaS companies. Specialist in demand generation, content strategy and building high-performing teams. Previously at [Company], where I grew MQL volume by 3x in 18 months..." rows="7"></textarea>
+        <div class="hint" id="bio-count">0 / 500 characters recommended</div>
+      </div>
+    </div>
+
+    <div class="error-msg" id="err-4">Please write a short summary so clients can get to know you.</div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="back(4)">← Back</button>
+      <button class="btn btn-primary" onclick="next(4)">Preview my CV →</button>
+    </div>
+  </div>
+
+  <!-- Step 5: Preview & Submit -->
+  <div class="step-card" id="step-5">
+    <div class="card-title">Your CV preview</div>
+    <div class="card-sub">This is how your profile will appear to TalentKnight clients. Happy with it? Hit submit to join the network.</div>
+
+    <div class="cv-preview" id="cv-preview">
+      <!-- Populated by JS -->
+    </div>
+
+    <div class="error-msg" id="err-5">Something went wrong submitting your profile. Please try again.</div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="back(5)">← Edit</button>
+      <button class="btn btn-primary" id="submit-btn" onclick="submitCV()">Submit to TalentKnight ✓</button>
+    </div>
+  </div>
+
+  <!-- Success -->
+  <div class="step-card" id="step-success">
+    <div class="success-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+    </div>
+    <div class="success-title">You're in the network!</div>
+    <div class="success-sub">Your profile has been added to TalentKnight's candidate pool. When a role matches your skills, a consultant will be in touch directly.</div>
+    <a href="/" class="btn btn-primary" style="text-decoration:none;display:inline-block">Back to TalentKnight →</a>
+  </div>
+
+</div>
+
+<script>
+  // ── State ──
+  let skills = [];
+  let currentStep = 1;
+
+  const stepLabels = ['Personal details', 'Current role', 'Skills', 'About you', 'Review & submit'];
+
+  // ── Navigation ──
+  function showStep(n) {
+    document.querySelectorAll('.step-card').forEach(c => c.classList.remove('active'));
+    document.getElementById('step-' + n)?.classList.add('active');
+    document.querySelectorAll('.progress-step').forEach((s, i) => {
+      s.classList.remove('active', 'done');
+      if (i + 1 < n) s.classList.add('done');
+      if (i + 1 === n) s.classList.add('active');
+    });
+    document.getElementById('prog-label').innerHTML =
+      '<strong>Step ' + n + ' of 5</strong> — ' + stepLabels[n - 1];
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    currentStep = n;
+  }
+
+  function next(from) {
+    if (from === 1) {
+      const name = document.getElementById('f-name').value.trim();
+      const email = document.getElementById('f-email').value.trim();
+      if (!name || !email) { document.getElementById('err-1').classList.add('visible'); return; }
+      document.getElementById('err-1').classList.remove('visible');
+    }
+    if (from === 2) {
+      if (!document.getElementById('f-role').value.trim()) { document.getElementById('err-2').classList.add('visible'); return; }
+      document.getElementById('err-2').classList.remove('visible');
+    }
+    if (from === 4) {
+      if (!document.getElementById('f-bio').value.trim()) { document.getElementById('err-4').classList.add('visible'); return; }
+      document.getElementById('err-4').classList.remove('visible');
+      buildPreview();
+    }
+    showStep(from + 1);
+  }
+
+  function back(from) { showStep(from - 1); }
+
+  // ── Skills input ──
+  document.getElementById('skill-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addSkill(e.target.value.replace(',','').trim());
+      e.target.value = '';
+    }
+    if (e.key === 'Backspace' && !e.target.value && skills.length) {
+      removeSkill(skills[skills.length - 1]);
+    }
+  });
+
+  function addSkill(s) {
+    if (!s || skills.includes(s)) return;
+    skills.push(s);
+    renderSkills();
+  }
+
+  function removeSkill(s) {
+    skills = skills.filter(x => x !== s);
+    renderSkills();
+  }
+
+  function renderSkills() {
+    const wrap = document.getElementById('skills-wrap');
+    const input = document.getElementById('skill-input');
+    wrap.querySelectorAll('.skill-tag').forEach(el => el.remove());
+    skills.forEach(s => {
+      const tag = document.createElement('div');
+      tag.className = 'skill-tag';
+      tag.innerHTML = s + '<button onclick="removeSkill(\'' + s.replace(/'/g,"\\'") + '\')" type="button">×</button>';
+      wrap.insertBefore(tag, input);
+    });
+  }
+
+  // ── Bio character count ──
+  document.getElementById('f-bio').addEventListener('input', e => {
+    const len = e.target.value.length;
+    document.getElementById('bio-count').textContent = len + ' / 500 characters recommended';
+  });
+
+  // ── Build CV preview ──
+  function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function buildPreview() {
+    const name     = esc(document.getElementById('f-name').value.trim());
+    const email    = esc(document.getElementById('f-email').value.trim());
+    const phone    = esc(document.getElementById('f-phone').value.trim());
+    const location = esc(document.getElementById('f-location').value.trim());
+    const linkedin = esc(document.getElementById('f-linkedin').value.trim());
+    const role     = esc(document.getElementById('f-role').value.trim());
+    const company  = esc(document.getElementById('f-company').value.trim());
+    const sector   = esc(document.getElementById('f-sector').value);
+    const type     = esc(document.getElementById('f-type').value);
+    const bio      = esc(document.getElementById('f-bio').value.trim()).replace(/\n/g,'<br>');
+    const skillsHtml = skills.map(s => '<span class="cv-skill-pill">' + esc(s) + '</span>').join('');
+
+    const contacts = [
+      email    ? '<span>✉ ' + email    + '</span>' : '',
+      phone    ? '<span>📞 ' + phone    + '</span>' : '',
+      location ? '<span>📍 ' + location + '</span>' : '',
+      linkedin ? '<span>🔗 <a href="' + linkedin + '" target="_blank" style="color:inherit">LinkedIn</a></span>' : '',
+    ].filter(Boolean).join('');
+
+    document.getElementById('cv-preview').innerHTML = `
+      <div class="cv-header">
+        <div class="cv-name">${name}</div>
+        <div class="cv-role">${role}${company ? ' · ' + company : ''}</div>
+        <div class="cv-contacts">${contacts}</div>
+      </div>
+
+      ${bio ? `<div class="cv-section">
+        <div class="cv-section-title">Professional Summary</div>
+        <div class="cv-bio-text">${bio}</div>
+      </div>` : ''}
+
+      ${company || role ? `<div class="cv-section">
+        <div class="cv-section-title">Current Position</div>
+        <div class="cv-company-block">
+          <div class="cv-company-name">${company || 'Independent'}</div>
+          <div class="cv-company-role">${role}</div>
+        </div>
+      </div>` : ''}
+
+      ${skills.length ? `<div class="cv-section">
+        <div class="cv-section-title">Skills & Expertise</div>
+        <div class="cv-skills-list">${skillsHtml}</div>
+      </div>` : ''}
+
+      ${sector || type ? `<div class="cv-section">
+        <div class="cv-section-title">Profile Details</div>
+        <div class="cv-meta">
+          ${sector ? `<div class="cv-meta-item"><div class="cv-meta-label">Sector</div><div class="cv-meta-value">${sector}</div></div>` : ''}
+          ${type ? `<div class="cv-meta-item"><div class="cv-meta-label">Looking for</div><div class="cv-meta-value">${type}</div></div>` : ''}
+        </div>
+      </div>` : ''}
+    `;
+  }
+
+  // ── Submit ──
+  async function submitCV() {
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.textContent = 'Submitting...';
+    document.getElementById('err-5').classList.remove('visible');
+
+    const payload = {
+      name:     document.getElementById('f-name').value.trim(),
+      email:    document.getElementById('f-email').value.trim(),
+      phone:    document.getElementById('f-phone').value.trim(),
+      location: document.getElementById('f-location').value.trim(),
+      linkedin: document.getElementById('f-linkedin').value.trim(),
+      role:     document.getElementById('f-role').value.trim(),
+      company:  document.getElementById('f-company').value.trim(),
+      sector:   document.getElementById('f-sector').value,
+      type:     document.getElementById('f-type').value,
+      skills:   skills.join(', '),
+      bio:      document.getElementById('f-bio').value.trim(),
+    };
+
+    try {
+      const res = await fetch('/api/submit-candidate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Unknown error');
+
+      // Show success
+      document.querySelectorAll('.step-card').forEach(c => c.classList.remove('active'));
+      document.getElementById('step-success').classList.add('active');
+      document.querySelector('.progress-wrap').style.display = 'none';
+    } catch(e) {
+      document.getElementById('err-5').textContent = 'Error: ' + e.message + '. Please try again.';
+      document.getElementById('err-5').classList.add('visible');
+      btn.disabled = false;
+      btn.textContent = 'Submit to TalentKnight ✓';
+    }
+  }
+</script>
+</body>
+</html>
