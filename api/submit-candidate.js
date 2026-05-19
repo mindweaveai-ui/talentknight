@@ -1,19 +1,14 @@
+// api/submit-candidate.js — TalentKnight candidate self-submission
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204);
-    return res.end();
-  }
+  const AT_TOKEN = process.env.AT_TOKEN;
+  if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
 
-  if (req.method !== 'POST') {
-    res.writeHead(405, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ error: 'Method not allowed' }));
-  }
-
-  const AT_TOKEN     = process.env.AT_TOKEN;
   const MASTER_BASE  = 'appnAnRSfB7bgIQVU';
   const MASTER_TABLE = 'tblRJLWMSOB9YEXUI';
 
@@ -36,14 +31,13 @@ export default async function handler(req, res) {
   } = req.body || {};
 
   if (!name || !email) {
-    res.writeHead(400, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ error: 'Name and email are required' }));
+    return res.status(400).json({ error: 'Name and email are required' });
   }
 
-  // Build enriched bio — sector/type + contact details appended as plain text
+  // Append sector/type + contact details as plain text into bio
   const metaLine = [
-    sector ? `Sector: ${sector}`       : '',
-    type   ? `Looking for: ${type}`    : '',
+    sector ? `Sector: ${sector}`    : '',
+    type   ? `Looking for: ${type}` : '',
   ].filter(Boolean).join(' | ');
 
   const contactLine = [
@@ -80,14 +74,11 @@ export default async function handler(req, res) {
     const atData = await atRes.json();
 
     if (!atRes.ok) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ error: atData.error?.message || 'Airtable error' }));
+      return res.status(500).json({ error: atData.error?.message || 'Airtable error' });
     }
 
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, id: atData.id }));
+    return res.status(200).json({ ok: true, id: atData.id });
   } catch (err) {
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: err.message }));
+    return res.status(500).json({ error: err.message });
   }
 }
