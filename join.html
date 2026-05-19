@@ -332,6 +332,19 @@
   let skills = [];
   let currentStep = 1;
 
+  // ── UTM source tracking — read ?src= param from URL ──
+  const srcMap = {
+    linkedin:  'LinkedIn',
+    instagram: 'Instagram',
+    tiktok:    'TikTok',
+    facebook:  'Facebook',
+    twitter:   'Twitter / X',
+    x:         'Twitter / X',
+    bio:       'Direct / Bio link',
+  };
+  const rawSrc = new URLSearchParams(window.location.search).get('src') || '';
+  const marketingSource = srcMap[rawSrc.toLowerCase()] || (rawSrc ? rawSrc : 'Direct');
+
   const stepLabels = ['Personal details', 'Current role', 'Skills', 'About you', 'Review & submit'];
 
   // ── Navigation ──
@@ -477,17 +490,18 @@
     document.getElementById('err-5').classList.remove('visible');
 
     const payload = {
-      name:     document.getElementById('f-name').value.trim(),
-      email:    document.getElementById('f-email').value.trim(),
-      phone:    document.getElementById('f-phone').value.trim(),
-      location: document.getElementById('f-location').value.trim(),
-      linkedin: document.getElementById('f-linkedin').value.trim(),
-      role:     document.getElementById('f-role').value.trim(),
-      company:  document.getElementById('f-company').value.trim(),
-      sector:   document.getElementById('f-sector').value,
-      type:     document.getElementById('f-type').value,
-      skills:   skills.join(', '),
-      bio:      document.getElementById('f-bio').value.trim(),
+      name:            document.getElementById('f-name').value.trim(),
+      email:           document.getElementById('f-email').value.trim(),
+      phone:           document.getElementById('f-phone').value.trim(),
+      location:        document.getElementById('f-location').value.trim(),
+      linkedin:        document.getElementById('f-linkedin').value.trim(),
+      role:            document.getElementById('f-role').value.trim(),
+      company:         document.getElementById('f-company').value.trim(),
+      sector:          document.getElementById('f-sector').value,
+      type:            document.getElementById('f-type').value,
+      skills:          skills.join(', '),
+      bio:             document.getElementById('f-bio').value.trim(),
+      marketingSource: marketingSource,
     };
 
     try {
