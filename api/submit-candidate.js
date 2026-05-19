@@ -17,7 +17,8 @@ export default async function handler(req, res) {
   const MASTER_BASE  = 'appnAnRSfB7bgIQVU';
   const MASTER_TABLE = 'tblRJLWMSOB9YEXUI';
 
-  // Airtable field IDs for Master Candidates table
+  // Only write to free-text field IDs — avoid select fields to prevent
+  // "Insufficient permissions to create new select option" errors
   const F = {
     name:     'fld8k1UET3DWwJV3S',
     location: 'fldNx4IFaKgaOnNw3',
@@ -25,8 +26,6 @@ export default async function handler(req, res) {
     company:  'fldJYcW9eWMMnFPDS',
     bio:      'fldtJGFbRDqFR9PPJ',
     skills:   'fldjzxELfOSU8M0dC',
-    sector:   'fldQjqjDdx2oV4KqA',
-    type:     'fldU5qaydUaqg8GxQ',
   };
 
   const { name, email, phone, location, linkedin, role, company, sector, type, skills, bio } = req.body || {};
@@ -36,14 +35,19 @@ export default async function handler(req, res) {
     return res.end(JSON.stringify({ error: 'Name and email are required' }));
   }
 
-  // Append contact details into the bio field
+  // Build enriched bio — contact info + sector/type appended as plain text
+  const metaLine = [
+    sector ? `Sector: ${sector}` : '',
+    type   ? `Looking for: ${type}` : '',
+  ].filter(Boolean).join(' | ');
+
   const contactLine = [
     email    ? `Email: ${email}`       : '',
     phone    ? `Phone: ${phone}`       : '',
     linkedin ? `LinkedIn: ${linkedin}` : '',
   ].filter(Boolean).join(' | ');
 
-  const fullBio = [bio, contactLine].filter(Boolean).join('\n\n');
+  const fullBio = [bio, metaLine, contactLine].filter(Boolean).join('\n\n');
 
   const fields = {
     [F.name]:     name,
@@ -52,8 +56,6 @@ export default async function handler(req, res) {
     [F.company]:  company  || '',
     [F.bio]:      fullBio,
     [F.skills]:   skills   || '',
-    [F.sector]:   sector   || '',
-    [F.type]:     type     || '',
   };
 
   try {
