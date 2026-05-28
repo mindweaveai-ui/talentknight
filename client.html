@@ -1102,8 +1102,7 @@ function escHtml(s) {
     const loggedIn = sessionStorage.getItem('tk_client') 
       || new URLSearchParams(window.location.search).get('li');
     if (loggedIn) return;
-    const gate = document.getElementById('login-gate');
-    if (gate) { gate.classList.add('visible'); document.body.style.overflow = 'hidden'; }
+ 
   });
 </script>
 </body>
