@@ -15,7 +15,8 @@ html{scroll-behavior:smooth;}
 body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
 nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:0 48px;height:64px;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.92);backdrop-filter:blur(12px);}
 .nav-logo{display:flex;align-items:center;cursor:pointer;text-decoration:none;}
-.nav-logo-text{font-size:17px;font-weight:700;color:var(--text);letter-spacing:-0.02em;}
+.nav-logo-text{font-size:22px;font-weight:700;color:var(--text);letter-spacing:-0.02em;}
+.nav-logo-text span{color:var(--accent-pill);}
 .nav-links{display:flex;align-items:center;gap:32px;}
 .nav-link{font-size:14px;font-weight:500;color:var(--text-muted);text-decoration:none;transition:color 0.2s;}
 .nav-link:hover{color:var(--text);}
@@ -131,6 +132,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content
 footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;background:var(--bg);}
 .footer-logo{display:flex;align-items:center;}
 .footer-logo-text{font-size:14px;font-weight:700;color:var(--text);}
+.footer-logo-text span{color:var(--accent-pill);}
 .footer-copy{font-size:13px;color:var(--text-dim);}
 .footer-links{display:flex;gap:24px;}
 .footer-link{font-size:13px;font-weight:500;color:var(--text-muted);text-decoration:none;transition:color 0.2s;}
@@ -145,7 +147,7 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
 </head>
 <body>
 <nav>
-  <a href="#" class="nav-logo"><span class="nav-logo-text">TalentKnight</span></a>
+  <a href="#" class="nav-logo"><span class="nav-logo-text">Talent<span>Knight</span></span></a>
   <div class="nav-links">
     <a href="#how-it-works" class="nav-link">How it works</a>
     <a href="#features" class="nav-link">Features</a>
@@ -240,7 +242,7 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
   <div class="contact-confirm-lp" id="contactConfirmLP"><h4>Message received ✓</h4><p>We'll be in touch within one business day.</p></div>
 </div></section>
 <footer>
-  <div class="footer-logo"><span class="footer-logo-text">TalentKnight</span></div>
+  <div class="footer-logo"><span class="footer-logo-text">Talent<span>Knight</span></span></div>
   <div class="footer-copy">© 2025 TalentKnight. All rights reserved.</div>
   <div class="footer-links"><a href="#how-it-works" class="footer-link">How it works</a><a href="#pricing" class="footer-link">Pricing</a><a href="#contact" class="footer-link">Contact</a><a href="demo.html" class="footer-link">Demo</a><a href="/join" class="footer-link">Join</a><a href="gdpr.html" class="footer-link">Privacy</a></div>
 </footer>
