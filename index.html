@@ -25,7 +25,6 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#ffffff;--bg-soft:#f8fafc;--surface:#f1f5f9;--surface-raised:#e2e8f0;--border:#e2e8f0;--border-strong:#cbd5e1;--accent:#111827;--accent-pill:#2563eb;--accent-pill-hover:#1d4ed8;--text:#0f172a;--text-muted:#64748b;--text-dim:#6b7280;--sans:"Inter",system-ui,sans-serif;}
@@ -257,7 +256,7 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
     <div class="cf"><label for="lp_company">Company</label><input type="text" id="lp_company" name="lp_company" placeholder="Acme Recruitment"></div>
     <div class="cf"><label for="lp_type">You are a…</label><select id="lp_type" name="lp_type"><option value="" disabled selected>Select one</option><option>Recruitment agency</option><option>SME / scale-up</option><option>Corporate / enterprise</option><option>Investor</option><option>Other</option></select></div>
     <div class="cf cf-full"><label for="lp_message">What are you hiring for?</label><textarea id="lp_message" name="lp_message" placeholder="Tell us about the role…"></textarea></div>
-    <div class="cf cf-full contact-submit"><button type="submit" class="btn-primary" style="width:100%;border-radius:10px;">Send message</button></div>
+    <div class="cf cf-full contact-submit"><button type="submit" id="contactSubmitBtn" class="btn-primary" style="width:100%;border-radius:10px;">Send message</button></div>
   </form>
   <div class="contact-confirm-lp" id="contactConfirmLP"><h4>Message received ✓</h4><p>We'll be in touch within one business day.</p></div>
 </div></section>
@@ -271,15 +270,46 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
 const revealEls=document.querySelectorAll('.reveal');
 const obs=new IntersectionObserver((e)=>{e.forEach(el=>{if(el.isIntersecting){el.target.classList.add('visible');obs.unobserve(el.target);}});},{threshold:0.12});
 revealEls.forEach(el=>obs.observe(el));
-emailjs.init('oDkTH93FdFLH1gN_-');
-document.getElementById('contactFormLP').addEventListener('submit',async function(e){
+
+document.getElementById('contactFormLP').addEventListener('submit', async function(e) {
   e.preventDefault();
-  const btn=this.querySelector('button[type=submit]');
-  btn.textContent='Sending…';btn.disabled=true;
-  try{
-    await emailjs.send('service_ydnjq8l','template_hidyipr',{name:document.getElementById('lp_name').value,email:document.getElementById('lp_email').value,company:document.getElementById('lp_company').value,type:document.getElementById('lp_type').value,message:document.getElementById('lp_message').value});
-    this.style.display='none';document.getElementById('contactConfirmLP').style.display='block';
-  }catch(err){btn.textContent='Send message';btn.disabled=false;alert('Something went wrong.');}
+  const btn = document.getElementById('contactSubmitBtn');
+  btn.textContent = 'Sending…';
+  btn.disabled = true;
+
+  const name    = document.getElementById('lp_name').value.trim();
+  const email   = document.getElementById('lp_email').value.trim();
+  const company = document.getElementById('lp_company').value.trim();
+  const type    = document.getElementById('lp_type').value;
+  const message = document.getElementById('lp_message').value.trim();
+
+  if (!name || !email) {
+    btn.textContent = 'Send message';
+    btn.disabled = false;
+    alert('Please fill in your name and email.');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        email,
+        company,
+        type,
+        notes: message ? `Enquiry: ${message}\nSource: Homepage contact form` : 'Source: Homepage contact form',
+      }),
+    });
+    if (!res.ok) throw new Error('API error');
+    this.style.display = 'none';
+    document.getElementById('contactConfirmLP').style.display = 'block';
+  } catch(err) {
+    btn.textContent = 'Send message';
+    btn.disabled = false;
+    alert('Something went wrong — please try again.');
+  }
 });
 </script>
 </body>
