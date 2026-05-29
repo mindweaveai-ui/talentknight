@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://talentknight.co.uk/</loc>
+    <loc>https://talentknight.ai/</loc>
     <priority>1.0</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://talentknight.co.uk/demo.html</loc>
+    <loc>https://talentknight.ai/demo.html</loc>
     <priority>0.9</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://talentknight.co.uk/join.html</loc>
+    <loc>https://talentknight.ai/join.html</loc>
     <priority>0.7</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://talentknight.co.uk/gdpr.html</loc>
+    <loc>https://talentknight.ai/gdpr.html</loc>
     <priority>0.3</priority>
     <changefreq>yearly</changefreq>
   </url>
