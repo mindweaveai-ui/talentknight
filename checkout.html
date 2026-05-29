@@ -53,15 +53,10 @@ nav{display:flex;justify-content:space-between;align-items:center;padding:0 48px
     <h1 class="checkout-h1">Start your TalentKnight plan</h1>
     <p class="checkout-sub">Fill in your details below and our team will set up your account within one business day.</p>
     <div class="plan-box" id="planBox">
-      <div class="plan-name" id="planName">Professional</div>
-      <div class="plan-price"><sup>£</sup><span id="planPrice">999</span></div>
-      <div class="plan-cadence">per month</div>
-      <ul class="plan-features">
-        <li>Unlimited role briefs</li>
-        <li>Live Vesper AI shortlists</li>
-        <li>Client login portal</li>
-        <li>Access to full candidate library</li>
-      </ul>
+      <div class="plan-name" id="planName"></div>
+      <div class="plan-price" id="planPriceWrap"></div>
+      <div class="plan-cadence" id="planCadence"></div>
+      <ul class="plan-features" id="planFeatures"></ul>
     </div>
     <div id="checkoutForm">
       <div class="form-fields">
@@ -80,16 +75,57 @@ nav{display:flex;justify-content:space-between;align-items:center;padding:0 48px
   </div>
 </div>
 <script>
-const params = new URLSearchParams(window.location.search);
-const plan = params.get('plan') || 'professional';
 const planMap = {
-  starter: { name: 'Starter', price: '299' },
-  professional: { name: 'Professional', price: '999' },
-  enterprise: { name: 'Enterprise', price: '2,000' },
+  starter: {
+    name: 'Starter',
+    priceHTML: '<sup>£</sup>299',
+    cadence: 'per month',
+    features: [
+      'Up to 5 role briefs per month',
+      'Live Vesper AI shortlists',
+      'Client login portal',
+      'Standard candidate library access',
+    ]
+  },
+  professional: {
+    name: 'Professional',
+    priceHTML: '<sup>£</sup>999',
+    cadence: 'per month',
+    features: [
+      '25 role briefs per month',
+      'Live Vesper AI shortlists',
+      'Client login portal',
+      'Full candidate library access',
+    ]
+  },
+  enterprise: {
+    name: 'Enterprise',
+    priceHTML: 'Bespoke',
+    cadence: 'custom-scoped to your needs',
+    features: [
+      'Unlimited role briefs',
+      'Dedicated account manager',
+      'Custom Vesper AI configuration',
+      'White-label client portal',
+      'Priority support & SLA',
+    ]
+  },
 };
-const p = planMap[plan] || planMap.professional;
+
+const params = new URLSearchParams(window.location.search);
+const key = (params.get('plan') || 'professional').toLowerCase();
+const p = planMap[key] || planMap.professional;
+
 document.getElementById('planName').textContent = p.name;
-document.getElementById('planPrice').textContent = p.price;
+document.getElementById('planPriceWrap').innerHTML = p.priceHTML;
+document.getElementById('planCadence').textContent = p.cadence;
+
+const ul = document.getElementById('planFeatures');
+p.features.forEach(f => {
+  const li = document.createElement('li');
+  li.textContent = f;
+  ul.appendChild(li);
+});
 
 function submitCheckout() {
   const name = document.getElementById('co-name').value.trim();
