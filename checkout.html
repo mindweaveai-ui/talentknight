@@ -1,1 +1,104 @@
-placeholder
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TalentKnight — Subscribe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#ffffff;--bg-soft:#f8fafc;--surface:#f1f5f9;--surface-raised:#e2e8f0;--border:#e2e8f0;--border-strong:#cbd5e1;--accent:#111827;--accent-pill:#2563eb;--accent-pill-hover:#1d4ed8;--text:#0f172a;--text-muted:#64748b;--text-dim:#94a3b8;--sans:"Inter",system-ui,sans-serif;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;min-height:100vh;display:flex;flex-direction:column;}
+nav{display:flex;justify-content:space-between;align-items:center;padding:0 48px;height:64px;border-bottom:1px solid var(--border);background:var(--bg);}
+.nav-logo-text{font-size:22px;font-weight:700;color:var(--text);letter-spacing:-0.02em;text-decoration:none;}
+.nav-logo-text span{color:var(--accent-pill);}
+.checkout-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:60px 24px;}
+.checkout-card{width:100%;max-width:520px;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:48px 44px;}
+.checkout-eyebrow{font-size:12px;font-weight:600;color:var(--accent-pill);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:16px;}
+.checkout-h1{font-size:32px;font-weight:800;letter-spacing:-0.025em;line-height:1.15;margin-bottom:8px;}
+.checkout-sub{font-size:15px;color:var(--text-muted);margin-bottom:36px;line-height:1.65;}
+.plan-box{background:var(--bg-soft);border:1px solid var(--border);border-radius:14px;padding:24px 28px;margin-bottom:32px;}
+.plan-name{font-size:13px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;}
+.plan-price{font-size:36px;font-weight:800;letter-spacing:-0.03em;color:var(--text);}
+.plan-price sup{font-size:18px;vertical-align:top;margin-top:6px;display:inline-block;}
+.plan-cadence{font-size:13px;color:var(--text-dim);margin-top:2px;margin-bottom:16px;}
+.plan-features{list-style:none;border-top:1px solid var(--border);padding-top:14px;}
+.plan-features li{font-size:13px;color:var(--text-muted);padding:5px 0;display:flex;align-items:flex-start;gap:10px;}
+.plan-features li::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--accent-pill);flex-shrink:0;margin-top:6px;}
+.form-fields{display:grid;gap:14px;margin-bottom:24px;}
+.cf{display:flex;flex-direction:column;gap:6px;}
+.cf label{font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;}
+.cf input,.cf select{background:var(--bg-soft);border:1px solid var(--border);color:var(--text);font-family:var(--sans);font-size:15px;padding:13px 16px;border-radius:10px;outline:none;transition:border-color 0.2s,box-shadow 0.2s;width:100%;}
+.cf input:focus,.cf select:focus{border-color:var(--accent-pill);box-shadow:0 0 0 3px rgba(37,99,235,0.1);}
+.cf input::placeholder{color:var(--text-dim);}
+.btn-primary{display:block;width:100%;background:var(--accent-pill);color:#fff;font-weight:700;font-size:16px;padding:17px 24px;border:none;border-radius:999px;cursor:pointer;transition:background 0.2s;text-align:center;}
+.btn-primary:hover{background:var(--accent-pill-hover);}
+.checkout-footer-note{font-size:12px;color:var(--text-dim);text-align:center;margin-top:16px;line-height:1.6;}
+.checkout-confirm{display:none;text-align:center;padding:32px 0;}
+.checkout-confirm h3{font-size:26px;font-weight:800;margin-bottom:12px;}
+.checkout-confirm p{color:var(--text-muted);font-size:16px;line-height:1.65;}
+@media(max-width:600px){nav{padding:0 20px;}.checkout-card{padding:32px 24px;}}
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="nav-logo-text">Talent<span>Knight</span></a>
+</nav>
+<div class="checkout-wrap">
+  <div class="checkout-card">
+    <div class="checkout-eyebrow">Get started</div>
+    <h1 class="checkout-h1">Start your TalentKnight plan</h1>
+    <p class="checkout-sub">Fill in your details below and our team will set up your account within one business day.</p>
+    <div class="plan-box" id="planBox">
+      <div class="plan-name" id="planName">Professional</div>
+      <div class="plan-price"><sup>£</sup><span id="planPrice">999</span></div>
+      <div class="plan-cadence">per month</div>
+      <ul class="plan-features">
+        <li>Unlimited role briefs</li>
+        <li>Live Vesper AI shortlists</li>
+        <li>Client login portal</li>
+        <li>Access to full candidate library</li>
+      </ul>
+    </div>
+    <div id="checkoutForm">
+      <div class="form-fields">
+        <div class="cf"><label>Full name</label><input type="text" id="co-name" placeholder="Jane Smith" required></div>
+        <div class="cf"><label>Work email</label><input type="email" id="co-email" placeholder="jane@company.com" required></div>
+        <div class="cf"><label>Company name</label><input type="text" id="co-company" placeholder="Acme Ltd" required></div>
+        <div class="cf"><label>Phone number</label><input type="tel" id="co-phone" placeholder="+44 7700 900000"></div>
+      </div>
+      <button class="btn-primary" onclick="submitCheckout()">Request account setup</button>
+      <p class="checkout-footer-note">No payment taken now. Our team will contact you within one business day to confirm your plan and arrange onboarding.</p>
+    </div>
+    <div class="checkout-confirm" id="checkoutConfirm">
+      <h3>Request received ✓</h3>
+      <p>Thanks — we'll be in touch within one business day to get your account set up.</p>
+    </div>
+  </div>
+</div>
+<script>
+const params = new URLSearchParams(window.location.search);
+const plan = params.get('plan') || 'professional';
+const planMap = {
+  starter: { name: 'Starter', price: '299' },
+  professional: { name: 'Professional', price: '999' },
+  enterprise: { name: 'Enterprise', price: '2,000' },
+};
+const p = planMap[plan] || planMap.professional;
+document.getElementById('planName').textContent = p.name;
+document.getElementById('planPrice').textContent = p.price;
+
+function submitCheckout() {
+  const name = document.getElementById('co-name').value.trim();
+  const email = document.getElementById('co-email').value.trim();
+  const company = document.getElementById('co-company').value.trim();
+  if (!name || !email || !company) { alert('Please fill in all required fields.'); return; }
+  document.getElementById('checkoutForm').style.display = 'none';
+  document.getElementById('checkoutConfirm').style.display = 'block';
+}
+</script>
+</body>
+</html>
