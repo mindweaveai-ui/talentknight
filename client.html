@@ -74,13 +74,12 @@ nav {
   margin-bottom: 48px;
 }
 .nav-brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
-.nav-brand img { height: 36px; width: 36px; border-radius: 4px; }
 .nav-brand-name {
   font-family: var(--serif);
   font-size: 18px;
-  font-weight: 400;
+  font-weight: 700;
   color: var(--text);
-  letter-spacing: 0.02em;
+  letter-spacing: -0.02em;
 }
 .nav-right { display: flex; align-items: center; gap: 20px; }
 .client-badge {
@@ -123,7 +122,6 @@ nav {
   padding: 48px 44px;
 }
 .login-logo { text-align: center; margin-bottom: 36px; }
-.login-logo img { height: 56px; width: 56px; border-radius: 8px; }
 .login-eyebrow {
   font-size: 10px;
   letter-spacing: 0.28em;
@@ -610,19 +608,13 @@ nav {
   .login-card { padding: 36px 28px; }
   .cand-actions { flex-direction: row; }
 }
-
-  
- 
 </style>
 </head>
 <body>
 
-  
- 
 <!-- NAV -->
 <nav>
   <a href="index.html" class="nav-brand">
-    <img src="data:image/png;base64,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" alt="TalentKnight">
     <span class="nav-brand-name">Talent<span style="color:var(--gold)">Knight</span></span>
   </a>
   <div class="nav-right" id="navRight" style="display:none">
@@ -645,7 +637,7 @@ nav {
     </div>
     <button class="btn-login" onclick="doLogin()">Access portal</button>
     <div class="login-error" id="loginError">Incorrect access code. Please check and try again.</div>
-    
+
     <div class="login-footer">
       Don't have an access code? <a href="index.html#contact">Contact TalentKnight →</a>
     </div>
@@ -697,7 +689,7 @@ nav {
         <div class="cv-drop-icon">
           <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
         </div>
-        <div class="cv-drop-label"><strong>Click to upload</strong> or drag & drop</div>
+        <div class="cv-drop-label"><strong>Click to upload</strong> or drag &amp; drop</div>
         <div class="cv-drop-types">PDF, DOC, DOCX or TXT · max 5MB</div>
       </div>
       <div class="cv-processing" id="cvProcessing">Scoring CV against your brief<span class="loading-dots"></span></div>
@@ -740,24 +732,6 @@ window.addEventListener('DOMContentLoaded', () => {
       currentClient = JSON.parse(saved);
       showPortal();
     } catch(e) {}
-  }
-
-  // LinkedIn auto-login — read ?li= param passed back from OAuth callback
-  if (!currentClient) {
-    const params = new URLSearchParams(window.location.search);
-    const li = params.get('li');
-    if (li) {
-      try {
-        const user = JSON.parse(atob(li));
-        const domain = (user.email || '').split('@')[1] || '';
-        const co = domain ? domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1) : 'TalentKnight';
-        currentClient = { name: user.name || 'Welcome', company: co, email: user.email || '', key: 'linkedin' };
-        sessionStorage.setItem('tk_client', JSON.stringify(currentClient));
-        // Clean the URL so the token doesn't sit in the address bar
-        history.replaceState({}, '', '/client');
-        showPortal();
-      } catch(e) { console.warn('LinkedIn param parse error:', e); }
-    }
   }
 
   // CV drag and drop
@@ -1095,16 +1069,6 @@ function formatDate(iso) {
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-</script>
-<script>
-  // ── LinkedIn login gate ──
-  document.addEventListener('DOMContentLoaded', function() {
-    // Show gate only if NOT logged in via sessionStorage or incoming ?li= param
-    const loggedIn = sessionStorage.getItem('tk_client') 
-      || new URLSearchParams(window.location.search).get('li');
-    if (loggedIn) return;
- 
-  });
 </script>
 </body>
 </html>
