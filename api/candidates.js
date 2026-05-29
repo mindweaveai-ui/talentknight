@@ -1,6 +1,6 @@
 // api/candidates.js — TalentKnight Vesper candidate search
-// Strategy: broad keyword pass first (100 records), supplement with diversity
-// pool if matches are thin, then send richest possible profiles to Claude.
+// Keyword match only — no random fallback. If nothing matches, return empty
+// so the UI can show an honest "no match" state rather than irrelevant profiles.
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -27,8 +27,7 @@ export default async function handler(req, res) {
   const { brief = '' } = req.body || {};
   const atHeaders = { Authorization: `Bearer ${AT_TOKEN}` };
 
-  // --- Keyword extraction ---
-  // Lean stopword list — keep domain terms like "crypto", "senior", "london"
+  // Keyword extraction — lean stopword list so domain terms survive
   const stopwords = new Set([
     'with','that','this','have','from','they','will','been','were','their','there',
     'about','would','could','should','looking','seeking','need','want','hire','find',
@@ -37,7 +36,6 @@ export default async function handler(req, res) {
     'some','very','well','able','into','over','more','make','what','just','like',
   ]);
 
-  // Keep up to 10 keywords, allow 3-char words (e.g. "DTC", "CFO", "ESG")
   const keywords = brief
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
@@ -45,59 +43,40 @@ export default async function handler(req, res) {
     .filter(w => w.length >= 3 && !stopwords.has(w))
     .slice(0, 10);
 
-  let keywordRecords = [];
-  let fallbackRecords = [];
-
-  // --- Pass 1: keyword search across 6 fields, pull up to 100 ---
-  if (keywords.length > 0) {
-    const fieldChecks = keywords.map(kw => {
-      const safe = kw.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-      return `OR(
-        SEARCH("${safe}", LOWER(IF({${F.role}},     {${F.role}},     ""))),
-        SEARCH("${safe}", LOWER(IF({${F.bio}},      {${F.bio}},      ""))),
-        SEARCH("${safe}", LOWER(IF({${F.skills}},   {${F.skills}},   ""))),
-        SEARCH("${safe}", LOWER(IF({${F.sector}},   {${F.sector}},   ""))),
-        SEARCH("${safe}", LOWER(IF({${F.location}}, {${F.location}}, ""))),
-        SEARCH("${safe}", LOWER(IF({${F.company}},  {${F.company}},  "")))
-      )`;
-    });
-    const formula = `OR(${fieldChecks.join(',')})`;
-    const url = `https://api.airtable.com/v0/${MASTER_BASE}/${MASTER_TABLE}`
-      + `?filterByFormula=${encodeURIComponent(formula)}&pageSize=100&returnFieldsByFieldId=true`;
-    try {
-      const r = await fetch(url, { headers: atHeaders });
-      const d = await r.json();
-      if (r.ok && d.records) keywordRecords = d.records;
-    } catch (_) {}
+  // If the brief yields no usable keywords, return empty immediately
+  if (keywords.length === 0) {
+    return res.status(200).json({ candidates: [], count: 0 });
   }
 
-  // --- Pass 2: if keyword matches are thin (<20), pull a diversity batch ---
-  // We fetch a fresh unfiltered page and merge, deduplicating by record ID.
-  // This ensures Claude always has at least 60 candidates to choose from.
-  if (keywordRecords.length < 20) {
-    const url = `https://api.airtable.com/v0/${MASTER_BASE}/${MASTER_TABLE}`
-      + `?pageSize=100&returnFieldsByFieldId=true`;
-    try {
-      const r = await fetch(url, { headers: atHeaders });
-      const d = await r.json();
-      if (r.ok && d.records) fallbackRecords = d.records;
-    } catch (err) {
-      if (keywordRecords.length === 0) {
-        return res.status(500).json({ error: 'Airtable fetch failed: ' + err.message });
-      }
-    }
+  // Build OR filter across 6 fields for every keyword
+  const fieldChecks = keywords.map(kw => {
+    const safe = kw.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    return `OR(
+      SEARCH("${safe}", LOWER(IF({${F.role}},     {${F.role}},     ""))),
+      SEARCH("${safe}", LOWER(IF({${F.bio}},      {${F.bio}},      ""))),
+      SEARCH("${safe}", LOWER(IF({${F.skills}},   {${F.skills}},   ""))),
+      SEARCH("${safe}", LOWER(IF({${F.sector}},   {${F.sector}},   ""))),
+      SEARCH("${safe}", LOWER(IF({${F.location}}, {${F.location}}, ""))),
+      SEARCH("${safe}", LOWER(IF({${F.company}},  {${F.company}},  "")))
+    )`;
+  });
+  const formula = `OR(${fieldChecks.join(',')})`;
+
+  const url = `https://api.airtable.com/v0/${MASTER_BASE}/${MASTER_TABLE}`
+    + `?filterByFormula=${encodeURIComponent(formula)}&pageSize=100&returnFieldsByFieldId=true`;
+
+  let records = [];
+  try {
+    const r = await fetch(url, { headers: atHeaders });
+    const d = await r.json();
+    if (!r.ok) return res.status(500).json({ error: 'Airtable error: ' + (d.error?.message || r.status) });
+    records = d.records || [];
+  } catch (err) {
+    return res.status(500).json({ error: 'Airtable fetch failed: ' + err.message });
   }
 
-  // Merge and deduplicate — keyword matches stay first (they're more relevant)
-  const seen = new Set(keywordRecords.map(r => r.id));
-  const merged = [
-    ...keywordRecords,
-    ...fallbackRecords.filter(r => !seen.has(r.id)),
-  ].slice(0, 100);
-
-  // --- Shape records for Claude ---
-  // Longer bio (400 chars) gives the AI more signal to work with
-  const candidates = merged.map(r => {
+  // Shape records — longer bio (400 chars) gives Claude more signal
+  const candidates = records.map(r => {
     const f = r.fields;
     return {
       name:     String(f[F.name]     || 'Unknown').trim(),
