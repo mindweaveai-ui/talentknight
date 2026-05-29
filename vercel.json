@@ -22,6 +22,8 @@
     { "src": "/client.html", "dest": "/client.html" },
     { "src": "/join", "dest": "/join.html" },
     { "src": "/join.html", "dest": "/join.html" },
+    { "src": "/admin", "dest": "/admin.html" },
+    { "src": "/admin.html", "dest": "/admin.html" },
     { "src": "/", "dest": "/index.html" }
   ]
 }
