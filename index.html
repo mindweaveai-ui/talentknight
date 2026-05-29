@@ -28,7 +28,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#ffffff;--bg-soft:#f8fafc;--surface:#f1f5f9;--surface-raised:#e2e8f0;--border:#e2e8f0;--border-strong:#cbd5e1;--accent:#111827;--accent-pill:#2563eb;--accent-pill-hover:#1d4ed8;--text:#0f172a;--text-muted:#64748b;--text-dim:#94a3b8;--sans:"Inter",system-ui,sans-serif;}
+:root{--bg:#ffffff;--bg-soft:#f8fafc;--surface:#f1f5f9;--surface-raised:#e2e8f0;--border:#e2e8f0;--border-strong:#cbd5e1;--accent:#111827;--accent-pill:#2563eb;--accent-pill-hover:#1d4ed8;--text:#0f172a;--text-muted:#64748b;--text-dim:#6b7280;--sans:"Inter",system-ui,sans-serif;}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 html{scroll-behavior:smooth;}
 body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
@@ -177,6 +177,7 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
   </div>
   <a href="demo.html" class="nav-cta">Try the demo</a>
 </nav>
+<main>
 <section style="padding-top:64px;">
   <div class="hero">
     <div class="hero-eyebrow"><span class="hero-eyebrow-dot"></span> Vesper-powered recruitment</div>
@@ -251,15 +252,16 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
   <div class="section-label reveal"><span class="section-label-dot"></span> Get in touch</div>
   <h2 class="section-h2 reveal reveal-delay-1">Let's talk about<br><span>your hiring needs.</span></h2>
   <form id="contactFormLP" class="contact-grid" novalidate>
-    <div class="cf"><label>Full name</label><input type="text" id="lp_name" name="lp_name" placeholder="Jane Smith" required></div>
-    <div class="cf"><label>Work email</label><input type="email" id="lp_email" name="lp_email" placeholder="jane@company.com" required></div>
-    <div class="cf"><label>Company</label><input type="text" id="lp_company" name="lp_company" placeholder="Acme Recruitment"></div>
-    <div class="cf"><label>You are a…</label><select id="lp_type" name="lp_type"><option value="" disabled selected>Select one</option><option>Recruitment agency</option><option>SME / scale-up</option><option>Corporate / enterprise</option><option>Investor</option><option>Other</option></select></div>
-    <div class="cf cf-full"><label>What are you hiring for?</label><textarea id="lp_message" name="lp_message" placeholder="Tell us about the role…"></textarea></div>
+    <div class="cf"><label for="lp_name">Full name</label><input type="text" id="lp_name" name="lp_name" placeholder="Jane Smith" required></div>
+    <div class="cf"><label for="lp_email">Work email</label><input type="email" id="lp_email" name="lp_email" placeholder="jane@company.com" required></div>
+    <div class="cf"><label for="lp_company">Company</label><input type="text" id="lp_company" name="lp_company" placeholder="Acme Recruitment"></div>
+    <div class="cf"><label for="lp_type">You are a…</label><select id="lp_type" name="lp_type"><option value="" disabled selected>Select one</option><option>Recruitment agency</option><option>SME / scale-up</option><option>Corporate / enterprise</option><option>Investor</option><option>Other</option></select></div>
+    <div class="cf cf-full"><label for="lp_message">What are you hiring for?</label><textarea id="lp_message" name="lp_message" placeholder="Tell us about the role…"></textarea></div>
     <div class="cf cf-full contact-submit"><button type="submit" class="btn-primary" style="width:100%;border-radius:10px;">Send message</button></div>
   </form>
   <div class="contact-confirm-lp" id="contactConfirmLP"><h4>Message received ✓</h4><p>We'll be in touch within one business day.</p></div>
 </div></section>
+</main>
 <footer>
   <div class="footer-logo"><span class="footer-logo-text">Talent<span>Knight</span></span></div>
   <div class="footer-copy">© 2025 TalentKnight. All rights reserved.</div>
