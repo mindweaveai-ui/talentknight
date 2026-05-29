@@ -4,4 +4,4 @@ Disallow: /Admin.html
 Disallow: /client.html
 Disallow: /checkout.html
 
-Sitemap: https://talentknight.co.uk/sitemap.xml
+Sitemap: https://talentknight.ai/sitemap.xml
