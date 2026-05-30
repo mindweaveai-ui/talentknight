@@ -31,7 +31,7 @@ export default async function handler(req, res) {
 
   const actorInput = {
     profileScraperMode: 'Full',
-    maxItems: 3,
+    maxItems: 5,
   };
   if (title) actorInput.searchQuery = title;
   if (location) actorInput.locations = [location];
