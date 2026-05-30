@@ -24,14 +24,15 @@ export default async function handler(req, res) {
   );
   const title = titleMatch ? titleMatch[1].trim() : '';
 
-  // Use harvestapi/linkedin-profile-search — no cookies required, 17K users, 4.6 stars
+  // harvestapi/linkedin-profile-search — no cookies required, 19K users, 4.5 stars
   const actorId = 'harvestapi~linkedin-profile-search';
-  const apifyEndpoint = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=50&memory=256`;
+  // timeout=25 keeps us within Vercel's 30s default function limit
+  const apifyEndpoint = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=25&memory=256`;
 
   // Build input using the actor's native filters
   const actorInput = {
     profileScraperMode: 'Short',
-    maxItems: 5,
+    maxItems: 3,
   };
   if (title) actorInput.searchQuery = title;
   if (location) actorInput.locations = [location];
@@ -39,12 +40,18 @@ export default async function handler(req, res) {
 
   let raw = [];
   let debugInfo = { actorInput };
+
   try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 27000); // 27s hard limit
+
     const r = await fetch(apifyEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(actorInput),
+      signal: controller.signal,
     });
+    clearTimeout(timer);
 
     debugInfo.status = r.status;
     debugInfo.statusText = r.statusText;
@@ -57,10 +64,16 @@ export default async function handler(req, res) {
 
     try { raw = JSON.parse(responseText); } catch(e) { debugInfo.parseError = e.message; }
   } catch (err) {
-    return res.status(200).json({ candidates: [], count: 0, source: 'apify_error', debug: { fetchError: err.message } });
+    const isTimeout = err.name === 'AbortError';
+    return res.status(200).json({
+      candidates: [],
+      count: 0,
+      source: isTimeout ? 'apify_timeout' : 'apify_error',
+      debug: { fetchError: err.message }
+    });
   }
 
-  // HarvestAPI returns fields: firstName, lastName, headline, location, profileUrl, summary, skills, industry
+  // HarvestAPI returns: firstName, lastName, headline, location, profileUrl, summary, skills, industry
   const candidates = (Array.isArray(raw) ? raw : [])
     .map(p => ({
       name:        ([p.firstName, p.lastName].filter(Boolean).join(' ') || p.fullName || '').trim(),
