@@ -25,11 +25,12 @@ export default async function handler(req, res) {
   const title = titleMatch ? titleMatch[1].trim() : '';
 
   // harvestapi/linkedin-profile-search — no cookies required, 19K users, 4.5 stars
+  // Full mode: ~$0.10/search page + $0.004/profile — gives headline, skills, industry
   const actorId = 'harvestapi~linkedin-profile-search';
   const apifyEndpoint = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=25&memory=256`;
 
   const actorInput = {
-    profileScraperMode: 'Short',
+    profileScraperMode: 'Full',
     maxItems: 3,
   };
   if (title) actorInput.searchQuery = title;
@@ -65,7 +66,6 @@ export default async function handler(req, res) {
     if (!v) return '';
     if (typeof v === 'string') return v.trim();
     if (typeof v === 'object') {
-      // HarvestAPI location is often { city, country } or { full }
       return (v.full || v.city || v.country || Object.values(v).filter(x => typeof x === 'string').join(', ')).trim();
     }
     return String(v).trim();
