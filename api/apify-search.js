@@ -28,7 +28,6 @@ export default async function handler(req, res) {
   const actorId = 'harvestapi~linkedin-profile-search';
   const apifyEndpoint = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=25&memory=256`;
 
-  // Build input using the actor's native filters
   const actorInput = {
     profileScraperMode: 'Short',
     maxItems: 3,
@@ -61,18 +60,28 @@ export default async function handler(req, res) {
     return res.status(200).json({ candidates: [], count: 0, source: 'apify_error', debug: { fetchError: err.message } });
   }
 
-  // HarvestAPI returns: firstName, lastName, headline, location, profileUrl, summary, skills, industry
+  // Helper: safely extract a string from a field that might be an object or string
+  function str(v) {
+    if (!v) return '';
+    if (typeof v === 'string') return v.trim();
+    if (typeof v === 'object') {
+      // HarvestAPI location is often { city, country } or { full }
+      return (v.full || v.city || v.country || Object.values(v).filter(x => typeof x === 'string').join(', ')).trim();
+    }
+    return String(v).trim();
+  }
+
   const candidates = (Array.isArray(raw) ? raw : [])
     .map(p => ({
-      name:        ([p.firstName, p.lastName].filter(Boolean).join(' ') || p.fullName || '').trim(),
-      role:        (p.headline || p.title || '').trim(),
-      company:     (p.companyName || p.currentCompany || (p.positions && p.positions[0] && p.positions[0].companyName) || '').trim(),
-      location:    (p.location || p.addressWithCountry || '').trim(),
-      bio:         (p.summary || p.about || '').slice(0, 400).trim(),
-      skills:      Array.isArray(p.skills) ? p.skills.slice(0, 10).join(', ') : (p.skills || ''),
-      sector:      (p.industry || '').trim(),
+      name:        str([p.firstName, p.lastName].filter(Boolean).join(' ') || p.fullName || ''),
+      role:        str(p.headline || p.title || ''),
+      company:     str(p.companyName || p.currentCompany || (p.positions && p.positions[0] && p.positions[0].companyName) || ''),
+      location:    str(p.location || p.addressWithCountry || ''),
+      bio:         str(p.summary || p.about || '').slice(0, 400),
+      skills:      Array.isArray(p.skills) ? p.skills.slice(0, 10).join(', ') : str(p.skills),
+      sector:      str(p.industry || ''),
       type:        'live',
-      linkedinUrl: p.profileUrl || p.url || '',
+      linkedinUrl: str(p.profileUrl || p.url || ''),
     }))
     .filter(c => c.name);
 
