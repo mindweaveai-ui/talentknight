@@ -1,5 +1,10 @@
 {
   "version": 2,
+  "functions": {
+    "api/apify-search.js": {
+      "maxDuration": 60
+    }
+  },
   "builds": [
     { "src": "api/ai.js", "use": "@vercel/node" },
     { "src": "api/candidates.js", "use": "@vercel/node" },
