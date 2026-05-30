@@ -1,16 +1,11 @@
 {
   "version": 2,
-  "functions": {
-    "api/apify-search.js": {
-      "maxDuration": 60
-    }
-  },
   "builds": [
     { "src": "api/ai.js", "use": "@vercel/node" },
     { "src": "api/candidates.js", "use": "@vercel/node" },
     { "src": "api/leads.js", "use": "@vercel/node" },
     { "src": "api/submit-candidate.js", "use": "@vercel/node" },
-    { "src": "api/apify-search.js", "use": "@vercel/node" },
+    { "src": "api/apify-search.js", "use": "@vercel/node", "config": { "maxDuration": 60 } },
     { "src": "api/auth/linkedin.js", "use": "@vercel/node" },
     { "src": "api/auth/callback.js", "use": "@vercel/node" },
     { "src": "*.html", "use": "@vercel/static" }
