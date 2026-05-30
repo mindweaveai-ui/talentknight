@@ -16,7 +16,6 @@ export default async function handler(req, res) {
   if (!brief.trim()) return res.status(200).json({ candidates: [], count: 0 });
 
   // ── Extract location from brief ──────────────────────────────────────────
-  // Matches: "based in Cardiff", "in London", "near Bristol", "around Leeds"
   const locationMatch = brief.match(
     /\b(?:based in|located in|in|near|around)\s+([A-Z][a-zA-Z\s\-]+?)(?:\s*,|\s+and\b|\s+with\b|\s*\.|\s*$)/i
   );
@@ -33,10 +32,9 @@ export default async function handler(req, res) {
   const linkedinUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(searchQuery)}&origin=GLOBAL_SEARCH_HEADER`;
 
   // ── Call Apify ───────────────────────────────────────────────────────────
-  // Actor: bebity/linkedin-people-search-scraper
-  // To change actor: update the actorId below (use ~ not / in the URL)
-  const actorId = 'bebity~linkedin-people-search-scraper';
-  const apifyEndpoint = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=55&memory=256`;
+  // Using curious_coder actor — faster cold start than bebity on free tier
+  const actorId = 'curious_coder~linkedin-people-search-scraper';
+  const apifyEndpoint = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=50&memory=256`;
 
   let raw = [];
   try {
@@ -45,7 +43,7 @@ export default async function handler(req, res) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         searchUrl: linkedinUrl,
-        maxResults: 25,
+        maxResults: 5,
       }),
     });
 
