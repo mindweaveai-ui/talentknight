@@ -6,6 +6,8 @@
     { "src": "api/leads.js", "use": "@vercel/node" },
     { "src": "api/submit-candidate.js", "use": "@vercel/node" },
     { "src": "api/apify-search.js", "use": "@vercel/node" },
+    { "src": "api/apify-start.js", "use": "@vercel/node" },
+    { "src": "api/apify-poll.js", "use": "@vercel/node" },
     { "src": "api/auth/linkedin.js", "use": "@vercel/node" },
     { "src": "api/auth/callback.js", "use": "@vercel/node" },
     { "src": "*.html", "use": "@vercel/static" }
@@ -16,6 +18,8 @@
     { "src": "/api/leads", "dest": "/api/leads.js" },
     { "src": "/api/submit-candidate", "dest": "/api/submit-candidate.js" },
     { "src": "/api/apify-search", "dest": "/api/apify-search.js" },
+    { "src": "/api/apify-start", "dest": "/api/apify-start.js" },
+    { "src": "/api/apify-poll", "dest": "/api/apify-poll.js" },
     { "src": "/api/auth/linkedin", "dest": "/api/auth/linkedin.js" },
     { "src": "/api/auth/callback", "dest": "/api/auth/callback.js" },
     { "src": "/demo", "dest": "/demo.html" },
