@@ -1764,43 +1764,92 @@ function showAIIndicator() {
 
 // ============ CLAUDE AI CALL (real Airtable candidates) ============
 async function callClaudeAPI(brief) {
-  // Step 1: try Apify live LinkedIn search first, fall back to Airtable
-  let pool = [];
-  let source = 'airtable';
+  // ── Step 1: fire both sources in parallel ──────────────────────────────────
+  const [candRes, apifyStartRes] = await Promise.allSettled([
+    fetch('/api/candidates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brief }),
+    }),
+    fetch('/api/apify-start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brief }),
+    }),
+  ]);
+
+  // ── Step 2: get Airtable pool (fast fallback) ──────────────────────────────
+  let airtablePool = [];
+  if (candRes.status === 'fulfilled' && candRes.value.ok) {
+    const { candidates } = await candRes.value.json();
+    airtablePool = candidates || [];
+  }
+
+  // ── Step 3: get Apify runId ────────────────────────────────────────────────
+  let runId = null;
+  if (apifyStartRes.status === 'fulfilled' && apifyStartRes.value.ok) {
+    const startData = await apifyStartRes.value.json();
+    runId = startData.runId || null;
+  }
+
+  // ── Step 4: show Airtable results immediately (if any) ────────────────────
+  if (airtablePool.length > 0 && runId) {
+    const initialCandidates = await rankWithClaude(brief, airtablePool);
+    pollAndUpgrade(brief, runId, airtablePool, initialCandidates);
+    return initialCandidates;
+  }
+
+  // ── Step 5: if no Airtable results, wait for Apify ────────────────────────
+  if (runId) {
+    const liveCandidates = await pollUntilDone(runId);
+    const pool = liveCandidates.length > 0 ? liveCandidates : airtablePool;
+    if (pool.length === 0) throw new Error('No candidates found');
+    return await rankWithClaude(brief, pool);
+  }
+
+  // ── Step 6: Apify didn't start — use Airtable only ────────────────────────
+  if (airtablePool.length === 0) throw new Error('No candidates found');
+  return await rankWithClaude(brief, airtablePool);
+}
+
+// Poll Apify every 3s until SUCCEEDED or FAILED (max 10 attempts = 30s)
+async function pollUntilDone(runId, maxAttempts = 10) {
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise(r => setTimeout(r, 3000));
+    try {
+      const r = await fetch(`/api/apify-poll?runId=${runId}`);
+      if (!r.ok) continue;
+      const data = await r.json();
+      if (data.status === 'SUCCEEDED') return data.candidates || [];
+      if (data.status === 'FAILED') return [];
+    } catch (e) {
+      // network hiccup — keep trying
+    }
+  }
+  return [];
+}
+
+// Background upgrade: poll Apify, then re-rank merged pool and update UI
+async function pollAndUpgrade(brief, runId, airtablePool, initialCandidates) {
+  const liveCandidates = await pollUntilDone(runId);
+  if (liveCandidates.length === 0) return;
+
+  const liveUrls = new Set(liveCandidates.map(c => c.linkedinUrl).filter(Boolean));
+  const uniqueAirtable = airtablePool.filter(c => !liveUrls.has(c.linkedinUrl));
+  const mergedPool = [...liveCandidates, ...uniqueAirtable];
 
   try {
-    const apifyRes = await fetch('/api/apify-search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brief }),
-    });
-    if (apifyRes.ok) {
-      const apifyData = await apifyRes.json();
-      if (apifyData.candidates && apifyData.candidates.length > 0) {
-        pool = apifyData.candidates;
-        source = 'apify';
-      }
+    const upgraded = await rankWithClaude(brief, mergedPool);
+    if (typeof window !== 'undefined' && typeof window.onApifyUpgrade === 'function') {
+      window.onApifyUpgrade(upgraded);
     }
   } catch (e) {
-    // Apify unavailable — fall through to Airtable
+    console.warn('Apify upgrade ranking failed:', e);
   }
+}
 
-  // Fall back to Airtable if Apify returned nothing
-  if (pool.length === 0) {
-    const candRes = await fetch('/api/candidates', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brief }),
-    });
-    if (!candRes.ok) throw new Error('Candidates fetch failed: ' + candRes.status);
-    const { candidates: atPool } = await candRes.json();
-    if (!atPool || atPool.length === 0) throw new Error('No candidates found in database');
-    pool = atPool;
-  }
-
-  console.log(`Vesper sourced ${pool.length} candidates via ${source}`);
-
-  // Step 2: format the candidate pool for Claude
+// Ask Claude to rank a candidate pool against the brief, return top 5
+async function rankWithClaude(brief, pool) {
   const candText = pool.slice(0, 40).map((c, i) => {
     const parts = [c.name];
     if (c.location) parts.push(c.location);
@@ -1808,56 +1857,35 @@ async function callClaudeAPI(brief) {
     if (c.sector)   parts.push(c.sector);
     if (c.company)  parts.push(c.company);
     if (c.skills)   parts.push('Skills: ' + c.skills);
+    if (c.openToWork) parts.push('Open to work');
     let line = `${i + 1}. ${parts.join(' · ')}`;
     if (c.bio) line += `\n   ${c.bio.slice(0, 200)}`;
     return line;
   }).join('\n');
 
-  // Step 3: ask Claude to rank the real candidates against the brief
-  const response = await fetch('/api/ai', {
+  const resp = await fetch('/api/ai', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1200,
-      system: `You are a recruitment matching AI for TalentKnight. You will be given a job brief and a list of REAL candidates from our database. Select the 5 best matches and score them.
-
-Return ONLY a valid JSON object in this exact format — no other text, no markdown, no preamble:
-{
-  "candidates": [
-    {
-      "name": "First L.",
-      "headline": "Role · Location · Key skills",
-      "score": 95,
-      "why": "2-3 sentences explaining specifically why this person fits the brief."
-    }
-  ]
-}
-
-Rules:
-- Select exactly 5 candidates from the list provided (or all available if fewer than 5)
-- Use the REAL names from the list — abbreviate to first name + last initial only (e.g. "Sarah M.")
-- Scores: range from 65 to 97, listed highest first
-- Build a concise headline from their role/sector/location/skills
-- Why text: specific and confident — reference details from their actual profile
-- Do NOT invent candidates — only choose from the provided list`,
-      messages: [
-        { role: 'user', content: `Job brief: ${brief}\n\nAvailable candidates:\n${candText}` }
-      ]
+      system: `You are a recruitment matching AI for TalentKnight. You will be given a job brief and a list of REAL candidates from our database. Select the 5 best matches and score them.\n\nReturn ONLY a valid JSON object in this exact format — no other text, no markdown, no preamble:\n{"candidates":[{"name":"First L.","headline":"Role · Location · Key skills","score":95,"why":"2-3 sentences explaining specifically why this person fits the brief."}]}\n\nRules:\n- Select exactly 5 candidates from the list provided (or all available if fewer than 5)\n- Use the REAL names from the list — abbreviate to first name + last initial only\n- Scores: range from 65 to 97, listed highest first\n- Build a concise headline from their role/sector/location/skills\n- Why text: specific and confident — reference details from their actual profile\n- Do NOT invent candidates — only choose from the provided list`,
+      messages: [{ role: 'user', content: `Job brief: ${brief}\n\nAvailable candidates:\n${candText}` }]
     })
   });
 
-  if (!response.ok) throw new Error(`API error: ${response.status}`);
-  const data = await response.json();
+  if (!resp.ok) throw new Error(`AI API ${resp.status}`);
+  const data = await resp.json();
   const text = data.content.map(b => b.text || '').join('');
   const clean = text.replace(/```json|```/g, '').trim();
   const parsed = JSON.parse(clean);
-
-  if (!parsed.candidates || !Array.isArray(parsed.candidates)) {
-    throw new Error('Invalid response structure');
-  }
+  if (!parsed.candidates) throw new Error('Bad AI response');
   return parsed.candidates;
 }
+
+window.onApifyUpgrade = function(upgraded) {
+  renderCandidates(upgraded, lastBrief, 'live');
+};
 
 // ============ CLIENT FLOW ============
 async function submitBrief() {
