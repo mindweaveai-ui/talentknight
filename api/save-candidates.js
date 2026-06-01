@@ -36,7 +36,6 @@ export default async function handler(req, res) {
   if (!valid.length) return res.status(200).json({ saved: 0, skipped: 0 });
 
   // Check which names already exist in Airtable to avoid duplicates
-  // Build OR filter for all candidate names
   const nameFilters = valid.map(c => {
     const safe = c.name.trim().replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     return `{${F.name}} = '${safe}'`;
@@ -56,7 +55,7 @@ export default async function handler(req, res) {
       });
     }
   } catch (e) {
-    // If duplicate check fails, proceed anyway — Airtable won't crash on dupes
+    // If duplicate check fails, proceed anyway
   }
 
   // Filter to only new candidates
@@ -80,7 +79,7 @@ export default async function handler(req, res) {
         [F.bio]:      (c.bio || '').slice(0, 400),
         [F.skills]:   Array.isArray(c.skills) ? c.skills.join(', ') : (c.skills || ''),
         [F.sector]:   c.sector || '',
-        [F.type]:     'live',
+        [F.type]:     'LinkedIn',
       }
     }));
 
@@ -88,7 +87,7 @@ export default async function handler(req, res) {
       const r = await fetch(`https://api.airtable.com/v0/${MASTER_BASE}/${MASTER_TABLE}`, {
         method: 'POST',
         headers: atHeaders,
-        body: JSON.stringify({ records }),
+        body: JSON.stringify({ records, typecast: true }),
       });
       const d = await r.json();
       if (r.ok) saved += (d.records || []).length;
