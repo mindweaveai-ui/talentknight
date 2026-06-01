@@ -77,45 +77,48 @@ nav{display:flex;justify-content:space-between;align-items:center;padding:0 48px
 </div>
 <script>
 const planMap = {
-  starter: {
-    name: 'Starter',
-    priceHTML: '<sup>£</sup>299',
-    cadence: 'per month per seat',
+  source: {
+    name: 'TalentKnight Source',
+    priceHTML: '<sup>£</sup>249',
+    cadence: 'per seat / month',
     features: [
-      'Up to 5 role briefs per month',
-      'Live Vesper AI shortlists',
-      'Client login portal',
-      'Standard candidate library access',
+      '10 candidate searches per month',
+      'Live AI shortlists with fit scores',
+      'Written match explanation per candidate',
+      'Email notifications on new leads',
+      'Access to TalentKnight candidate pool',
     ]
   },
-  professional: {
-    name: 'Professional',
-    priceHTML: '<sup>£</sup>999',
-    cadence: 'per month per seat',
+  sourcepro: {
+    name: 'TalentKnight Source Pro',
+    priceHTML: '<sup>£</sup>499',
+    cadence: 'per seat / month',
     features: [
-      '25 role briefs per month',
-      'Live Vesper AI shortlists',
-      'Client login portal',
-      'Full candidate library access',
+      '25 candidate searches per month',
+      'Live AI shortlists with fit scores',
+      'Written match explanation per candidate',
+      'Email notifications on new leads',
+      'Access to TalentKnight candidate pool',
+      'Priority email support',
     ]
   },
-  enterprise: {
-    name: 'Enterprise',
-    priceHTML: 'Bespoke',
-    cadence: 'custom-scoped to your needs',
+  embedded: {
+    name: 'TalentKnight Embedded',
+    priceHTML: '<sup>£</sup>1,495',
+    cadence: 'per seat / month',
     features: [
-      'Unlimited role briefs',
-      'Dedicated account manager',
-      'Custom Vesper AI configuration',
-      'White-label client portal',
-      'Priority support & SLA',
+      'Everything in Source Pro',
+      'Client Engine — serve your own clients',
+      'White-label under your brand',
+      'Multi-client dashboard',
+      'Dedicated onboarding support',
     ]
   },
 };
 
 const params = new URLSearchParams(window.location.search);
-const key = (params.get('plan') || 'professional').toLowerCase();
-const p = planMap[key] || planMap.professional;
+const key = (params.get('plan') || 'sourcepro').toLowerCase();
+const p = planMap[key] || planMap.sourcepro;
 
 document.getElementById('planName').textContent = p.name;
 document.getElementById('planPriceWrap').innerHTML = p.priceHTML;
