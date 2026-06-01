@@ -1,5 +1,4 @@
-// api/apify-poll.js — Poll an Apify run for completion and return normalised candidates
-// Called repeatedly by the frontend every 3s until status is SUCCEEDED or FAILED.
+// api/apify-poll.js — Poll an Apify run for completion, return normalised candidates, auto-save to Airtable
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -26,12 +25,12 @@ export default async function handler(req, res) {
     return res.status(200).json({ status: 'ERROR', reason: err.message });
   }
 
-  // Run still in progress — tell the frontend to keep polling
+  // Still running — tell frontend to keep polling
   if (status === 'RUNNING' || status === 'READY' || status === 'CREATED') {
     return res.status(200).json({ status: 'RUNNING' });
   }
 
-  // Run failed or timed out
+  // Failed
   if (status !== 'SUCCEEDED') {
     return res.status(200).json({ status: 'FAILED', reason: status });
   }
@@ -48,7 +47,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ status: 'FAILED', reason: err.message });
   }
 
-  // Normalise to consistent shape Vesper expects
   function str(v) {
     if (!v) return '';
     if (typeof v === 'string') return v.trim();
@@ -73,5 +71,16 @@ export default async function handler(req, res) {
     }))
     .filter(c => c.name);
 
-    return res.status(200).json({ status: 'SUCCEEDED', candidates, count: candidates.length });
+  // Auto-save new profiles to Airtable in the background (fire and forget)
+  if (candidates.length > 0) {
+    const host = req.headers.host || 'talentknight.vercel.app';
+    const protocol = host.includes('localhost') ? 'http' : 'https';
+    fetch(`${protocol}://${host}/api/save-candidates`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidates }),
+    }).catch(() => {});
+  }
+
+  return res.status(200).json({ status: 'SUCCEEDED', candidates, count: candidates.length });
 }
