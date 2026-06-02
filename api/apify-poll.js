@@ -1,4 +1,4 @@
-// api/apify-poll.js — Poll an Apify run for completion, return normalised candidates, auto-save to Airtable
+// api/apify-poll.js — Poll Apify run, return candidates, save new ones directly to Airtable
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -7,6 +7,7 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   const APIFY_TOKEN = process.env.APIFY_TOKEN;
+  const AT_TOKEN    = process.env.AT_TOKEN;
   if (!APIFY_TOKEN) return res.status(500).json({ error: 'APIFY_TOKEN not configured' });
 
   const { runId } = req.query;
@@ -14,7 +15,6 @@ export default async function handler(req, res) {
 
   // Check run status
   const statusUrl = `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`;
-
   let status;
   try {
     const r = await fetch(statusUrl);
@@ -25,19 +25,15 @@ export default async function handler(req, res) {
     return res.status(200).json({ status: 'ERROR', reason: err.message });
   }
 
-  // Still running — tell frontend to keep polling
   if (status === 'RUNNING' || status === 'READY' || status === 'CREATED') {
     return res.status(200).json({ status: 'RUNNING' });
   }
-
-  // Failed
   if (status !== 'SUCCEEDED') {
     return res.status(200).json({ status: 'FAILED', reason: status });
   }
 
   // Fetch dataset results
   const datasetUrl = `https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${APIFY_TOKEN}&limit=25`;
-
   let raw = [];
   try {
     const r = await fetch(datasetUrl);
@@ -71,15 +67,66 @@ export default async function handler(req, res) {
     }))
     .filter(c => c.name);
 
-  // Auto-save new profiles to Airtable in the background (fire and forget)
-  if (candidates.length > 0) {
-    const host = req.headers.host || 'talentknight.vercel.app';
-    const protocol = host.includes('localhost') ? 'http' : 'https';
-    fetch(`${protocol}://${host}/api/save-candidates`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ candidates }),
-    }).catch(() => {});
+  // Save new profiles directly to Airtable (no internal HTTP call)
+  if (candidates.length > 0 && AT_TOKEN) {
+    const MASTER_BASE  = 'appnAnRSfB7bgIQVU';
+    const MASTER_TABLE = 'tblRJLWMSOB9YEXUI';
+    const F = {
+      name:     'fld8k1UET3DWwJV3S',
+      location: 'fldNx4IFaKgaOnNw3',
+      role:     'fldwOPyq4vmWzEquB',
+      company:  'fldJYcW9eWMMnFPDS',
+      bio:      'fldtJGFbRDqFR9PPJ',
+      skills:   'fldjzxELfOSU8M0dC',
+      sector:   'fldQjqjDdx2oV4KqA',
+      type:     'fldU5qaydUaqg8GxQ',
+    };
+    const atHeaders = {
+      Authorization: `Bearer ${AT_TOKEN}`,
+      'Content-Type': 'application/json',
+    };
+
+    // Check for existing names to avoid duplicates
+    try {
+      const nameFilters = candidates.map(c => {
+        const safe = c.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        return `{${F.name}} = '${safe}'`;
+      });
+      const formula = `OR(${nameFilters.join(',')})`;
+      const checkUrl = `https://api.airtable.com/v0/${MASTER_BASE}/${MASTER_TABLE}`
+        + `?filterByFormula=${encodeURIComponent(formula)}&fields[]=${F.name}&returnFieldsByFieldId=true`;
+      const checkR = await fetch(checkUrl, { headers: atHeaders });
+      const checkD = await checkR.json();
+      const existingNames = new Set(
+        (checkD.records || []).map(r => (r.fields[F.name] || '').trim().toLowerCase())
+      );
+
+      const toSave = candidates.filter(c => !existingNames.has(c.name.trim().toLowerCase()));
+
+      // Batch create in groups of 10
+      for (let i = 0; i < toSave.length; i += 10) {
+        const batch = toSave.slice(i, i + 10);
+        const records = batch.map(c => ({
+          fields: {
+            [F.name]:     c.name.trim(),
+            [F.location]: c.location || '',
+            [F.role]:     c.role || '',
+            [F.company]:  c.company || '',
+            [F.bio]:      (c.bio || '').slice(0, 400),
+            [F.skills]:   c.skills || '',
+            [F.sector]:   c.sector || '',
+            [F.type]:     'LinkedIn',
+          }
+        }));
+        await fetch(`https://api.airtable.com/v0/${MASTER_BASE}/${MASTER_TABLE}`, {
+          method: 'POST',
+          headers: atHeaders,
+          body: JSON.stringify({ records, typecast: true }),
+        });
+      }
+    } catch (e) {
+      // Save failure should never block the response
+    }
   }
 
   return res.status(200).json({ status: 'SUCCEEDED', candidates, count: candidates.length });
