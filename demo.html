@@ -1764,17 +1764,31 @@ function showAIIndicator() {
 
 // ============ CLAUDE AI CALL (real Airtable candidates) ============
 async function callClaudeAPI(brief) {
+  // ── Step 0: parse brief with Claude for smarter search ────────────────────
+  let parsed = null;
+  try {
+    const parseRes = await fetch('/api/parse-brief', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brief }),
+    });
+    if (parseRes.ok) {
+      const parseData = await parseRes.json();
+      parsed = parseData.parsed || null;
+    }
+  } catch(e) {}
+
   // ── Step 1: fire both sources in parallel ──────────────────────────────────
   const [candRes, apifyStartRes] = await Promise.allSettled([
     fetch('/api/candidates', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brief }),
+      body: JSON.stringify({ brief, parsed }),
     }),
     fetch('/api/apify-start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brief }),
+      body: JSON.stringify({ brief, parsed }),
     }),
   ]);
 
