@@ -1900,7 +1900,10 @@ async function rankWithClaude(brief, pool) {
   const data = await resp.json();
   const text = data.content.map(b => b.text || '').join('');
   const clean = text.replace(/```json|```/g, '').trim();
-  const parsed = JSON.parse(clean);
+  // Extract just the JSON object — ignore any explanation text Claude adds after it
+  const jsonMatch = clean.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('No JSON found in AI response');
+  const parsed = JSON.parse(jsonMatch[0]);
   if (!parsed.candidates) throw new Error('Bad AI response');
   return parsed.candidates;
 }
