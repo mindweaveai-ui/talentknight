@@ -1,6 +1,5 @@
 // api/candidates.js — TalentKnight Vesper candidate search
-// Keyword match only — no random fallback. If nothing matches, return empty
-// so the UI can show an honest "no match" state rather than irrelevant profiles.
+// Uses Claude-parsed keywords when available, falls back to brief extraction
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -24,26 +23,43 @@ export default async function handler(req, res) {
     type:     'fldU5qaydUaqg8GxQ',
   };
 
-  const { brief = '' } = req.body || {};
+  const { brief = '', parsed } = req.body || {};
   const atHeaders = { Authorization: `Bearer ${AT_TOKEN}` };
 
-  // Keyword extraction — lean stopword list so domain terms survive
-  const stopwords = new Set([
-    'with','that','this','have','from','they','will','been','were','their','there',
-    'about','would','could','should','looking','seeking','need','want','hire','find',
-    'recruit','ideal','good','great','level','years','year','experience','experienced',
-    'someone','person','candidate','professional','team','work','based','must','also',
-    'some','very','well','able','into','over','more','make','what','just','like',
-  ]);
+  let keywords = [];
 
-  const keywords = brief
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .split(/\s+/)
-    .filter(w => w.length >= 3 && !stopwords.has(w))
-    .slice(0, 10);
+  // Use Claude-parsed keywords if available — much more accurate
+  if (parsed?.keywords?.length > 0) {
+    const allTerms = [
+      parsed.title,
+      ...(parsed.keywords || []),
+      ...(parsed.qualifications || []),
+      parsed.location,
+    ].filter(Boolean);
 
-  // If the brief yields no usable keywords, return empty immediately
+    const stopwords = new Set(['with', 'that', 'this', 'have', 'from', 'they', 'will', 'been', 'were', 'their', 'there', 'about', 'would', 'could', 'should', 'based', 'must', 'also', 'some', 'very', 'well', 'able', 'into', 'over', 'more', 'make', 'what', 'just', 'like', 'hybrid', 'remote', 'onsite', 'working']);
+
+    keywords = allTerms
+      .map(t => t.toLowerCase().trim())
+      .filter(t => t.length >= 2 && !stopwords.has(t))
+      .slice(0, 12);
+  } else {
+    // Fall back to extracting from raw brief
+    const stopwords = new Set([
+      'with','that','this','have','from','they','will','been','were','their','there',
+      'about','would','could','should','looking','seeking','need','want','hire','find',
+      'recruit','ideal','good','great','level','years','year','experience','experienced',
+      'someone','person','candidate','professional','team','work','based','must','also',
+      'some','very','well','able','into','over','more','make','what','just','like',
+    ]);
+    keywords = brief
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length >= 3 && !stopwords.has(w))
+      .slice(0, 10);
+  }
+
   if (keywords.length === 0) {
     return res.status(200).json({ candidates: [], count: 0 });
   }
@@ -75,7 +91,6 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Airtable fetch failed: ' + err.message });
   }
 
-  // Shape records — longer bio (400 chars) gives Claude more signal
   const candidates = records.map(r => {
     const f = r.fields;
     return {
