@@ -1,5 +1,5 @@
 // api/candidates.js — TalentKnight Vesper candidate search
-// Uses Claude-parsed keywords when available, falls back to brief extraction
+// Only returns LinkedIn-sourced candidates — excludes Essex firm directors
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -23,6 +23,9 @@ export default async function handler(req, res) {
     type:     'fldU5qaydUaqg8GxQ',
   };
 
+  // Only show LinkedIn candidates — never Essex firm directors or developers
+  const ALLOWED_TYPES = ['LinkedIn', 'live'];
+
   const { brief = '', parsed } = req.body || {};
   const atHeaders = { Authorization: `Bearer ${AT_TOKEN}` };
 
@@ -44,7 +47,6 @@ export default async function handler(req, res) {
       .filter(t => t.length >= 2 && !stopwords.has(t))
       .slice(0, 12);
   } else {
-    // Fall back to extracting from raw brief
     const stopwords = new Set([
       'with','that','this','have','from','they','will','been','were','their','there',
       'about','would','could','should','looking','seeking','need','want','hire','find',
@@ -64,7 +66,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ candidates: [], count: 0 });
   }
 
-  // Build OR filter across 6 fields for every keyword
+  // Build keyword filter
   const fieldChecks = keywords.map(kw => {
     const safe = kw.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     return `OR(
@@ -76,7 +78,11 @@ export default async function handler(req, res) {
       SEARCH("${safe}", LOWER(IF({${F.company}},  {${F.company}},  "")))
     )`;
   });
-  const formula = `OR(${fieldChecks.join(',')})`;
+
+  // Combine: must match keywords AND must be a LinkedIn/live candidate
+  const typeFilter = `OR(${ALLOWED_TYPES.map(t => `{${F.type}} = '${t}'`).join(',')})`;
+  const keywordFilter = `OR(${fieldChecks.join(',')})`;
+  const formula = `AND(${typeFilter}, ${keywordFilter})`;
 
   const url = `https://api.airtable.com/v0/${MASTER_BASE}/${MASTER_TABLE}`
     + `?filterByFormula=${encodeURIComponent(formula)}&pageSize=100&returnFieldsByFieldId=true`;
