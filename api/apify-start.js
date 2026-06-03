@@ -32,6 +32,21 @@ export default async function handler(req, res) {
     title = titleMatch ? titleMatch[1].trim() : '';
   }
 
+  // UK-specific locations — append "United Kingdom" to avoid Apify returning US results
+  // e.g. "Essex" → "Essex, United Kingdom" (avoids Essex, Maryland USA)
+  const ukLocations = new Set([
+    'essex','london','manchester','birmingham','leeds','liverpool','sheffield',
+    'bristol','cardiff','edinburgh','glasgow','belfast','nottingham','leicester',
+    'coventry','hull','bradford','stoke','wolverhampton','derby','reading',
+    'northampton','luton','portsmouth','southampton','oxford','cambridge',
+    'norwich','swindon','exeter','brighton','milton keynes','york','bath',
+    'worcester','cheltenham','gloucester','ipswich','swansea','dundee','aberdeen',
+  ]);
+
+  if (location && ukLocations.has(location.toLowerCase()) && !location.toLowerCase().includes('united kingdom')) {
+    location = `${location}, United Kingdom`;
+  }
+
   const actorId = 'harvestapi~linkedin-profile-search';
 
   const actorInput = {
