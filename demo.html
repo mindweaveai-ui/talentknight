@@ -1806,11 +1806,19 @@ async function callClaudeAPI(brief) {
     runId = startData.runId || null;
   }
 
-  // ── Step 4: show Airtable results immediately (if any) ────────────────────
+  // ── Step 4: show Airtable results immediately (if any good matches) ────────
   if (airtablePool.length > 0 && runId) {
-    const initialCandidates = await rankWithClaude(brief, airtablePool);
-    pollAndUpgrade(brief, runId, airtablePool, initialCandidates);
-    return initialCandidates;
+    try {
+      const initialCandidates = await rankWithClaude(brief, airtablePool);
+      if (initialCandidates && initialCandidates.length > 0) {
+        // Good Airtable matches — show now, upgrade with LinkedIn in background
+        pollAndUpgrade(brief, runId, airtablePool, initialCandidates);
+        return initialCandidates;
+      }
+      // Airtable had candidates but none matched — fall through to wait for LinkedIn
+    } catch(e) {
+      // Ranking failed — fall through to wait for LinkedIn
+    }
   }
 
   // ── Step 5: if no Airtable results, wait for Apify ────────────────────────
