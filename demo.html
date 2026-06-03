@@ -1598,8 +1598,8 @@
         <path d="M24 4 L38 12 V28 C38 36 32 42 24 44 C16 42 10 36 10 28 V12 Z"/>
         <path d="M24 16 V32 M18 24 H30" opacity="0.5"/>
       </svg>
-      <h3>Your brief is with our team</h3>
-      <p>We've received the role and our sourcing team is building your shortlist now. You'll see matches in your dashboard within 24 hours — usually much sooner.</p>
+      <h3 id="fallbackHeading">Your brief is with our team</h3>
+      <p id="fallbackBody">We've received the role and our sourcing team is building your shortlist now. You'll see matches in your dashboard within 24 hours — usually much sooner.</p>
       <button class="new-search" onclick="showView('brief')">← New search</button>
     </div>
   </section>
@@ -1817,17 +1817,17 @@ async function callClaudeAPI(brief) {
   if (runId) {
     const liveCandidates = await pollUntilDone(runId);
     const pool = liveCandidates.length > 0 ? liveCandidates : airtablePool;
-    if (pool.length === 0) throw new Error('No candidates found');
+    if (pool.length === 0) throw new Error('no_matches');
     return await rankWithClaude(brief, pool);
   }
 
   // ── Step 6: Apify didn't start — use Airtable only ────────────────────────
-  if (airtablePool.length === 0) throw new Error('No candidates found');
+  if (airtablePool.length === 0) throw new Error('no_matches');
   return await rankWithClaude(brief, airtablePool);
 }
 
 // Poll Apify every 3s until SUCCEEDED or FAILED (max 10 attempts = 30s)
-async function pollUntilDone(runId, maxAttempts = 10) {
+async function pollUntilDone(runId, maxAttempts = 20) {
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise(r => setTimeout(r, 3000));
     try {
@@ -1954,17 +1954,29 @@ async function submitBrief() {
   } catch(e) {
     console.warn('Claude API unavailable, falling back to scenarios:', e.message);
 
-    // Silently fall back to keyword-matched scenarios
-    const match = findKeywordMatch(brief);
-    setStage(2, 'done');
-    await sleep(400);
-
-    if (match) {
-      document.getElementById('errorNotice').style.display = 'block';
-      renderCandidates(match.candidates, false);
-      showView('results');
-    } else {
+    if (e.message === 'no_matches') {
+      document.getElementById('fallbackHeading').textContent = 'No exact matches found';
+      document.getElementById('fallbackBody').textContent = 'Vesper searched LinkedIn live but couldn\'t find an exact match. Try broadening your brief or search again in a moment.';
+      setStage(2, 'done');
+      await sleep(400);
       showView('fallback');
+    } else {
+      // Restore default fallback text in case it was previously changed
+      document.getElementById('fallbackHeading').textContent = 'Your brief is with our team';
+      document.getElementById('fallbackBody').textContent = 'We\'ve received the role and our sourcing team is building your shortlist now. You\'ll see matches in your dashboard within 24 hours — usually much sooner.';
+
+      // Silently fall back to keyword-matched scenarios
+      const match = findKeywordMatch(brief);
+      setStage(2, 'done');
+      await sleep(400);
+
+      if (match) {
+        document.getElementById('errorNotice').style.display = 'block';
+        renderCandidates(match.candidates, false);
+        showView('results');
+      } else {
+        showView('fallback');
+      }
     }
   }
 
