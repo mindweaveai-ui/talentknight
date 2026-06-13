@@ -1460,7 +1460,7 @@
   .brand img { display: none !important; }
   .brand::before { content: 'Talent'; font-size: 20px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; font-family: var(--sans); }
   .brand::after  { content: 'Knight'; font-size: 20px; font-weight: 700; color: #2563eb; letter-spacing: -0.02em; font-family: var(--sans); }
-</style>
+.view-switcher{display:flex;gap:6px;}.view-btn{font-family:var(--sans);font-size:12px;font-weight:500;padding:6px 14px;border-radius:999px;border:1px solid var(--border);background:var(--bg);color:var(--text-muted);cursor:pointer;transition:all 0.2s ease;}.view-btn:hover{border-color:var(--border-strong);}.view-btn.active{border-color:var(--gold);color:var(--gold);background:rgba(37,99,235,0.06);}.view-note{font-size:12px;color:var(--text-muted);line-height:1.7;margin:16px 0 0;padding:12px 16px;background:var(--surface);border-left:2px solid var(--gold);border-radius:0 4px 4px 0;}.view-note strong{color:var(--text);}</style>
 </head>
 <body>
 
@@ -1523,7 +1523,7 @@
       </div>
       <button class="new-search" onclick="showView('brief')">← New search</button>
     </div>
-    <div class="error-notice" id="errorNotice">
+    <div class="view-switcher" id="viewSwitcher"><button class="view-btn active" onclick="selectView('client')" id="viewBtnClient">Client view</button><button class="view-btn" onclick="selectView('internal')" id="viewBtnInternal">Internal view</button></div><p class="view-note" id="viewNote">Client view: names are replaced with a reference code so this list can be shared safely. Full names and contact details are released after you request a profile.</p>  <div class="error-notice" id="errorNotice">
       AI is warming up — showing pre-loaded results for this search.
     </div>
     <div class="candidates-grid" id="candidatesGrid"></div>
@@ -2014,7 +2014,7 @@ function findKeywordMatch(brief) {
 }
 
 // ============ RENDERING ============
-function renderCandidates(candidates, isAI) {
+let viewMode = 'client';function refCode(i) {  return 'Candidate ' + String(i + 1).padStart(3, '0');}function selectView(mode) {  viewMode = mode;  document.getElementById('viewBtnClient').classList.toggle('active', mode === 'client');  document.getElementById('viewBtnInternal').classList.toggle('active', mode === 'internal');  const note = document.getElementById('viewNote');  if (mode === 'client') {    note.textContent = 'Client view: names are replaced with a reference code so this list can be shared safely. Full names and contact details are released after you request a profile.';  } else {    note.textContent = 'Internal view: full candidate names, for your team only.';  }  if (window.lastRenderedCandidates) {    renderCandidates(window.lastRenderedCandidates, window.lastRenderedIsAI);  }}function renderCandidates(candidates, isAI) {  window.lastRenderedCandidates = candidates;  window.lastRenderedIsAI = isAI;
   const grid = document.getElementById('candidatesGrid');
   grid.innerHTML = '';
 
@@ -2028,16 +2028,16 @@ function renderCandidates(candidates, isAI) {
     subtitle.innerHTML = 'Ranked by fit score. Click anyone to register interest.';
   }
 
-  sorted.forEach((c) => {
+  sorted.forEach((c, i) => {
     const initials = c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
     const fitClass = c.score >= 85 ? '' : c.score >= 75 ? 'sage' : 'amber';
 
     const el = document.createElement('div');
     el.className = 'candidate';
     el.innerHTML = `
-      <div class="avatar">${initials}</div>
+      <div class="avatar">${viewMode === 'client' ? String(i + 1).padStart(2, '0') : initials}</div>
       <div class="candidate-body">
-        <div class="candidate-name">${escapeHtml(c.name)}</div>
+        <div class="candidate-name">${escapeHtml(viewMode === 'client' ? refCode(i) : c.name)}</div>
         <div class="candidate-headline">${escapeHtml(c.headline)}</div>
         <div class="candidate-why">${escapeHtml(c.why)}</div>
       </div>
