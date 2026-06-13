@@ -21,6 +21,16 @@ export default async function handler(req, res) {
     skills:   'fldjzxELfOSU8M0dC',
     sector:   'fldQjqjDdx2oV4KqA',
     type:     'fldU5qaydUaqg8GxQ',
+    // Self-submitted candidate fields (written by api/submit-candidate.js).
+    // Not populated for LinkedIn-sourced records — surfaced here at zero
+    // extra scraping cost for the Candidate Snapshot Card.
+    salaryMin:       'fldukD1lSgSMk5QP3',
+    salaryMax:       'fld7s9k8DA4xZRDfB',
+    noticePeriod:    'fld6bjkGxD9O17rZL',
+    yearsExp:        'fldvniEirssDClM9N',
+    certifications:  'fldgTtC0PqkPoL69R',
+    educationLevel:  'fldWagGVvad1qKxKu',
+    degreeSubject:   'fldjb6pNRuLnKsTaO',
   };
 
   // Only show LinkedIn candidates — never Essex firm directors or developers
@@ -97,6 +107,20 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Airtable fetch failed: ' + err.message });
   }
 
+  // Helper: coerce a field that may be a number, string, or array (multi-select)
+  // into a clean array of strings — used for certifications.
+  function toList(v) {
+    if (Array.isArray(v)) return v.map(x => String(x).trim()).filter(Boolean);
+    if (v == null || v === '') return [];
+    return String(v).split(/[,;]/).map(s => s.trim()).filter(Boolean);
+  }
+
+  function toNumber(v) {
+    if (v === '' || v == null) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
   const candidates = records.map(r => {
     const f = r.fields;
     return {
@@ -108,6 +132,14 @@ export default async function handler(req, res) {
       skills:   String(f[F.skills]   || '').trim(),
       sector:   String(f[F.sector]   || '').trim(),
       type:     String(f[F.type]     || '').trim(),
+      // Self-submitted candidates only — empty/null for LinkedIn-sourced records
+      salaryMin:      toNumber(f[F.salaryMin]),
+      salaryMax:      toNumber(f[F.salaryMax]),
+      noticePeriod:   String(f[F.noticePeriod] || '').trim(),
+      yearsExp:       toNumber(f[F.yearsExp]),
+      certifications: toList(f[F.certifications]),
+      educationLevel: String(f[F.educationLevel] || '').trim(),
+      degreeSubject:  String(f[F.degreeSubject] || '').trim(),
     };
   }).filter(c => c.name && c.name !== 'Unknown');
 
