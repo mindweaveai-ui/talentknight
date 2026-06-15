@@ -743,6 +743,46 @@
   .candidate.interested .candidate-actions { display: none; }
   .candidate.passed { opacity: 0.35; }
 
+  .candidate-snapshot {
+    grid-column: 1 / -1;
+    margin-top: 12px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .snapshot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+  }
+
+  .snapshot-field { display: flex; flex-direction: column; gap: 2px; }
+
+  .snapshot-label {
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .snapshot-value { font-size: 13px; font-weight: 500; color: var(--text); }
+
+  .btn-details {
+    font-family: var(--sans);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 10px 16px;
+    border-radius: 2px;
+    border: 1px solid var(--border-strong);
+    background: var(--bg);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn-details:hover { border-color: var(--gold); color: var(--gold); }
+
   /* ============ ERROR STATE ============ */
   .error-notice {
     background: rgba(184, 122, 111, 0.08);
@@ -1905,7 +1945,35 @@ async function rankWithClaude(brief, pool) {
   if (!jsonMatch) throw new Error('No JSON found in AI response');
   const parsed = JSON.parse(jsonMatch[0]);
   if (!parsed.candidates) throw new Error('Bad AI response');
-  return parsed.candidates;
+  return mergeCandidateDetails(parsed.candidates, pool);
+}
+
+// Merge richer self-submitted fields (salary, notice period, experience,
+// certifications, education) from the original candidate pool back onto the
+// AI-ranked results, matched by name (AI returns "First L." abbreviated names).
+function mergeCandidateDetails(ranked, pool) {
+  const DETAIL_FIELDS = ['salaryMin', 'salaryMax', 'noticePeriod', 'yearsExp', 'certifications', 'educationLevel', 'degreeSubject'];
+  return ranked.map(cand => {
+    const parts = (cand.name || '').trim().split(/\s+/);
+    const first = (parts[0] || '').toLowerCase();
+    const lastInitial = (parts[1] || '').replace(/\./g, '').toLowerCase();
+    const src = pool.find(p => {
+      if (!p.name) return false;
+      const pParts = p.name.trim().split(/\s+/);
+      const pFirst = (pParts[0] || '').toLowerCase();
+      const pLast = (pParts[pParts.length - 1] || '').toLowerCase();
+      return pFirst === first && (!lastInitial || pLast.startsWith(lastInitial));
+    });
+    if (src) {
+      DETAIL_FIELDS.forEach(f => {
+        const v = src[f];
+        if (v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)) {
+          cand[f] = v;
+        }
+      });
+    }
+    return cand;
+  });
 }
 
 window.onApifyUpgrade = function(upgraded) {
@@ -2031,6 +2099,7 @@ let viewMode = 'client';function refCode(i) {  return 'Candidate ' + String(i + 
   sorted.forEach((c, i) => {
     const initials = c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
     const fitClass = c.score >= 85 ? '' : c.score >= 75 ? 'sage' : 'amber';
+    const snapshotFields = buildSnapshotFields(c);
 
     const el = document.createElement('div');
     el.className = 'candidate';
@@ -2054,9 +2123,11 @@ let viewMode = 'client';function refCode(i) {  return 'Candidate ' + String(i + 
             Request profile
           </button>
           <button class="btn-interest" onclick="showInterest(this)">I'm interested</button>
+          ${snapshotFields.length ? `<button class="btn-details" onclick="toggleSnapshot(this)">Details</button>` : ''}
         </div>
       </div>
       <div class="interest-confirm">Noted — we'll reach out to ${escapeHtml(c.name)} on your behalf and be in touch within 24 hours.</div>
+      ${snapshotFields.length ? `<div class="candidate-snapshot" hidden><div class="snapshot-grid">${snapshotFields.map(f => `<div class="snapshot-field"><span class="snapshot-label">${escapeHtml(f.label)}</span><span class="snapshot-value">${escapeHtml(f.value)}</span></div>`).join('')}</div></div>` : ''}
     `;
     grid.appendChild(el);
   });
@@ -2070,6 +2141,38 @@ let viewMode = 'client';function refCode(i) {  return 'Candidate ' + String(i + 
       document.getElementById('cvUploadSection').classList.add('visible');
     }, 300);
   });
+}
+
+// Build the optional "Details" snapshot fields for a candidate, from
+// self-submitted data (salary, notice period, experience, education, certs).
+function buildSnapshotFields(c) {
+  const fields = [];
+  if (c.salaryMin || c.salaryMax) {
+    let val;
+    if (c.salaryMin && c.salaryMax) val = `\u00a3${Number(c.salaryMin).toLocaleString()} \u2013 \u00a3${Number(c.salaryMax).toLocaleString()}`;
+    else val = `\u00a3${Number(c.salaryMin || c.salaryMax).toLocaleString()}`;
+    fields.push({ label: 'Salary expectation', value: val });
+  }
+  if (c.noticePeriod) fields.push({ label: 'Notice period', value: c.noticePeriod });
+  if (c.yearsExp) fields.push({ label: 'Experience', value: `${c.yearsExp} yrs` });
+  if (c.educationLevel || c.degreeSubject) {
+    fields.push({ label: 'Education', value: [c.educationLevel, c.degreeSubject].filter(Boolean).join(' \u00b7 ') });
+  }
+  if (c.certifications && c.certifications.length) {
+    fields.push({ label: 'Certifications', value: c.certifications.join(', ') });
+  }
+  return fields;
+}
+
+// Toggle the "Details" snapshot panel for a candidate card.
+function toggleSnapshot(btn) {
+  const card = btn.closest('.candidate');
+  const panel = card && card.querySelector('.candidate-snapshot');
+  if (!panel) return;
+  const hidden = panel.hasAttribute('hidden');
+  if (hidden) panel.removeAttribute('hidden');
+  else panel.setAttribute('hidden', '');
+  btn.textContent = hidden ? 'Hide details' : 'Details';
 }
 
 function showInterest(btn) {
