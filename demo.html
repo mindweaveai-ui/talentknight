@@ -767,6 +767,8 @@
 
   .snapshot-value { font-size: 13px; font-weight: 500; color: var(--text); }
 
+  .snapshot-loading .snapshot-value { color: var(--text-dim); font-weight: 400; font-style: italic; }
+
   .btn-details {
     font-family: var(--sans);
     font-size: 11px;
@@ -1952,7 +1954,7 @@ async function rankWithClaude(brief, pool) {
 // certifications, education) from the original candidate pool back onto the
 // AI-ranked results, matched by name (AI returns "First L." abbreviated names).
 function mergeCandidateDetails(ranked, pool) {
-  const DETAIL_FIELDS = ['salaryMin', 'salaryMax', 'noticePeriod', 'yearsExp', 'certifications', 'educationLevel', 'degreeSubject'];
+  const DETAIL_FIELDS = ['salaryMin', 'salaryMax', 'noticePeriod', 'yearsExp', 'certifications', 'educationLevel', 'degreeSubject', 'linkedinUrl'];
   return ranked.map(cand => {
     const parts = (cand.name || '').trim().split(/\s+/);
     const first = (parts[0] || '').toLowerCase();
@@ -2100,6 +2102,7 @@ let viewMode = 'client';function refCode(i) {  return 'Candidate ' + String(i + 
     const initials = c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
     const fitClass = c.score >= 85 ? '' : c.score >= 75 ? 'sage' : 'amber';
     const snapshotFields = buildSnapshotFields(c);
+    const showDetails = snapshotFields.length > 0 || !!c.linkedinUrl;
 
     const el = document.createElement('div');
     el.className = 'candidate';
@@ -2123,11 +2126,11 @@ let viewMode = 'client';function refCode(i) {  return 'Candidate ' + String(i + 
             Request profile
           </button>
           <button class="btn-interest" onclick="showInterest(this)">I'm interested</button>
-          ${snapshotFields.length ? `<button class="btn-details" onclick="toggleSnapshot(this)">Details</button>` : ''}
+          ${showDetails ? `<button class="btn-details" onclick="toggleSnapshot(this)">Details</button>` : ''}
         </div>
       </div>
       <div class="interest-confirm">Noted — we'll reach out to ${escapeHtml(c.name)} on your behalf and be in touch within 24 hours.</div>
-      ${snapshotFields.length ? `<div class="candidate-snapshot" hidden><div class="snapshot-grid">${snapshotFields.map(f => `<div class="snapshot-field"><span class="snapshot-label">${escapeHtml(f.label)}</span><span class="snapshot-value">${escapeHtml(f.value)}</span></div>`).join('')}</div></div>` : ''}
+      ${showDetails ? `<div class="candidate-snapshot" hidden data-linkedin="${escapeHtml(c.linkedinUrl || '')}" data-has-edu="${(c.educationLevel || c.degreeSubject) ? '1' : '0'}" data-has-certs="${(c.certifications && c.certifications.length) ? '1' : '0'}"><div class="snapshot-grid">${snapshotFields.map(f => `<div class="snapshot-field"><span class="snapshot-label">${escapeHtml(f.label)}</span><span class="snapshot-value">${escapeHtml(f.value)}</span></div>`).join('')}</div></div>` : ''}
     `;
     grid.appendChild(el);
   });
@@ -2164,8 +2167,32 @@ function buildSnapshotFields(c) {
   return fields;
 }
 
-// Toggle the "Details" snapshot panel for a candidate card.
-function toggleSnapshot(btn) {
+// Build extra snapshot fields from a LinkedIn profile enrichment result
+// (api/apify-enrich.js), skipping fields already covered by self-submitted
+// (Bucket 1) data.
+function buildEnrichedFields(panel, enriched) {
+  const fields = [];
+  if (enriched.tenure) fields.push({ label: 'Tenure (current role)', value: enriched.tenure });
+  if (panel.dataset.hasEdu !== '1' && enriched.education && enriched.education.length) {
+    const eduStr = enriched.education
+      .map(e => [e.degree, e.field, e.school].filter(Boolean).join(' \u00b7 '))
+      .filter(Boolean)
+      .join('; ');
+    if (eduStr) fields.push({ label: 'Education', value: eduStr });
+  }
+  if (panel.dataset.hasCerts !== '1' && enriched.certifications && enriched.certifications.length) {
+    fields.push({ label: 'Certifications', value: enriched.certifications.join(', ') });
+  }
+  if (enriched.skills && enriched.skills.length) {
+    fields.push({ label: 'Skills', value: enriched.skills.slice(0, 8).join(', ') });
+  }
+  return fields;
+}
+
+// Toggle the "Details" snapshot panel for a candidate card. On first expand,
+// if the candidate has a LinkedIn URL, fetch a fuller profile enrichment
+// (tenure, education, certifications, skills) and append it to the panel.
+async function toggleSnapshot(btn) {
   const card = btn.closest('.candidate');
   const panel = card && card.querySelector('.candidate-snapshot');
   if (!panel) return;
@@ -2173,6 +2200,44 @@ function toggleSnapshot(btn) {
   if (hidden) panel.removeAttribute('hidden');
   else panel.setAttribute('hidden', '');
   btn.textContent = hidden ? 'Hide details' : 'Details';
+
+  if (!hidden || panel.dataset.enriched || !panel.dataset.linkedin) return;
+  panel.dataset.enriched = 'pending';
+
+  const grid = panel.querySelector('.snapshot-grid');
+  const loading = document.createElement('div');
+  loading.className = 'snapshot-field snapshot-loading';
+  loading.innerHTML = '<span class="snapshot-label">LinkedIn details</span><span class="snapshot-value">Loading\u2026</span>';
+  grid.appendChild(loading);
+
+  try {
+    const resp = await fetch('/api/apify-enrich', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ linkedinUrl: panel.dataset.linkedin }),
+    });
+    const data = await resp.json();
+    loading.remove();
+
+    const extra = data && data.enriched ? buildEnrichedFields(panel, data.enriched) : [];
+    if (extra.length) {
+      extra.forEach(f => {
+        const el = document.createElement('div');
+        el.className = 'snapshot-field';
+        el.innerHTML = `<span class="snapshot-label">${escapeHtml(f.label)}</span><span class="snapshot-value">${escapeHtml(f.value)}</span>`;
+        grid.appendChild(el);
+      });
+    } else if (!grid.children.length) {
+      const el = document.createElement('div');
+      el.className = 'snapshot-field';
+      el.innerHTML = '<span class="snapshot-label">LinkedIn details</span><span class="snapshot-value">No additional details available</span>';
+      grid.appendChild(el);
+    }
+    panel.dataset.enriched = 'done';
+  } catch (err) {
+    loading.remove();
+    panel.dataset.enriched = '';
+  }
 }
 
 function showInterest(btn) {
