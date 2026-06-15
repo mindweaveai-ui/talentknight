@@ -785,6 +785,26 @@
 
   .btn-details:hover { border-color: var(--gold); color: var(--gold); }
 
+  /* ============ ENRICHING INDICATOR ============ */
+  .enriching-indicator {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+  }
+
+  .enriching-indicator.active { display: flex; }
+
+  .enriching-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+
   /* ============ ERROR STATE ============ */
   .error-notice {
     background: rgba(184, 122, 111, 0.08);
@@ -1568,6 +1588,7 @@
     <div class="view-switcher" id="viewSwitcher"><button class="view-btn active" onclick="selectView('client')" id="viewBtnClient">Client view</button><button class="view-btn" onclick="selectView('internal')" id="viewBtnInternal">Internal view</button></div><p class="view-note" id="viewNote">Client view: names are replaced with a reference code so this list can be shared safely. Full names and contact details are released after you request a profile.</p>  <div class="error-notice" id="errorNotice">
       AI is warming up — showing pre-loaded results for this search.
     </div>
+    <div class="enriching-indicator" id="enrichingIndicator"><span class="enriching-dot"></span>Finding more matches with live LinkedIn data…</div>
     <div class="candidates-grid" id="candidatesGrid"></div>
 
     <!-- CV Upload -->
@@ -1893,22 +1914,37 @@ async function pollUntilDone(runId, maxAttempts = 20) {
   return [];
 }
 
+// Show/hide the "finding more matches" indicator while the live LinkedIn upgrade runs
+function showEnrichingIndicator() {
+  const el = document.getElementById('enrichingIndicator');
+  if (el) el.classList.add('active');
+}
+function hideEnrichingIndicator() {
+  const el = document.getElementById('enrichingIndicator');
+  if (el) el.classList.remove('active');
+}
+
 // Background upgrade: poll Apify, then re-rank merged pool and update UI
 async function pollAndUpgrade(brief, runId, airtablePool, initialCandidates) {
-  const liveCandidates = await pollUntilDone(runId);
-  if (liveCandidates.length === 0) return;
-
-  const liveUrls = new Set(liveCandidates.map(c => c.linkedinUrl).filter(Boolean));
-  const uniqueAirtable = airtablePool.filter(c => !liveUrls.has(c.linkedinUrl));
-  const mergedPool = [...liveCandidates, ...uniqueAirtable];
-
+  showEnrichingIndicator();
   try {
-    const upgraded = await rankWithClaude(brief, mergedPool);
-    if (typeof window !== 'undefined' && typeof window.onApifyUpgrade === 'function') {
-      window.onApifyUpgrade(upgraded);
+    const liveCandidates = await pollUntilDone(runId);
+    if (liveCandidates.length === 0) return;
+
+    const liveUrls = new Set(liveCandidates.map(c => c.linkedinUrl).filter(Boolean));
+    const uniqueAirtable = airtablePool.filter(c => !liveUrls.has(c.linkedinUrl));
+    const mergedPool = [...liveCandidates, ...uniqueAirtable];
+
+    try {
+      const upgraded = await rankWithClaude(brief, mergedPool);
+      if (typeof window !== 'undefined' && typeof window.onApifyUpgrade === 'function') {
+        window.onApifyUpgrade(upgraded);
+      }
+    } catch (e) {
+      console.warn('Apify upgrade ranking failed:', e);
     }
-  } catch (e) {
-    console.warn('Apify upgrade ranking failed:', e);
+  } finally {
+    hideEnrichingIndicator();
   }
 }
 
@@ -1987,6 +2023,7 @@ async function submitBrief() {
   const brief = document.getElementById('briefInput').value.trim();
   if (!brief) { document.getElementById('briefInput').focus(); return; }
   lastBrief = brief;
+  hideEnrichingIndicator();
 
   showView('loading');
   setStage(0, 'active');
