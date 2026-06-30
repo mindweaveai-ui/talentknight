@@ -55,6 +55,8 @@ export default async function handler(req, res) {
   const candidates = (Array.isArray(raw) ? raw : [])
     .map(p => ({
       name:        str([p.firstName, p.lastName].filter(Boolean).join(' ') || p.fullName || ''),
+      firstName:   str(p.firstName || ''),
+      lastName:    str(p.lastName || ''),
       role:        str(p.headline || p.title || ''),
       company:     str(p.companyName || p.currentCompany || (p.currentPosition?.[0]?.companyName) || ''),
       location:    str(p.location || p.addressWithCountry || ''),
@@ -72,50 +74,84 @@ export default async function handler(req, res) {
     const MASTER_BASE  = 'appnAnRSfB7bgIQVU';
     const MASTER_TABLE = 'tblRJLWMSOB9YEXUI';
     const F = {
-      name:     'fld8k1UET3DWwJV3S',
-      location: 'fldNx4IFaKgaOnNw3',
-      role:     'fldwOPyq4vmWzEquB',
-      company:  'fldJYcW9eWMMnFPDS',
-      bio:      'fldtJGFbRDqFR9PPJ',
-      skills:   'fldjzxELfOSU8M0dC',
-      sector:   'fldQjqjDdx2oV4KqA',
-      type:     'fldU5qaydUaqg8GxQ',
+      name:             'fld8k1UET3DWwJV3S',
+      firstName:        'fldcs3RwQaCDfb5F0',
+      lastName:         'fldHxBcnOl6PvotSu',
+      location:         'fldNx4IFaKgaOnNw3',
+      role:             'fldwOPyq4vmWzEquB',
+      company:          'fldJYcW9eWMMnFPDS',
+      bio:              'fldtJGFbRDqFR9PPJ',
+      skills:           'fldjzxELfOSU8M0dC',
+      sector:           'fldQjqjDdx2oV4KqA',
+      type:             'fldU5qaydUaqg8GxQ',
+      linkedinUrl:      'fldU8JEsMJ7Qf9ftJ',
+      candidateSource:  'flda47WcrjAHQM3En',
+      enrichmentStatus: 'fldHX3Q6XduR3q6JJ',
     };
     const atHeaders = {
       Authorization: `Bearer ${AT_TOKEN}`,
       'Content-Type': 'application/json',
     };
 
-    // Check for existing names to avoid duplicates
     try {
-      const nameFilters = candidates.map(c => {
-        const safe = c.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-        return `{${F.name}} = '${safe}'`;
-      });
-      const formula = `OR(${nameFilters.join(',')})`;
-      const checkUrl = `https://api.airtable.com/v0/${MASTER_BASE}/${MASTER_TABLE}`
-        + `?filterByFormula=${encodeURIComponent(formula)}&fields[]=${F.name}&returnFieldsByFieldId=true`;
-      const checkR = await fetch(checkUrl, { headers: atHeaders });
-      const checkD = await checkR.json();
-      const existingNames = new Set(
-        (checkD.records || []).map(r => (r.fields[F.name] || '').trim().toLowerCase())
-      );
+      // Split candidates into those with/without LinkedIn URLs
+      const withUrl    = candidates.filter(c => c.linkedinUrl);
+      const withoutUrl = candidates.filter(c => !c.linkedinUrl);
 
-      const toSave = candidates.filter(c => !existingNames.has(c.name.trim().toLowerCase()));
+      let toSave = [];
+
+      // Dedup by LinkedIn URL (preferred — reliable unique key)
+      if (withUrl.length > 0) {
+        const urlFilters = withUrl.map(c => {
+          const safe = c.linkedinUrl.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+          return `{${F.linkedinUrl}} = '${safe}'`;
+        });
+        const formula = `OR(${urlFilters.join(',')})`;
+        const checkUrl = `https://api.airtable.com/v0/${MASTER_BASE}/${MASTER_TABLE}`
+          + `?filterByFormula=${encodeURIComponent(formula)}&fields[]=${F.linkedinUrl}&returnFieldsByFieldId=true`;
+        const checkR = await fetch(checkUrl, { headers: atHeaders });
+        const checkD = await checkR.json();
+        const existingUrls = new Set(
+          (checkD.records || []).map(r => (r.fields[F.linkedinUrl] || '').trim().toLowerCase())
+        );
+        toSave = withUrl.filter(c => !existingUrls.has(c.linkedinUrl.trim().toLowerCase()));
+      }
+
+      // Dedup by name for candidates without a LinkedIn URL
+      if (withoutUrl.length > 0) {
+        const nameFilters = withoutUrl.map(c => {
+          const safe = c.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+          return `{${F.name}} = '${safe}'`;
+        });
+        const formula = `OR(${nameFilters.join(',')})`;
+        const checkUrl = `https://api.airtable.com/v0/${MASTER_BASE}/${MASTER_TABLE}`
+          + `?filterByFormula=${encodeURIComponent(formula)}&fields[]=${F.name}&returnFieldsByFieldId=true`;
+        const checkR = await fetch(checkUrl, { headers: atHeaders });
+        const checkD = await checkR.json();
+        const existingNames = new Set(
+          (checkD.records || []).map(r => (r.fields[F.name] || '').trim().toLowerCase())
+        );
+        toSave = [...toSave, ...withoutUrl.filter(c => !existingNames.has(c.name.trim().toLowerCase()))];
+      }
 
       // Batch create in groups of 10
       for (let i = 0; i < toSave.length; i += 10) {
         const batch = toSave.slice(i, i + 10);
         const records = batch.map(c => ({
           fields: {
-            [F.name]:     c.name.trim(),
-            [F.location]: c.location || '',
-            [F.role]:     c.role || '',
-            [F.company]:  c.company || '',
-            [F.bio]:      (c.bio || '').slice(0, 400),
-            [F.skills]:   c.skills || '',
-            [F.sector]:   c.sector || '',
-            [F.type]:     'LinkedIn',
+            [F.name]:             c.name.trim(),
+            [F.firstName]:        c.firstName || c.name.split(' ')[0] || '',
+            [F.lastName]:         c.lastName  || c.name.split(' ').slice(1).join(' ') || '',
+            [F.location]:         c.location || '',
+            [F.role]:             c.role || '',
+            [F.company]:          c.company || '',
+            [F.bio]:              (c.bio || '').slice(0, 400),
+            [F.skills]:           c.skills || '',
+            [F.sector]:           c.sector || '',
+            [F.type]:             'LinkedIn',
+            [F.linkedinUrl]:      c.linkedinUrl || '',
+            [F.candidateSource]:  'Apify',
+            [F.enrichmentStatus]: 'Pending',
           }
         }));
         await fetch(`https://api.airtable.com/v0/${MASTER_BASE}/${MASTER_TABLE}`, {
