@@ -84,7 +84,7 @@ export default async function handler(req, res) {
       skills:           'fldjzxELfOSU8M0dC',
       sector:           'fldQjqjDdx2oV4KqA',
       type:             'fldU5qaydUaqg8GxQ',
-      linkedinUrl:      'fldU8JEsMJ7Qf9ftJ',
+      linkedinUrl:      'fldOmVhPF36ULGx7K',  // "LinkedIn URL" field (was incorrectly set to "Website")
       candidateSource:  'flda47WcrjAHQM3En',
       enrichmentStatus: 'fldHX3Q6XduR3q6JJ',
     };
