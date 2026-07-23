@@ -18,6 +18,7 @@
       --muted: #64748b;
       --dim: #94a3b8;
       --green: #16a34a;
+      --amber: #d97706;
       --rose: #ef4444;
     }
     body {
@@ -30,16 +31,9 @@
 
     /* ── NAV ── */
     .nav {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 0 28px;
-      height: 58px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 200;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 0 28px; height: 58px; display: flex; align-items: center;
+      justify-content: space-between; position: sticky; top: 0; z-index: 200;
     }
     .nav-logo { font-size: 17px; font-weight: 700; color: var(--blue); letter-spacing: -0.5px; }
     .nav-logo span { color: var(--text); }
@@ -90,17 +84,9 @@
     .role-brief { color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 500px; }
 
     /* ── SEARCH BAR ── */
-    .search-row {
-      display: flex; align-items: center; gap: 10px;
-      padding: 12px 20px 8px;
-    }
-    .search-wrap {
-      position: relative; flex: 1; max-width: 340px;
-    }
-    .search-icon {
-      position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
-      color: var(--dim); font-size: 13px; pointer-events: none;
-    }
+    .search-row { display: flex; align-items: center; gap: 10px; padding: 12px 20px 8px; }
+    .search-wrap { position: relative; flex: 1; max-width: 340px; }
+    .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--dim); font-size: 13px; pointer-events: none; }
     .search-input {
       font-family: inherit; font-size: 13px; width: 100%;
       padding: 8px 32px 8px 32px; border: 1px solid var(--border);
@@ -125,7 +111,7 @@
       border-radius: 10px; background: #eef2f7; border: 1px solid #dde3ec; overflow: hidden;
     }
     .col-header {
-      display: flex; align-items: center; gap: 7px; padding: 10px 10px;
+      display: flex; align-items: center; gap: 7px; padding: 10px;
       background: var(--surface); border-bottom: 1px solid var(--border);
     }
     .stage-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -168,7 +154,14 @@
       display: flex; align-items: center; justify-content: space-between;
       margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); gap: 4px;
     }
-    .card-loc { font-size: 11px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+    .card-loc { font-size: 11px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+    .stage-age {
+      font-size: 10px; font-weight: 700; padding: 1px 5px;
+      border-radius: 4px; white-space: nowrap; flex-shrink: 0;
+    }
+    .stage-age-ok     { background: #f1f5f9; color: var(--muted); }
+    .stage-age-warn   { background: #fef3c7; color: var(--amber); }
+    .stage-age-alert  { background: #fee2e2; color: var(--rose); }
     .card-icons { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
     .li-btn {
       display: inline-flex; align-items: center; justify-content: center;
@@ -230,6 +223,13 @@
       transition: border-color 0.12s;
     }
     .drawer-stage-select:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-light); }
+    .stage-since {
+      font-size: 12px; margin-top: 7px; padding: 6px 10px; border-radius: 7px;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .stage-since-ok    { background: #f1f5f9; color: var(--muted); }
+    .stage-since-warn  { background: #fef3c7; color: var(--amber); }
+    .stage-since-alert { background: #fee2e2; color: var(--rose); }
     .drawer-notes {
       font-family: inherit; font-size: 13px; line-height: 1.6;
       padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
@@ -465,7 +465,6 @@ function render() {
     ${role.location ? `<span>📍 ${esc(role.location)}</span>` : ''}
     ${role.brief ? `<span class="role-brief" title="${esc(role.brief)}">${esc(role.brief)}</span>` : ''}`;
 
-  // Restore clear button visibility if query exists
   updateSearchClear();
   buildKanban(role);
 }
@@ -540,7 +539,6 @@ function buildKanban(role) {
       cards.forEach(c => body.appendChild(makeCard(c)));
     }
 
-    // Only wire drag-drop when not filtering
     if (!searchQuery) {
       body.addEventListener('dragover', e => { e.preventDefault(); body.classList.add('drag-over'); });
       body.addEventListener('dragleave', e => { if (!body.contains(e.relatedTarget)) body.classList.remove('drag-over'); });
@@ -559,8 +557,8 @@ function makeCard(c) {
   card.draggable = !searchQuery;
   const sub = [c.role, c.company].filter(Boolean).join(' · ');
   const loc = shortLoc(c.location);
+  const age = stageDays(c.stageChangedAt);
 
-  // Highlight matching text
   const q = searchQuery.toLowerCase().trim();
   const hl = (s) => {
     if (!q || !s) return esc(s || '');
@@ -568,6 +566,10 @@ function makeCard(c) {
     if (idx === -1) return esc(s);
     return esc(s.slice(0, idx)) + `<mark style="background:#fef08a;border-radius:2px;padding:0 1px">${esc(s.slice(idx, idx + q.length))}</mark>` + esc(s.slice(idx + q.length));
   };
+
+  const ageBadge = age !== null
+    ? `<span class="stage-age ${ageClass(age)}" title="${age === 0 ? 'Moved today' : `${age} day${age !== 1 ? 's' : ''} in this stage`}">${age === 0 ? 'today' : age + 'd'}</span>`
+    : '';
 
   card.innerHTML = `
     <div class="card-top">
@@ -579,6 +581,7 @@ function makeCard(c) {
     </div>
     <div class="card-footer">
       <span class="card-loc">${loc ? `📍 ${hl(loc)}` : ''}</span>
+      ${ageBadge}
       <div class="card-icons">
         <span class="consent-dot${c.email ? ' ok' : ''}" title="${c.email ? 'Email available' : 'Pending consent'}"></span>
         ${c.linkedinUrl ? `<a class="li-btn" href="${escA(c.linkedinUrl)}" target="_blank" title="View on LinkedIn" onclick="event.stopPropagation()">in</a>` : ''}
@@ -604,7 +607,7 @@ function makeCard(c) {
 async function applyStage(candidateId, newStage, oldStage) {
   const role = state.roles[roleIdx];
   const cand = role.candidates.find(c => c.id === candidateId);
-  if (cand) cand.pipelineStage = newStage;
+  if (cand) { cand.pipelineStage = newStage; cand.stageChangedAt = todayISO(); }
   buildKanban(role);
   try {
     const r = await fetch('/api/crm?action=update-stage', {
@@ -613,7 +616,7 @@ async function applyStage(candidateId, newStage, oldStage) {
     });
     if (!r.ok) throw new Error();
   } catch {
-    if (cand) cand.pipelineStage = oldStage;
+    if (cand) { cand.pipelineStage = oldStage; cand.stageChangedAt = cand._prevStageChangedAt; }
     buildKanban(role);
     alert('Stage update failed — please try again.');
   }
@@ -625,6 +628,7 @@ function openDrawer(c) {
   const bg = avatarColor(c.name);
   const sub = [c.role, c.company].filter(Boolean).join(' · ');
   const loc = shortLoc(c.location);
+  const age = stageDays(c.stageChangedAt);
 
   document.getElementById('drawerHead').innerHTML = `
     <div class="drawer-avatar" style="background:${bg}">${esc(initials(c.name))}</div>
@@ -633,6 +637,12 @@ function openDrawer(c) {
       ${sub ? `<div class="drawer-sub">${esc(sub)}</div>` : ''}
     </div>
     <button class="drawer-close" onclick="closeDrawer()">✕</button>`;
+
+  const stageSinceHtml = age !== null
+    ? `<div class="stage-since ${ageClass(age).replace('stage-age-','stage-since-')}">
+        ⏱ ${age === 0 ? 'Moved to this stage today' : `${age} day${age !== 1 ? 's' : ''} in this stage`}
+       </div>`
+    : '';
 
   document.getElementById('drawerBody').innerHTML = `
     <div class="drawer-section">
@@ -651,6 +661,7 @@ function openDrawer(c) {
       <select class="drawer-stage-select" id="drawerStage" onchange="drawerChangeStage(this)">
         ${STAGES.map(s => `<option value="${s}"${s === c.pipelineStage ? ' selected' : ''}>${s}</option>`).join('')}
       </select>
+      ${stageSinceHtml}
     </div>
 
     <div class="drawer-section" style="flex:1;">
@@ -674,7 +685,14 @@ async function drawerChangeStage(sel) {
   const newStage = sel.value;
   const oldStage = openCand.pipelineStage;
   if (newStage === oldStage) return;
+  openCand._prevStageChangedAt = openCand.stageChangedAt;
   await applyStage(openCand.id, newStage, oldStage);
+  // refresh stage-since in drawer
+  const since = document.querySelector('.stage-since');
+  if (since) {
+    since.className = 'stage-since stage-since-ok';
+    since.textContent = '⏱ Moved to this stage today';
+  }
 }
 
 async function saveNotes() {
@@ -738,6 +756,24 @@ async function submitNewRole() {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
+function stageDays(dateStr) {
+  if (!dateStr) return null;
+  const then = new Date(dateStr + 'T00:00:00');
+  const now = new Date();
+  const diff = Math.floor((now - then) / 86400000);
+  return diff < 0 ? 0 : diff;
+}
+
+function ageClass(days) {
+  if (days >= 14) return 'stage-age-alert';
+  if (days >= 7)  return 'stage-age-warn';
+  return 'stage-age-ok';
+}
+
+function todayISO() {
+  return new Date().toISOString().split('T')[0];
+}
+
 function avatarColor(name) {
   const p = ['#2563eb','#7c3aed','#db2777','#dc2626','#d97706','#059669','#0891b2','#4f46e5'];
   let h = 0;
