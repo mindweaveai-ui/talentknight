@@ -51,7 +51,7 @@
     .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.4px; }
 
     /* ── ROLE TABS ── */
-    .role-tabs { display: flex; padding: 0 28px; margin-top: 10px; overflow-x: auto; gap: 2px; }
+    .role-tabs { display: flex; padding: 0 28px; margin-top: 10px; overflow-x: auto; gap: 2px; align-items: center; }
     .role-tab {
       padding: 10px 14px; font-size: 13px; font-weight: 500; color: var(--muted);
       border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap;
@@ -65,6 +65,15 @@
       margin-left: 5px; background: var(--bg); color: var(--muted);
     }
     .role-tab.active .tab-badge { background: var(--blue-light); color: var(--blue); }
+
+    .new-role-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 11px; font-size: 12px; font-weight: 600;
+      color: var(--blue); background: var(--blue-light); border: 1px solid #bfdbfe;
+      border-radius: 7px; cursor: pointer; white-space: nowrap;
+      transition: background 0.12s; margin-left: 6px; flex-shrink: 0;
+    }
+    .new-role-btn:hover { background: #dbeafe; }
 
     /* ── ROLE INFO BAR ── */
     .role-info {
@@ -221,6 +230,73 @@
     .save-btn:disabled { background: var(--dim); cursor: not-allowed; }
     .save-status { font-size: 12px; color: var(--green); opacity: 0; transition: opacity 0.3s; }
 
+    /* ── ROLE MODAL ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(15,23,42,0.4); z-index: 400;
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+      opacity: 0; transition: opacity 0.18s; pointer-events: none;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+    .modal {
+      background: var(--surface); border-radius: 14px; width: 100%; max-width: 460px;
+      border: 1px solid var(--border); box-shadow: 0 20px 60px rgba(15,23,42,0.2);
+      transform: translateY(10px); transition: transform 0.18s;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .modal-overlay.open .modal { transform: translateY(0); }
+
+    .modal-header {
+      padding: 20px 20px 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .modal-title { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
+    .modal-close {
+      width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--border);
+      background: var(--surface); cursor: pointer; display: flex; align-items: center;
+      justify-content: center; font-size: 13px; color: var(--muted);
+      transition: background 0.1s;
+    }
+    .modal-close:hover { background: var(--bg); color: var(--text); }
+
+    .modal-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+
+    .modal-field label {
+      display: block; font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.6px; color: var(--dim); margin-bottom: 6px;
+    }
+    .modal-field label .req { color: var(--rose); margin-left: 2px; }
+    .modal-input, .modal-textarea {
+      font-family: inherit; font-size: 13px; width: 100%;
+      padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px;
+      background: var(--bg); color: var(--text);
+      transition: border-color 0.12s, background 0.12s;
+    }
+    .modal-input:focus, .modal-textarea:focus {
+      outline: none; border-color: var(--blue);
+      background: var(--surface); box-shadow: 0 0 0 3px var(--blue-light);
+    }
+    .modal-textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
+
+    .modal-footer {
+      padding: 14px 20px; border-top: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+    }
+    .modal-cancel {
+      font-family: inherit; font-size: 13px; font-weight: 500;
+      padding: 8px 16px; background: var(--bg); color: var(--muted);
+      border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+      transition: background 0.1s;
+    }
+    .modal-cancel:hover { background: var(--border); color: var(--text); }
+    .modal-submit {
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      padding: 9px 18px; background: var(--blue); color: white;
+      border: none; border-radius: 8px; cursor: pointer; transition: background 0.12s;
+    }
+    .modal-submit:hover { background: #1d4ed8; }
+    .modal-submit:disabled { background: var(--dim); cursor: not-allowed; }
+
     /* ── STATES ── */
     .centered { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 14px; text-align: center; }
     .spinner { width: 34px; height: 34px; border: 3px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.7s linear infinite; }
@@ -251,6 +327,34 @@
   <div class="drawer-footer">
     <button class="save-btn" id="saveBtn" onclick="saveNotes()">Save notes</button>
     <span class="save-status" id="saveStatus">✓ Saved</span>
+  </div>
+</div>
+
+<!-- New role modal -->
+<div class="modal-overlay" id="roleModalOverlay" onclick="closeRoleModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">Request a new role</div>
+      <button class="modal-close" onclick="closeRoleModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label>Role title <span class="req">*</span></label>
+        <input id="roleTitle" class="modal-input" type="text" placeholder="e.g. Senior Tax Manager" />
+      </div>
+      <div class="modal-field">
+        <label>Location</label>
+        <input id="roleLocation" class="modal-input" type="text" placeholder="e.g. London (Hybrid)" />
+      </div>
+      <div class="modal-field">
+        <label>Brief / key requirements</label>
+        <textarea id="roleBrief" class="modal-textarea" placeholder="Qualifications, years of experience, specialisms, salary range…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-cancel" onclick="closeRoleModal()">Cancel</button>
+      <button class="modal-submit" id="roleSubmitBtn" onclick="submitNewRole()">Submit role</button>
+    </div>
   </div>
 </div>
 
@@ -294,11 +398,13 @@ function render() {
 
   if (!roles.length) {
     main.innerHTML = `
-      <div class="page-header"><div class="header-inner"><div class="page-title">${esc(client.name)}</div></div><div style="height:18px"></div></div>
+      <div class="page-header"><div class="header-inner"><div class="page-title">${esc(client.name)}</div></div>
+      <div class="role-tabs"><button class="new-role-btn" onclick="openRoleModal()">＋ New role</button></div>
+      <div style="height:12px"></div></div>
       <div class="centered" style="min-height:50vh;">
         <div style="font-size:36px;">📋</div>
         <div style="font-size:16px;font-weight:600;">No roles yet</div>
-        <div style="color:var(--muted);font-size:13px;">Your TalentKnight recruiter will set up your first role shortly.</div>
+        <div style="color:var(--muted);font-size:13px;">Click <strong>＋ New role</strong> to request your first search.</div>
       </div>`;
     return;
   }
@@ -322,6 +428,13 @@ function render() {
     t.onclick = () => { roleIdx = i; closeDrawer(); render(); };
     tabs.appendChild(t);
   });
+
+  // New role button at end of tabs
+  const btn = document.createElement('button');
+  btn.className = 'new-role-btn';
+  btn.innerHTML = '＋ New role';
+  btn.onclick = openRoleModal;
+  tabs.appendChild(btn);
 
   const info = document.getElementById('roleInfo');
   info.innerHTML = `
@@ -422,7 +535,7 @@ async function applyStage(candidateId, newStage, oldStage) {
   }
 }
 
-// ── Drawer ────────────────────────────────────────────────────────
+// ── Candidate drawer ──────────────────────────────────────────────
 function openDrawer(c) {
   openCand = c;
   const bg = avatarColor(c.name);
@@ -436,8 +549,6 @@ function openDrawer(c) {
       ${sub ? `<div class="drawer-sub">${esc(sub)}</div>` : ''}
     </div>
     <button class="drawer-close" onclick="closeDrawer()">✕</button>`;
-
-  const stageCfg = STAGE_CFG[c.pipelineStage] || STAGE_CFG.Sourced;
 
   document.getElementById('drawerBody').innerHTML = `
     <div class="drawer-section">
@@ -499,6 +610,50 @@ async function saveNotes() {
     setTimeout(() => { status.style.opacity = '0'; }, 2500);
   } catch { alert('Failed to save notes — please try again.'); }
   finally { btn.disabled = false; btn.textContent = 'Save notes'; }
+}
+
+// ── Role modal ────────────────────────────────────────────────────
+function openRoleModal() {
+  document.getElementById('roleTitle').value = '';
+  document.getElementById('roleLocation').value = '';
+  document.getElementById('roleBrief').value = '';
+  document.getElementById('roleSubmitBtn').disabled = false;
+  document.getElementById('roleSubmitBtn').textContent = 'Submit role';
+  document.getElementById('roleModalOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('roleTitle').focus(), 50);
+}
+
+function closeRoleModal(e) {
+  if (e && e.target !== document.getElementById('roleModalOverlay')) return;
+  document.getElementById('roleModalOverlay').classList.remove('open');
+}
+
+async function submitNewRole() {
+  const title = document.getElementById('roleTitle').value.trim();
+  if (!title) { document.getElementById('roleTitle').focus(); return; }
+
+  const location = document.getElementById('roleLocation').value.trim();
+  const brief = document.getElementById('roleBrief').value.trim();
+  const btn = document.getElementById('roleSubmitBtn');
+  btn.disabled = true; btn.textContent = 'Submitting…';
+
+  try {
+    const r = await fetch('/api/crm?action=create-role', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: TOKEN, title, location, brief }),
+    });
+    if (!r.ok) throw new Error();
+    const data = await r.json();
+
+    // Add new role to local state and switch to it
+    state.roles.push({ id: data.roleId, title, location, brief, status: 'Active', candidates: [] });
+    roleIdx = state.roles.length - 1;
+    document.getElementById('roleModalOverlay').classList.remove('open');
+    render();
+  } catch {
+    alert('Failed to create role — please try again.');
+    btn.disabled = false; btn.textContent = 'Submit role';
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
