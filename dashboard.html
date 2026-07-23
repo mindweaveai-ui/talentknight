@@ -46,259 +46,184 @@
     .nav-client { font-size: 13px; color: var(--muted); font-weight: 500; }
 
     /* ── PAGE HEADER ── */
-    .page-header {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-    }
-    .header-inner {
-      padding: 18px 28px 0;
-    }
+    .page-header { background: var(--surface); border-bottom: 1px solid var(--border); }
+    .header-inner { padding: 18px 28px 0; }
     .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.4px; }
 
     /* ── ROLE TABS ── */
-    .role-tabs {
-      display: flex;
-      padding: 0 28px;
-      margin-top: 10px;
-      overflow-x: auto;
-      gap: 2px;
-    }
+    .role-tabs { display: flex; padding: 0 28px; margin-top: 10px; overflow-x: auto; gap: 2px; }
     .role-tab {
-      padding: 10px 14px;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--muted);
-      border-bottom: 2px solid transparent;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: color 0.12s;
-      user-select: none;
+      padding: 10px 14px; font-size: 13px; font-weight: 500; color: var(--muted);
+      border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap;
+      transition: color 0.12s; user-select: none;
     }
     .role-tab:hover { color: var(--text); }
     .role-tab.active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 600; }
     .tab-badge {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 11px;
-      font-weight: 600;
-      padding: 1px 6px;
-      border-radius: 10px;
-      margin-left: 5px;
-      background: var(--bg);
-      color: var(--muted);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 10px;
+      margin-left: 5px; background: var(--bg); color: var(--muted);
     }
     .role-tab.active .tab-badge { background: var(--blue-light); color: var(--blue); }
 
     /* ── ROLE INFO BAR ── */
     .role-info {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 28px 12px;
-      font-size: 12px;
-      color: var(--muted);
-      flex-wrap: wrap;
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 28px 12px; font-size: 12px; color: var(--muted); flex-wrap: wrap;
     }
     .status-badge {
-      font-size: 11px;
-      font-weight: 600;
-      padding: 2px 9px;
-      border-radius: 20px;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
+      font-size: 11px; font-weight: 600; padding: 2px 9px;
+      border-radius: 20px; text-transform: uppercase; letter-spacing: 0.4px;
     }
     .status-active   { background: #dcfce7; color: #166534; }
     .status-paused   { background: #fef9c3; color: #854d0e; }
     .status-filled   { background: #dbeafe; color: #1e40af; }
     .status-closed   { background: #f1f5f9; color: #475569; }
-    .role-brief {
-      color: var(--dim);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 500px;
-    }
+    .role-brief { color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 500px; }
 
     /* ── KANBAN ── */
-    .kanban-outer {
-      padding: 20px 20px 60px;
-    }
-    .kanban-board {
-      display: flex;
-      gap: 8px;
-      align-items: flex-start;
-      width: 100%;
-    }
+    .kanban-outer { padding: 20px 20px 60px; }
+    .kanban-board { display: flex; gap: 8px; align-items: flex-start; width: 100%; }
     .kanban-col {
-      flex: 1;
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-      border-radius: 10px;
-      background: #eef2f7;
-      border: 1px solid #dde3ec;
-      overflow: hidden;
+      flex: 1; min-width: 0; display: flex; flex-direction: column;
+      border-radius: 10px; background: #eef2f7; border: 1px solid #dde3ec; overflow: hidden;
     }
     .col-header {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      padding: 10px 10px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 7px; padding: 10px 10px;
+      background: var(--surface); border-bottom: 1px solid var(--border);
     }
-    .stage-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
+    .stage-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
     .stage-name {
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      flex: 1;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .stage-count {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--muted);
-      background: var(--bg);
-      padding: 1px 6px;
-      border-radius: 10px;
-      flex-shrink: 0;
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      background: var(--bg); padding: 1px 6px; border-radius: 10px; flex-shrink: 0;
     }
     .col-body {
-      padding: 7px;
-      min-height: 180px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      transition: background 0.12s;
+      padding: 7px; min-height: 180px; display: flex; flex-direction: column;
+      gap: 6px; transition: background 0.12s;
     }
     .col-body.drag-over {
-      background: #dbeafe;
-      outline: 2px dashed var(--blue);
-      outline-offset: -3px;
-      border-radius: 0 0 10px 10px;
+      background: #dbeafe; outline: 2px dashed var(--blue);
+      outline-offset: -3px; border-radius: 0 0 10px 10px;
     }
-    .col-empty {
-      padding: 20px 8px;
-      text-align: center;
-      color: var(--dim);
-      font-size: 11px;
-    }
+    .col-empty { padding: 20px 8px; text-align: center; color: var(--dim); font-size: 11px; }
 
     /* ── CANDIDATE CARDS ── */
     .cand-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 7px;
-      padding: 10px;
-      cursor: grab;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 7px; padding: 10px; cursor: pointer;
       transition: box-shadow 0.12s, transform 0.12s, opacity 0.12s;
     }
-    .cand-card:hover {
-      box-shadow: 0 3px 10px rgba(15,23,42,0.1);
-      transform: translateY(-1px);
-    }
-    .cand-card.dragging {
-      opacity: 0.35;
-      cursor: grabbing;
-    }
+    .cand-card:hover { box-shadow: 0 3px 10px rgba(15,23,42,0.1); transform: translateY(-1px); }
+    .cand-card.dragging { opacity: 0.35; cursor: grabbing; }
     .card-top { display: flex; align-items: flex-start; gap: 8px; }
     .cand-avatar {
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 11px;
-      font-weight: 700;
-      color: white;
-      flex-shrink: 0;
+      width: 30px; height: 30px; border-radius: 50%; display: flex;
+      align-items: center; justify-content: center; font-size: 11px;
+      font-weight: 700; color: white; flex-shrink: 0;
     }
     .card-body { flex: 1; min-width: 0; }
-    .cand-name {
-      font-size: 12px;
-      font-weight: 600;
-      line-height: 1.3;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .cand-sub {
-      font-size: 11px;
-      color: var(--muted);
-      margin-top: 2px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      line-height: 1.4;
-    }
+    .cand-name { font-size: 12px; font-weight: 600; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cand-sub { font-size: 11px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }
     .card-footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-top: 8px;
-      padding-top: 8px;
-      border-top: 1px solid var(--border);
-      gap: 4px;
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); gap: 4px;
     }
-    .card-loc {
-      font-size: 11px;
-      color: var(--dim);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      flex: 1;
-    }
+    .card-loc { font-size: 11px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
     .card-icons { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
     .li-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 18px;
-      height: 18px;
-      border-radius: 3px;
-      background: #0a66c2;
-      color: white;
-      font-size: 9px;
-      font-weight: 800;
-      text-decoration: none;
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 18px; height: 18px; border-radius: 3px; background: #0a66c2;
+      color: white; font-size: 9px; font-weight: 800; text-decoration: none;
     }
-    .consent-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--dim);
-    }
+    .consent-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); }
     .consent-dot.ok { background: var(--green); }
 
+    /* ── DRAWER ── */
+    .drawer-backdrop {
+      position: fixed; inset: 0; background: rgba(15,23,42,0.25); z-index: 300;
+      opacity: 0; transition: opacity 0.2s; pointer-events: none;
+    }
+    .drawer-backdrop.open { opacity: 1; pointer-events: all; }
+
+    .drawer {
+      position: fixed; top: 0; right: 0; bottom: 0; width: 400px;
+      background: var(--surface); border-left: 1px solid var(--border);
+      z-index: 301; transform: translateX(100%);
+      transition: transform 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .drawer.open { transform: translateX(0); }
+
+    .drawer-head {
+      padding: 20px 20px 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: flex-start; gap: 12px; flex-shrink: 0;
+    }
+    .drawer-avatar {
+      width: 46px; height: 46px; border-radius: 50%; display: flex;
+      align-items: center; justify-content: center; font-size: 16px;
+      font-weight: 700; color: white; flex-shrink: 0;
+    }
+    .drawer-name-block { flex: 1; min-width: 0; padding-top: 2px; }
+    .drawer-name { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+    .drawer-sub { font-size: 13px; color: var(--muted); margin-top: 3px; }
+    .drawer-close {
+      width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--border);
+      background: var(--surface); cursor: pointer; display: flex; align-items: center;
+      justify-content: center; font-size: 14px; color: var(--muted); flex-shrink: 0;
+      transition: background 0.1s;
+    }
+    .drawer-close:hover { background: var(--bg); color: var(--text); }
+
+    .drawer-body { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 24px; }
+
+    .drawer-section {}
+    .drawer-section-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.7px; color: var(--dim); margin-bottom: 10px;
+    }
+    .drawer-detail-row {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; color: var(--text); margin-bottom: 7px;
+    }
+    .drawer-detail-row:last-child { margin-bottom: 0; }
+    .drawer-detail-icon { width: 16px; text-align: center; flex-shrink: 0; font-size: 13px; }
+
+    .drawer-stage-select {
+      font-family: inherit; font-size: 13px; font-weight: 500;
+      padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px;
+      background: var(--surface); width: 100%; cursor: pointer; color: var(--text);
+      transition: border-color 0.12s;
+    }
+    .drawer-stage-select:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-light); }
+
+    .drawer-notes {
+      font-family: inherit; font-size: 13px; line-height: 1.6;
+      padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+      background: var(--bg); width: 100%; resize: vertical; min-height: 110px;
+      color: var(--text); transition: border-color 0.12s, background 0.12s;
+    }
+    .drawer-notes:focus { outline: none; border-color: var(--blue); background: var(--surface); box-shadow: 0 0 0 3px var(--blue-light); }
+
+    .drawer-footer {
+      padding: 14px 20px; border-top: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+    }
+    .save-btn {
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      padding: 9px 18px; background: var(--blue); color: white;
+      border: none; border-radius: 8px; cursor: pointer; transition: background 0.12s;
+    }
+    .save-btn:hover { background: #1d4ed8; }
+    .save-btn:disabled { background: var(--dim); cursor: not-allowed; }
+    .save-status { font-size: 12px; color: var(--green); opacity: 0; transition: opacity 0.3s; }
+
     /* ── STATES ── */
-    .centered {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 60vh;
-      gap: 14px;
-      text-align: center;
-    }
-    .spinner {
-      width: 34px;
-      height: 34px;
-      border: 3px solid var(--border);
-      border-top-color: var(--blue);
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-    }
+    .centered { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 14px; text-align: center; }
+    .spinner { width: 34px; height: 34px; border: 3px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .err-title { font-size: 17px; font-weight: 600; }
     .err-msg { color: var(--rose); font-size: 14px; }
@@ -318,9 +243,19 @@
   </div>
 </div>
 
+<!-- Candidate detail drawer -->
+<div class="drawer-backdrop" id="drawerBackdrop" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head" id="drawerHead"></div>
+  <div class="drawer-body" id="drawerBody"></div>
+  <div class="drawer-footer">
+    <button class="save-btn" id="saveBtn" onclick="saveNotes()">Save notes</button>
+    <span class="save-status" id="saveStatus">✓ Saved</span>
+  </div>
+</div>
+
 <script>
 const TOKEN = new URLSearchParams(window.location.search).get('token');
-
 const STAGES = ['Sourced','Contacted','Shortlisted','Interviewing','Offered','Placed','Rejected'];
 const STAGE_CFG = {
   Sourced:      { dot: '#94a3b8', color: '#475569' },
@@ -336,7 +271,9 @@ let state = null;
 let roleIdx = 0;
 let dragId = null;
 let dragFrom = null;
+let openCand = null;
 
+// ── Load ──────────────────────────────────────────────────────────
 async function load() {
   if (!TOKEN) return showErr('No access token', 'Check your dashboard link and try again.');
   try {
@@ -348,11 +285,11 @@ async function load() {
   render();
 }
 
+// ── Render ────────────────────────────────────────────────────────
 function render() {
   const { client, roles } = state;
   document.getElementById('navClient').textContent = client.name;
   document.title = `${client.name} — TalentKnight`;
-
   const main = document.getElementById('main');
 
   if (!roles.length) {
@@ -371,52 +308,41 @@ function render() {
 
   main.innerHTML = `
     <div class="page-header">
-      <div class="header-inner">
-        <div class="page-title">${esc(client.name)}</div>
-      </div>
+      <div class="header-inner"><div class="page-title">${esc(client.name)}</div></div>
       <div class="role-tabs" id="roleTabs"></div>
       <div class="role-info" id="roleInfo"></div>
     </div>
-    <div class="kanban-outer">
-      <div class="kanban-board" id="board"></div>
-    </div>`;
+    <div class="kanban-outer"><div class="kanban-board" id="board"></div></div>`;
 
-  // Tabs
   const tabs = document.getElementById('roleTabs');
   roles.forEach((r, i) => {
     const t = document.createElement('div');
     t.className = 'role-tab' + (i === roleIdx ? ' active' : '');
     t.innerHTML = `${esc(r.title)}<span class="tab-badge">${r.candidates.length}</span>`;
-    t.onclick = () => { roleIdx = i; render(); };
+    t.onclick = () => { roleIdx = i; closeDrawer(); render(); };
     tabs.appendChild(t);
   });
 
-  // Role info bar
   const info = document.getElementById('roleInfo');
-  const statusClass = 'status-' + role.status.toLowerCase();
   info.innerHTML = `
-    <span class="status-badge ${statusClass}">${esc(role.status)}</span>
+    <span class="status-badge status-${role.status.toLowerCase()}">${esc(role.status)}</span>
     ${role.location ? `<span>📍 ${esc(role.location)}</span>` : ''}
     ${role.brief ? `<span class="role-brief" title="${esc(role.brief)}">${esc(role.brief)}</span>` : ''}`;
 
   buildKanban(role);
 }
 
+// ── Kanban ────────────────────────────────────────────────────────
 function buildKanban(role) {
   const board = document.getElementById('board');
   board.innerHTML = '';
-
   const byStage = {};
   STAGES.forEach(s => byStage[s] = []);
-  role.candidates.forEach(c => {
-    const s = STAGES.includes(c.pipelineStage) ? c.pipelineStage : 'Sourced';
-    byStage[s].push(c);
-  });
+  role.candidates.forEach(c => { byStage[STAGES.includes(c.pipelineStage) ? c.pipelineStage : 'Sourced'].push(c); });
 
   STAGES.forEach(stage => {
     const cfg = STAGE_CFG[stage];
     const cards = byStage[stage];
-
     const col = document.createElement('div');
     col.className = 'kanban-col';
     col.innerHTML = `
@@ -428,21 +354,15 @@ function buildKanban(role) {
       <div class="col-body" data-stage="${stage}"></div>`;
 
     const body = col.querySelector('.col-body');
-
-    if (!cards.length) {
-      body.innerHTML = `<div class="col-empty">Drop here</div>`;
-    } else {
-      cards.forEach(c => body.appendChild(makeCard(c)));
-    }
+    if (!cards.length) body.innerHTML = `<div class="col-empty">Drop here</div>`;
+    else cards.forEach(c => body.appendChild(makeCard(c)));
 
     body.addEventListener('dragover', e => { e.preventDefault(); body.classList.add('drag-over'); });
     body.addEventListener('dragleave', e => { if (!body.contains(e.relatedTarget)) body.classList.remove('drag-over'); });
     body.addEventListener('drop', e => {
-      e.preventDefault();
-      body.classList.remove('drag-over');
+      e.preventDefault(); body.classList.remove('drag-over');
       if (dragId && dragFrom && dragFrom !== stage) applyStage(dragId, stage, dragFrom);
     });
-
     board.appendChild(col);
   });
 }
@@ -451,15 +371,12 @@ function makeCard(c) {
   const card = document.createElement('div');
   card.className = 'cand-card';
   card.draggable = true;
-
-  const bg = avatarColor(c.name);
-  const ini = initials(c.name);
   const sub = [c.role, c.company].filter(Boolean).join(' · ');
   const loc = shortLoc(c.location);
 
   card.innerHTML = `
     <div class="card-top">
-      <div class="cand-avatar" style="background:${bg}">${esc(ini)}</div>
+      <div class="cand-avatar" style="background:${avatarColor(c.name)}">${esc(initials(c.name))}</div>
       <div class="card-body">
         <div class="cand-name" title="${esc(c.name)}">${esc(c.name)}</div>
         ${sub ? `<div class="cand-sub" title="${esc(sub)}">${esc(sub)}</div>` : ''}
@@ -469,13 +386,13 @@ function makeCard(c) {
       <span class="card-loc">${loc ? `📍 ${esc(loc)}` : ''}</span>
       <div class="card-icons">
         <span class="consent-dot${c.email ? ' ok' : ''}" title="${c.email ? 'Email available' : 'Pending consent'}"></span>
-        ${c.linkedinUrl ? `<a class="li-btn" href="${escA(c.linkedinUrl)}" target="_blank" title="View on LinkedIn">in</a>` : ''}
+        ${c.linkedinUrl ? `<a class="li-btn" href="${escA(c.linkedinUrl)}" target="_blank" title="View on LinkedIn" onclick="event.stopPropagation()">in</a>` : ''}
       </div>
     </div>`;
 
+  card.addEventListener('click', () => openDrawer(c));
   card.addEventListener('dragstart', e => {
-    dragId = c.id;
-    dragFrom = STAGES.includes(c.pipelineStage) ? c.pipelineStage : 'Sourced';
+    dragId = c.id; dragFrom = c.pipelineStage || 'Sourced';
     e.dataTransfer.effectAllowed = 'move';
     setTimeout(() => card.classList.add('dragging'), 0);
   });
@@ -483,20 +400,18 @@ function makeCard(c) {
     card.classList.remove('dragging');
     document.querySelectorAll('.col-body').forEach(b => b.classList.remove('drag-over'));
   });
-
   return card;
 }
 
+// ── Stage update ──────────────────────────────────────────────────
 async function applyStage(candidateId, newStage, oldStage) {
   const role = state.roles[roleIdx];
   const cand = role.candidates.find(c => c.id === candidateId);
   if (cand) cand.pipelineStage = newStage;
   buildKanban(role);
-
   try {
     const r = await fetch('/api/crm?action=update-stage', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: TOKEN, candidateId, stage: newStage }),
     });
     if (!r.ok) throw new Error();
@@ -507,6 +422,86 @@ async function applyStage(candidateId, newStage, oldStage) {
   }
 }
 
+// ── Drawer ────────────────────────────────────────────────────────
+function openDrawer(c) {
+  openCand = c;
+  const bg = avatarColor(c.name);
+  const sub = [c.role, c.company].filter(Boolean).join(' · ');
+  const loc = shortLoc(c.location);
+
+  document.getElementById('drawerHead').innerHTML = `
+    <div class="drawer-avatar" style="background:${bg}">${esc(initials(c.name))}</div>
+    <div class="drawer-name-block">
+      <div class="drawer-name">${esc(c.name)}</div>
+      ${sub ? `<div class="drawer-sub">${esc(sub)}</div>` : ''}
+    </div>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>`;
+
+  const stageCfg = STAGE_CFG[c.pipelineStage] || STAGE_CFG.Sourced;
+
+  document.getElementById('drawerBody').innerHTML = `
+    <div class="drawer-section">
+      <div class="drawer-section-label">Details</div>
+      ${loc ? `<div class="drawer-detail-row"><span class="drawer-detail-icon">📍</span><span>${esc(loc)}</span></div>` : ''}
+      ${c.linkedinUrl
+        ? `<div class="drawer-detail-row"><span class="drawer-detail-icon" style="color:#0a66c2;font-weight:800;font-size:11px;">in</span><a href="${escA(c.linkedinUrl)}" target="_blank" style="color:var(--blue);font-size:13px;text-decoration:none;">View LinkedIn profile ↗</a></div>`
+        : ''}
+      ${c.email
+        ? `<div class="drawer-detail-row"><span class="drawer-detail-icon">📧</span><span style="color:var(--green);font-weight:500;">${esc(c.email)}</span></div>`
+        : `<div class="drawer-detail-row"><span class="drawer-detail-icon">📧</span><span style="color:var(--dim);">Pending consent</span></div>`}
+    </div>
+
+    <div class="drawer-section">
+      <div class="drawer-section-label">Pipeline stage</div>
+      <select class="drawer-stage-select" id="drawerStage" onchange="drawerChangeStage(this)">
+        ${STAGES.map(s => `<option value="${s}"${s === c.pipelineStage ? ' selected' : ''}>${s}</option>`).join('')}
+      </select>
+    </div>
+
+    <div class="drawer-section" style="flex:1;">
+      <div class="drawer-section-label">Notes</div>
+      <textarea class="drawer-notes" id="drawerNotes" placeholder="Add notes about this candidate…">${esc(c.notes || '')}</textarea>
+    </div>`;
+
+  document.getElementById('drawerBackdrop').classList.add('open');
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('saveStatus').style.opacity = '0';
+}
+
+function closeDrawer() {
+  document.getElementById('drawerBackdrop').classList.remove('open');
+  document.getElementById('drawer').classList.remove('open');
+  openCand = null;
+}
+
+async function drawerChangeStage(sel) {
+  if (!openCand) return;
+  const newStage = sel.value;
+  const oldStage = openCand.pipelineStage;
+  if (newStage === oldStage) return;
+  await applyStage(openCand.id, newStage, oldStage);
+}
+
+async function saveNotes() {
+  if (!openCand) return;
+  const notes = document.getElementById('drawerNotes').value;
+  const btn = document.getElementById('saveBtn');
+  const status = document.getElementById('saveStatus');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const r = await fetch('/api/crm?action=save-notes', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: TOKEN, candidateId: openCand.id, notes }),
+    });
+    if (!r.ok) throw new Error();
+    openCand.notes = notes;
+    status.style.opacity = '1';
+    setTimeout(() => { status.style.opacity = '0'; }, 2500);
+  } catch { alert('Failed to save notes — please try again.'); }
+  finally { btn.disabled = false; btn.textContent = 'Save notes'; }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────
 function avatarColor(name) {
   const p = ['#2563eb','#7c3aed','#db2777','#dc2626','#d97706','#059669','#0891b2','#4f46e5'];
   let h = 0;
@@ -525,8 +520,8 @@ function shortLoc(loc) {
 }
 function esc(s)  { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function escA(s) { return String(s ?? '').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
-function showErr(title, msg) {
-  document.getElementById('main').innerHTML = `<div class="centered"><div class="err-title">${esc(title)}</div><div class="err-msg">${esc(msg)}</div></div>`;
+function showErr(t, m) {
+  document.getElementById('main').innerHTML = `<div class="centered"><div class="err-title">${esc(t)}</div><div class="err-msg">${esc(m)}</div></div>`;
 }
 
 load();
