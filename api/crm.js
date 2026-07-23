@@ -1,5 +1,5 @@
 // api/crm.js — TalentKnight CRM
-// Actions: dashboard | generate-token | update-stage | save-notes
+// Actions: dashboard | generate-token | update-stage | save-notes | create-role
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
@@ -13,6 +13,7 @@ export default async function handler(req, res) {
   if (action === 'generate-token') return handleGenerateToken(req, res);
   if (action === 'update-stage')   return handleUpdateStage(req, res);
   if (action === 'save-notes')     return handleSaveNotes(req, res);
+  if (action === 'create-role')    return handleCreateRole(req, res);
   return res.status(400).json({ error: 'Unknown action' });
 }
 
@@ -186,4 +187,39 @@ async function handleSaveNotes(req, res) {
   }).then(r => r.json());
 
   return upd.id ? res.status(200).json({ ok: true }) : res.status(500).json({ error: 'Save failed' });
+}
+
+// ── CREATE ROLE ───────────────────────────────────────────────────
+async function handleCreateRole(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const AT_TOKEN = process.env.AT_TOKEN;
+  if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
+
+  const { token, title, location, brief } = req.body || {};
+  if (!token || !title?.trim()) return res.status(400).json({ error: 'token and title are required' });
+
+  const h = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
+  const client = await validateToken(token, h);
+  if (!client) return res.status(401).json({ error: 'Invalid or inactive token' });
+
+  // Create the role record
+  const roleRes = await fetch(`https://api.airtable.com/v0/${BASE}/tbltVrndDo3zAzMhe`, {
+    method: 'POST', headers: h,
+    body: JSON.stringify({ fields: {
+      [RF.title]: title.trim(),
+      [RF.location]: (location || '').trim(),
+      [RF.brief]: (brief || '').trim(),
+      [RF.status]: 'Active',
+    }}),
+  }).then(r => r.json());
+
+  if (!roleRes.id) return res.status(500).json({ error: 'Failed to create role' });
+
+  // Link new role to client by appending to existing roles
+  await fetch(`https://api.airtable.com/v0/${BASE}/tblyRQmcdoRF51jJa/${client.id}`, {
+    method: 'PATCH', headers: h,
+    body: JSON.stringify({ fields: { [CF.roles]: [...client.roleIds, roleRes.id] } }),
+  });
+
+  return res.status(200).json({ ok: true, roleId: roleRes.id, title: title.trim() });
 }
