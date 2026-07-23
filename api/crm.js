@@ -26,6 +26,7 @@ const KF = {
   location: 'fldNx4IFaKgaOnNw3', linkedinUrl: 'fldOmVhPF36ULGx7K',
   personalEmail: 'fld0zHTu4JhuZ2LPl', outreachStatus: 'fldkzgRgl71KVUg93',
   pipelineStage: 'fldwlXw21bdKx5mpw', notes: 'fld15lbm2amuugdrv',
+  stageChangedAt: 'fldVM6xsL7tXN1pvM',
 };
 
 async function validateToken(token, h) {
@@ -90,6 +91,7 @@ async function handleDashboard(req, res) {
         outreachStatus: f[KF.outreachStatus] || '',
         pipelineStage: f[KF.pipelineStage] || 'Sourced',
         notes: f[KF.notes] || '',
+        stageChangedAt: f[KF.stageChangedAt] || '',
       };
     });
   }
@@ -155,12 +157,15 @@ async function handleUpdateStage(req, res) {
   if (!candRes.fields['fld72aDuvebMTHpB0']?.some(id => client.roleIds.includes(id)))
     return res.status(403).json({ error: 'Candidate not in your pipeline' });
 
+  const today = new Date().toISOString().split('T')[0];
   const upd = await fetch(`https://api.airtable.com/v0/${BASE}/tblRJLWMSOB9YEXUI/${candidateId}`, {
     method: 'PATCH', headers: h,
-    body: JSON.stringify({ fields: { [KF.pipelineStage]: stage } }),
+    body: JSON.stringify({ fields: { [KF.pipelineStage]: stage, [KF.stageChangedAt]: today } }),
   }).then(r => r.json());
 
-  return upd.id ? res.status(200).json({ ok: true, stage }) : res.status(500).json({ error: 'Update failed' });
+  return upd.id
+    ? res.status(200).json({ ok: true, stage, stageChangedAt: today })
+    : res.status(500).json({ error: 'Update failed' });
 }
 
 // ── SAVE NOTES ────────────────────────────────────────────────────
@@ -202,7 +207,6 @@ async function handleCreateRole(req, res) {
   const client = await validateToken(token, h);
   if (!client) return res.status(401).json({ error: 'Invalid or inactive token' });
 
-  // Create the role record
   const roleRes = await fetch(`https://api.airtable.com/v0/${BASE}/tbltVrndDo3zAzMhe`, {
     method: 'POST', headers: h,
     body: JSON.stringify({ fields: {
@@ -215,7 +219,6 @@ async function handleCreateRole(req, res) {
 
   if (!roleRes.id) return res.status(500).json({ error: 'Failed to create role' });
 
-  // Link new role to client by appending to existing roles
   await fetch(`https://api.airtable.com/v0/${BASE}/tblyRQmcdoRF51jJa/${client.id}`, {
     method: 'PATCH', headers: h,
     body: JSON.stringify({ fields: { [CF.roles]: [...client.roleIds, roleRes.id] } }),
