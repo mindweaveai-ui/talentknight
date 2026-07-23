@@ -52,6 +52,16 @@ export default async function handler(req, res) {
     return String(v).trim();
   }
 
+  // Extract photo URL from the various field names Apify scraper may return
+  function extractPhoto(p) {
+    const raw = p.profilePicture || p.profilePic || p.photo || p.photoUrl
+      || p.pictureUrl || p.profilePhoto || p.avatar || p.profileImageUrl
+      || p.imgUrl || p.image || p.picture || '';
+    if (!raw || typeof raw !== 'string') return '';
+    // Only return https URLs (skip data: URIs or relative paths)
+    return raw.startsWith('https://') ? raw.trim() : '';
+  }
+
   const candidates = (Array.isArray(raw) ? raw : [])
     .map(p => ({
       name:        str([p.firstName, p.lastName].filter(Boolean).join(' ') || p.fullName || ''),
@@ -66,6 +76,7 @@ export default async function handler(req, res) {
       openToWork:  Boolean(p.openToWork),
       type:        'live',
       linkedinUrl: str(p.profileUrl || p.linkedinUrl || p.url || ''),
+      photoUrl:    extractPhoto(p),
     }))
     .filter(c => c.name);
 
@@ -84,9 +95,10 @@ export default async function handler(req, res) {
       skills:           'fldjzxELfOSU8M0dC',
       sector:           'fldQjqjDdx2oV4KqA',
       type:             'fldU5qaydUaqg8GxQ',
-      linkedinUrl:      'fldOmVhPF36ULGx7K',  // "LinkedIn URL" field (was incorrectly set to "Website")
+      linkedinUrl:      'fldOmVhPF36ULGx7K',
       candidateSource:  'flda47WcrjAHQM3En',
       enrichmentStatus: 'fldHX3Q6XduR3q6JJ',
+      photoUrl:         'fldLjRmZdkPpNzqRF',
     };
     const atHeaders = {
       Authorization: `Bearer ${AT_TOKEN}`,
@@ -152,6 +164,7 @@ export default async function handler(req, res) {
             [F.linkedinUrl]:      c.linkedinUrl || '',
             [F.candidateSource]:  'Apify',
             [F.enrichmentStatus]: 'Pending',
+            ...(c.photoUrl ? { [F.photoUrl]: c.photoUrl } : {}),
           }
         }));
         await fetch(`https://api.airtable.com/v0/${MASTER_BASE}/${MASTER_TABLE}`, {
