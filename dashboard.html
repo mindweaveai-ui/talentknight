@@ -8,9 +8,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg: #f8fafc;
+      --bg: #f1f5f9;
       --surface: #ffffff;
       --border: #e2e8f0;
       --blue: #2563eb;
@@ -18,85 +17,293 @@
       --text: #0f172a;
       --muted: #64748b;
       --dim: #94a3b8;
-      --green: #10b981;
-      --amber: #f59e0b;
+      --green: #16a34a;
       --rose: #ef4444;
     }
-
     body {
       font-family: 'Inter', -apple-system, sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
+      overflow-x: hidden;
     }
 
+    /* ── NAV ── */
     .nav {
       background: var(--surface);
       border-bottom: 1px solid var(--border);
-      padding: 0 32px;
-      height: 60px;
+      padding: 0 28px;
+      height: 58px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       position: sticky;
       top: 0;
-      z-index: 100;
+      z-index: 200;
     }
-    .nav-logo { font-size: 18px; font-weight: 700; color: var(--blue); letter-spacing: -0.5px; }
+    .nav-logo { font-size: 17px; font-weight: 700; color: var(--blue); letter-spacing: -0.5px; }
     .nav-logo span { color: var(--text); }
     .nav-client { font-size: 13px; color: var(--muted); font-weight: 500; }
 
-    .main { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
-    .page-title { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 6px; }
-    .page-subtitle { font-size: 14px; color: var(--muted); margin-bottom: 36px; }
+    /* ── PAGE HEADER ── */
+    .page-header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .header-inner {
+      padding: 18px 28px 0;
+    }
+    .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.4px; }
 
-    .role-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 24px; overflow: hidden; }
-    .role-header { padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
-    .role-header:hover { background: #fafafa; }
-    .role-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-    .role-title { font-size: 16px; font-weight: 600; }
-    .role-location { font-size: 13px; color: var(--muted); }
-    .role-status { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .role-status.active { background: #dcfce7; color: #166534; }
-    .role-status.paused { background: #fef9c3; color: #854d0e; }
-    .role-status.filled { background: #dbeafe; color: #1e40af; }
-    .role-status.closed { background: #f1f5f9; color: #475569; }
-    .role-count { font-size: 13px; color: var(--muted); margin-left: auto; margin-right: 16px; }
-    .chevron { color: var(--dim); transition: transform 0.2s; font-size: 18px; line-height: 1; }
-    .role-card.open .chevron { transform: rotate(180deg); }
+    /* ── ROLE TABS ── */
+    .role-tabs {
+      display: flex;
+      padding: 0 28px;
+      margin-top: 10px;
+      overflow-x: auto;
+      gap: 2px;
+    }
+    .role-tab {
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted);
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color 0.12s;
+      user-select: none;
+    }
+    .role-tab:hover { color: var(--text); }
+    .role-tab.active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 600; }
+    .tab-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 10px;
+      margin-left: 5px;
+      background: var(--bg);
+      color: var(--muted);
+    }
+    .role-tab.active .tab-badge { background: var(--blue-light); color: var(--blue); }
 
-    .candidates-section { display: none; border-top: 1px solid var(--border); }
-    .role-card.open .candidates-section { display: block; }
-    .empty-state { padding: 40px 24px; text-align: center; color: var(--muted); font-size: 14px; }
+    /* ── ROLE INFO BAR ── */
+    .role-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 28px 12px;
+      font-size: 12px;
+      color: var(--muted);
+      flex-wrap: wrap;
+    }
+    .status-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 9px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .status-active   { background: #dcfce7; color: #166534; }
+    .status-paused   { background: #fef9c3; color: #854d0e; }
+    .status-filled   { background: #dbeafe; color: #1e40af; }
+    .status-closed   { background: #f1f5f9; color: #475569; }
+    .role-brief {
+      color: var(--dim);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 500px;
+    }
 
-    .candidates-table { width: 100%; border-collapse: collapse; }
-    .candidates-table th { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--dim); padding: 12px 16px; text-align: left; background: #f8fafc; border-bottom: 1px solid var(--border); }
-    .candidates-table td { padding: 14px 16px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
-    .candidates-table tr:last-child td { border-bottom: none; }
-    .candidates-table tr:hover td { background: #f8fafc; }
+    /* ── KANBAN ── */
+    .kanban-outer {
+      overflow-x: auto;
+      padding: 20px 28px 60px;
+    }
+    .kanban-board {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      min-width: max-content;
+    }
+    .kanban-col {
+      width: 232px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      border-radius: 10px;
+      background: #eef2f7;
+      border: 1px solid #dde3ec;
+      overflow: hidden;
+    }
+    .col-header {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 10px 12px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .stage-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .stage-name {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      flex: 1;
+    }
+    .stage-count {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      background: var(--bg);
+      padding: 1px 7px;
+      border-radius: 10px;
+      min-width: 20px;
+      text-align: center;
+    }
+    .col-body {
+      padding: 8px;
+      min-height: 180px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      transition: background 0.12s;
+    }
+    .col-body.drag-over {
+      background: #dbeafe;
+      outline: 2px dashed var(--blue);
+      outline-offset: -3px;
+      border-radius: 0 0 10px 10px;
+    }
+    .col-empty {
+      padding: 24px 12px;
+      text-align: center;
+      color: var(--dim);
+      font-size: 11px;
+      letter-spacing: 0.2px;
+    }
 
-    .cand-name { font-weight: 600; display: block; }
-    .cand-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
-    .linkedin-link { color: var(--blue); text-decoration: none; font-size: 12px; }
-    .linkedin-link:hover { text-decoration: underline; }
-    .email-tag { font-size: 12px; color: var(--green); font-weight: 500; }
-    .no-email { font-size: 12px; color: var(--dim); }
+    /* ── CANDIDATE CARDS ── */
+    .cand-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 11px 12px;
+      cursor: grab;
+      transition: box-shadow 0.12s, transform 0.12s, opacity 0.12s;
+    }
+    .cand-card:hover {
+      box-shadow: 0 3px 10px rgba(15,23,42,0.1);
+      transform: translateY(-1px);
+    }
+    .cand-card.dragging {
+      opacity: 0.35;
+      cursor: grabbing;
+    }
+    .card-top { display: flex; align-items: flex-start; gap: 9px; }
+    .cand-avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: white;
+      flex-shrink: 0;
+      letter-spacing: 0.3px;
+    }
+    .card-body { flex: 1; min-width: 0; }
+    .cand-name {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.3;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .cand-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.4;
+    }
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 9px;
+      padding-top: 9px;
+      border-top: 1px solid var(--border);
+      gap: 4px;
+    }
+    .card-loc {
+      font-size: 11px;
+      color: var(--dim);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+    .card-icons { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+    .li-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      background: #0a66c2;
+      color: white;
+      font-size: 9px;
+      font-weight: 800;
+      text-decoration: none;
+      letter-spacing: -0.3px;
+    }
+    .consent-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--dim);
+    }
+    .consent-dot.ok { background: var(--green); }
 
-    .stage-select { font-family: inherit; font-size: 12px; font-weight: 600; padding: 5px 24px 5px 10px; border-radius: 20px; border: none; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2364748b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; }
-    .stage-select:focus { outline: none; }
-    .stage-select.sourced      { background-color: #f1f5f9; color: #475569; }
-    .stage-select.contacted    { background-color: #dbeafe; color: #1e40af; }
-    .stage-select.shortlisted  { background-color: #cffafe; color: #155e75; }
-    .stage-select.interviewing { background-color: #fef9c3; color: #854d0e; }
-    .stage-select.offered      { background-color: #ffedd5; color: #9a3412; }
-    .stage-select.placed       { background-color: #dcfce7; color: #166534; }
-    .stage-select.rejected     { background-color: #fee2e2; color: #991b1b; }
-
-    .centered { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 16px; text-align: center; }
-    .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    /* ── STATES ── */
+    .centered {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+      gap: 14px;
+      text-align: center;
+    }
+    .spinner {
+      width: 34px;
+      height: 34px;
+      border: 3px solid var(--border);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .error-title { font-size: 18px; font-weight: 600; }
-    .error-msg { color: var(--rose); font-size: 14px; }
+    .err-title { font-size: 17px; font-weight: 600; }
+    .err-msg { color: var(--rose); font-size: 14px; }
   </style>
 </head>
 <body>
@@ -106,102 +313,225 @@
   <div class="nav-client" id="navClient"></div>
 </nav>
 
-<div class="main" id="main">
-  <div class="centered" id="loadingState">
+<div id="main">
+  <div class="centered">
     <div class="spinner"></div>
     <div style="color:var(--muted);font-size:14px;">Loading your pipeline…</div>
   </div>
 </div>
 
 <script>
-  const TOKEN = new URLSearchParams(window.location.search).get('token');
+const TOKEN = new URLSearchParams(window.location.search).get('token');
 
-  async function load() {
-    if (!TOKEN) return showError('No access token found', 'Check your dashboard link and try again.');
-    let data;
-    try {
-      const r = await fetch(`/api/crm?action=dashboard&token=${TOKEN}`);
-      if (r.status === 401) return showError('Access denied', 'This link is invalid or has expired.');
-      if (!r.ok) return showError('Something went wrong', 'Please try refreshing the page.');
-      data = await r.json();
-    } catch { return showError('Connection error', 'Please check your connection and refresh.'); }
-    render(data);
-  }
+const STAGES = ['Sourced','Contacted','Shortlisted','Interviewing','Offered','Placed','Rejected'];
+const STAGE_CFG = {
+  Sourced:      { dot: '#94a3b8', color: '#475569' },
+  Contacted:    { dot: '#3b82f6', color: '#1d4ed8' },
+  Shortlisted:  { dot: '#06b6d4', color: '#0e7490' },
+  Interviewing: { dot: '#f59e0b', color: '#b45309' },
+  Offered:      { dot: '#f97316', color: '#c2410c' },
+  Placed:       { dot: '#22c55e', color: '#15803d' },
+  Rejected:     { dot: '#ef4444', color: '#b91c1c' },
+};
 
-  function render({ client, roles }) {
-    document.getElementById('navClient').textContent = client.name;
-    document.title = `${client.name} — TalentKnight`;
-    const main = document.getElementById('main');
+let state = null;
+let roleIdx = 0;
+let dragId = null;
+let dragFrom = null;
+
+async function load() {
+  if (!TOKEN) return showErr('No access token', 'Check your dashboard link and try again.');
+  try {
+    const r = await fetch(`/api/crm?action=dashboard&token=${TOKEN}`);
+    if (r.status === 401) return showErr('Access denied', 'This link is invalid or has expired.');
+    if (!r.ok) return showErr('Something went wrong', 'Please try refreshing the page.');
+    state = await r.json();
+  } catch { return showErr('Connection error', 'Please check your connection and refresh.'); }
+  render();
+}
+
+function render() {
+  const { client, roles } = state;
+  document.getElementById('navClient').textContent = client.name;
+  document.title = `${client.name} — TalentKnight`;
+
+  const main = document.getElementById('main');
+
+  if (!roles.length) {
     main.innerHTML = `
-      <div class="page-title">${esc(client.name)}</div>
-      <div class="page-subtitle">Your candidate pipeline — ${roles.length} active role${roles.length !== 1 ? 's' : ''}</div>
-      <div id="roles"></div>
-    `;
-    const rolesEl = document.getElementById('roles');
-    if (!roles.length) {
-      rolesEl.innerHTML = `<div class="centered" style="min-height:200px;"><div style="color:var(--muted);font-size:14px;">No roles set up yet.</div></div>`;
-      return;
+      <div class="page-header"><div class="header-inner"><div class="page-title">${esc(client.name)}</div></div><div style="height:18px"></div></div>
+      <div class="centered" style="min-height:50vh;">
+        <div style="font-size:36px;">📋</div>
+        <div style="font-size:16px;font-weight:600;">No roles yet</div>
+        <div style="color:var(--muted);font-size:13px;">Your TalentKnight recruiter will set up your first role shortly.</div>
+      </div>`;
+    return;
+  }
+
+  roleIdx = Math.min(roleIdx, roles.length - 1);
+  const role = roles[roleIdx];
+
+  main.innerHTML = `
+    <div class="page-header">
+      <div class="header-inner">
+        <div class="page-title">${esc(client.name)}</div>
+      </div>
+      <div class="role-tabs" id="roleTabs"></div>
+      <div class="role-info" id="roleInfo"></div>
+    </div>
+    <div class="kanban-outer">
+      <div class="kanban-board" id="board"></div>
+    </div>`;
+
+  // Tabs
+  const tabs = document.getElementById('roleTabs');
+  roles.forEach((r, i) => {
+    const t = document.createElement('div');
+    t.className = 'role-tab' + (i === roleIdx ? ' active' : '');
+    t.innerHTML = `${esc(r.title)}<span class="tab-badge">${r.candidates.length}</span>`;
+    t.onclick = () => { roleIdx = i; render(); };
+    tabs.appendChild(t);
+  });
+
+  // Role info bar
+  const info = document.getElementById('roleInfo');
+  const statusClass = 'status-' + role.status.toLowerCase();
+  info.innerHTML = `
+    <span class="status-badge ${statusClass}">${esc(role.status)}</span>
+    ${role.location ? `<span>📍 ${esc(role.location)}</span>` : ''}
+    ${role.brief ? `<span class="role-brief" title="${esc(role.brief)}">${esc(role.brief)}</span>` : ''}`;
+
+  buildKanban(role);
+}
+
+function buildKanban(role) {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+
+  const byStage = {};
+  STAGES.forEach(s => byStage[s] = []);
+  role.candidates.forEach(c => {
+    const s = STAGES.includes(c.pipelineStage) ? c.pipelineStage : 'Sourced';
+    byStage[s].push(c);
+  });
+
+  STAGES.forEach(stage => {
+    const cfg = STAGE_CFG[stage];
+    const cards = byStage[stage];
+
+    const col = document.createElement('div');
+    col.className = 'kanban-col';
+    col.innerHTML = `
+      <div class="col-header">
+        <span class="stage-dot" style="background:${cfg.dot}"></span>
+        <span class="stage-name" style="color:${cfg.color}">${stage}</span>
+        <span class="stage-count">${cards.length}</span>
+      </div>
+      <div class="col-body" data-stage="${stage}"></div>`;
+
+    const body = col.querySelector('.col-body');
+
+    if (!cards.length) {
+      body.innerHTML = `<div class="col-empty">Drop here</div>`;
+    } else {
+      cards.forEach(c => body.appendChild(makeCard(c)));
     }
-    roles.forEach(role => {
-      const card = document.createElement('div');
-      card.className = 'role-card open';
-      card.innerHTML = `
-        <div class="role-header" onclick="this.closest('.role-card').classList.toggle('open')">
-          <div class="role-meta">
-            <span class="role-title">${esc(role.title)}</span>
-            ${role.location ? `<span class="role-location">📍 ${esc(role.location)}</span>` : ''}
-            <span class="role-status ${role.status.toLowerCase()}">${esc(role.status)}</span>
-          </div>
-          <span class="role-count">${role.candidates.length} candidate${role.candidates.length !== 1 ? 's' : ''}</span>
-          <span class="chevron">&#8964;</span>
-        </div>
-        <div class="candidates-section">${renderCandidates(role.candidates)}</div>
-      `;
-      rolesEl.appendChild(card);
+
+    body.addEventListener('dragover', e => { e.preventDefault(); body.classList.add('drag-over'); });
+    body.addEventListener('dragleave', e => { if (!body.contains(e.relatedTarget)) body.classList.remove('drag-over'); });
+    body.addEventListener('drop', e => {
+      e.preventDefault();
+      body.classList.remove('drag-over');
+      if (dragId && dragFrom && dragFrom !== stage) applyStage(dragId, stage, dragFrom);
     });
-  }
 
-  function renderCandidates(candidates) {
-    if (!candidates.length) return `<div class="empty-state">No candidates in this pipeline yet.</div>`;
-    return `<table class="candidates-table">
-      <thead><tr><th>Candidate</th><th>Location</th><th>Contact</th><th>LinkedIn</th><th>Stage</th></tr></thead>
-      <tbody>${candidates.map(c => `
-        <tr>
-          <td><span class="cand-name">${esc(c.name)}</span><span class="cand-meta">${[c.role,c.company].filter(Boolean).map(esc).join(' · ')}</span></td>
-          <td style="color:var(--muted);font-size:13px;">${esc(c.location)}</td>
-          <td>${c.email ? `<span class="email-tag">✓ ${esc(c.email)}</span>` : `<span class="no-email">Pending consent</span>`}</td>
-          <td>${c.linkedinUrl ? `<a class="linkedin-link" href="${escA(c.linkedinUrl)}" target="_blank">↗ LinkedIn</a>` : '—'}</td>
-          <td><select class="stage-select ${c.pipelineStage.toLowerCase()}" onchange="updateStage('${escA(c.id)}',this)">${['Sourced','Contacted','Shortlisted','Interviewing','Offered','Placed','Rejected'].map(s=>`<option value="${s}"${s===c.pipelineStage?' selected':''}>${s}</option>`).join('')}</select></td>
-        </tr>`).join('')}
-      </tbody></table>`;
-  }
+    board.appendChild(col);
+  });
+}
 
-  async function updateStage(candidateId, sel) {
-    const stage = sel.value;
-    const prev = [...sel.classList].find(c => c !== 'stage-select');
-    sel.className = `stage-select ${stage.toLowerCase()}`;
-    sel.disabled = true;
-    try {
-      const r = await fetch('/api/crm?action=update-stage', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: TOKEN, candidateId, stage }),
-      });
-      if (!r.ok) throw new Error();
-    } catch {
-      sel.value = prev.charAt(0).toUpperCase() + prev.slice(1);
-      sel.className = `stage-select ${prev}`;
-      alert('Failed to update stage. Please try again.');
-    } finally { sel.disabled = false; }
-  }
+function makeCard(c) {
+  const card = document.createElement('div');
+  card.className = 'cand-card';
+  card.draggable = true;
 
-  function showError(title, msg) {
-    document.getElementById('main').innerHTML = `<div class="centered"><div class="error-title">${esc(title)}</div><div class="error-msg">${esc(msg)}</div></div>`;
-  }
-  function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-  function escA(s) { return String(s||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+  const bg = avatarColor(c.name);
+  const ini = initials(c.name);
+  const sub = [c.role, c.company].filter(Boolean).join(' · ');
+  const loc = shortLoc(c.location);
 
-  load();
+  card.innerHTML = `
+    <div class="card-top">
+      <div class="cand-avatar" style="background:${bg}">${esc(ini)}</div>
+      <div class="card-body">
+        <div class="cand-name" title="${esc(c.name)}">${esc(c.name)}</div>
+        ${sub ? `<div class="cand-sub" title="${esc(sub)}">${esc(sub)}</div>` : ''}
+      </div>
+    </div>
+    <div class="card-footer">
+      <span class="card-loc">${loc ? `📍 ${esc(loc)}` : ''}</span>
+      <div class="card-icons">
+        <span class="consent-dot${c.email ? ' ok' : ''}" title="${c.email ? 'Email available' : 'Pending consent'}"></span>
+        ${c.linkedinUrl ? `<a class="li-btn" href="${escA(c.linkedinUrl)}" target="_blank" title="View on LinkedIn">in</a>` : ''}
+      </div>
+    </div>`;
+
+  card.addEventListener('dragstart', e => {
+    dragId = c.id;
+    dragFrom = STAGES.includes(c.pipelineStage) ? c.pipelineStage : 'Sourced';
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => card.classList.add('dragging'), 0);
+  });
+  card.addEventListener('dragend', () => {
+    card.classList.remove('dragging');
+    document.querySelectorAll('.col-body').forEach(b => b.classList.remove('drag-over'));
+  });
+
+  return card;
+}
+
+async function applyStage(candidateId, newStage, oldStage) {
+  const role = state.roles[roleIdx];
+  const cand = role.candidates.find(c => c.id === candidateId);
+  if (cand) cand.pipelineStage = newStage;
+  buildKanban(role);
+
+  try {
+    const r = await fetch('/api/crm?action=update-stage', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: TOKEN, candidateId, stage: newStage }),
+    });
+    if (!r.ok) throw new Error();
+  } catch {
+    if (cand) cand.pipelineStage = oldStage;
+    buildKanban(role);
+    alert('Stage update failed — please try again.');
+  }
+}
+
+function avatarColor(name) {
+  const p = ['#2563eb','#7c3aed','#db2777','#dc2626','#d97706','#059669','#0891b2','#4f46e5'];
+  let h = 0;
+  for (const ch of String(name)) h = (h * 31 + ch.charCodeAt(0)) & 0x7fffffff;
+  return p[h % p.length];
+}
+function initials(name) {
+  return String(name || '').split(' ').slice(0, 2).map(w => w[0] || '').join('').toUpperCase() || '?';
+}
+function shortLoc(loc) {
+  if (!loc) return '';
+  const parts = loc.split(',').map(p => p.trim());
+  if (parts.length === 1) return loc;
+  const cm = { 'United Kingdom':'UK','England':'UK','Scotland':'UK','Wales':'UK','Northern Ireland':'UK','United States':'US','United States of America':'US' };
+  return `${parts[0]}, ${cm[parts[parts.length-1]] ?? parts[parts.length-1]}`;
+}
+function esc(s)  { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escA(s) { return String(s ?? '').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function showErr(title, msg) {
+  document.getElementById('main').innerHTML = `<div class="centered"><div class="err-title">${esc(title)}</div><div class="err-msg">${esc(msg)}</div></div>`;
+}
+
+load();
 </script>
 </body>
 </html>
