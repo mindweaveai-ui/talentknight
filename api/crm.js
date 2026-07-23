@@ -26,7 +26,7 @@ const KF = {
   location: 'fldNx4IFaKgaOnNw3', linkedinUrl: 'fldOmVhPF36ULGx7K',
   personalEmail: 'fld0zHTu4JhuZ2LPl', outreachStatus: 'fldkzgRgl71KVUg93',
   pipelineStage: 'fldwlXw21bdKx5mpw', notes: 'fld15lbm2amuugdrv',
-  stageChangedAt: 'fldVM6xsL7tXN1pvM',
+  stageChangedAt: 'fldVM6xsL7tXN1pvM', photoUrl: 'fldLjRmZdkPpNzqRF',
 };
 
 async function validateToken(token, h) {
@@ -92,6 +92,7 @@ async function handleDashboard(req, res) {
         pipelineStage: f[KF.pipelineStage] || 'Sourced',
         notes: f[KF.notes] || '',
         stageChangedAt: f[KF.stageChangedAt] || '',
+        photoUrl: f[KF.photoUrl] || '',
       };
     });
   }
