@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TalentKnight — Client Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --blue: #2563eb;
+      --blue-light: #eff6ff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --dim: #94a3b8;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --rose: #ef4444;
+      --stage-sourced: #94a3b8;
+      --stage-contacted: #3b82f6;
+      --stage-shortlisted: #06b6d4;
+      --stage-interviewing: #f59e0b;
+      --stage-offered: #f97316;
+      --stage-placed: #10b981;
+      --stage-rejected: #ef4444;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* NAV */
+    .nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav-logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--blue);
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .nav-logo span { color: var(--text); }
+    .nav-client {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    /* MAIN */
+    .main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    .page-title {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+    .page-subtitle {
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 36px;
+    }
+
+    /* ROLE CARD */
+    .role-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    .role-header {
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+    }
+    .role-header:hover { background: #fafafa; }
+    .role-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .role-title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .role-location {
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .role-status {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .role-status.active { background: #dcfce7; color: #166534; }
+    .role-status.paused { background: #fef9c3; color: #854d0e; }
+    .role-status.filled { background: #dbeafe; color: #1e40af; }
+    .role-status.closed { background: #f1f5f9; color: #475569; }
+    .role-count {
+      font-size: 13px;
+      color: var(--muted);
+      margin-left: auto;
+      margin-right: 16px;
+    }
+    .chevron {
+      color: var(--dim);
+      transition: transform 0.2s;
+      font-size: 18px;
+      line-height: 1;
+    }
+    .role-card.open .chevron { transform: rotate(180deg); }
+
+    /* CANDIDATES TABLE */
+    .candidates-section {
+      display: none;
+      border-top: 1px solid var(--border);
+    }
+    .role-card.open .candidates-section { display: block; }
+
+    .empty-state {
+      padding: 40px 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .candidates-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .candidates-table th {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--dim);
+      padding: 12px 16px;
+      text-align: left;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--border);
+    }
+    .candidates-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      vertical-align: middle;
+    }
+    .candidates-table tr:last-child td { border-bottom: none; }
+    .candidates-table tr:hover td { background: #f8fafc; }
+
+    .cand-name {
+      font-weight: 600;
+      display: block;
+    }
+    .cand-meta {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .linkedin-link {
+      color: var(--blue);
+      text-decoration: none;
+      font-size: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .linkedin-link:hover { text-decoration: underline; }
+
+    .email-tag {
+      font-size: 12px;
+      color: var(--green);
+      font-weight: 500;
+    }
+    .no-email {
+      font-size: 12px;
+      color: var(--dim);
+    }
+
+    /* STAGE SELECT */
+    .stage-select {
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 20px;
+      border: none;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2364748b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+      padding-right: 24px;
+    }
+    .stage-select:focus { outline: none; }
+    .stage-select.sourced     { background-color: #f1f5f9; color: #475569; }
+    .stage-select.contacted   { background-color: #dbeafe; color: #1e40af; }
+    .stage-select.shortlisted { background-color: #cffafe; color: #155e75; }
+    .stage-select.interviewing{ background-color: #fef9c3; color: #854d0e; }
+    .stage-select.offered     { background-color: #ffedd5; color: #9a3412; }
+    .stage-select.placed      { background-color: #dcfce7; color: #166534; }
+    .stage-select.rejected    { background-color: #fee2e2; color: #991b1b; }
+
+    /* LOADING / ERROR */
+    .centered {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+      gap: 16px;
+      text-align: center;
+    }
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .error-msg { color: var(--rose); font-size: 14px; }
+    .error-title { font-size: 18px; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-logo">Talent<span>Knight</span></div>
+  <div class="nav-client" id="navClient"></div>
+</nav>
+
+<div class="main" id="main">
+  <div class="centered" id="loadingState">
+    <div class="spinner"></div>
+    <div style="color: var(--muted); font-size: 14px;">Loading your pipeline…</div>
+  </div>
+</div>
+
+<script>
+  const TOKEN = new URLSearchParams(window.location.search).get('token');
+
+  async function load() {
+    if (!TOKEN) return showError('No access token found', 'Check your dashboard link and try again.');
+
+    let data;
+    try {
+      const r = await fetch(`/api/dashboard?token=${TOKEN}`);
+      if (r.status === 401) return showError('Access denied', 'This link is invalid or has expired. Please contact TalentKnight.');
+      if (!r.ok) return showError('Something went wrong', 'Please try refreshing the page.');
+      data = await r.json();
+    } catch (e) {
+      return showError('Connection error', 'Please check your internet connection and refresh.');
+    }
+
+    render(data);
+  }
+
+  function render({ client, roles }) {
+    document.getElementById('navClient').textContent = client.name;
+    document.title = `${client.name} — TalentKnight`;
+
+    const main = document.getElementById('main');
+    main.innerHTML = `
+      <div class="page-title">${escHtml(client.name)}</div>
+      <div class="page-subtitle">Your candidate pipeline — ${roles.length} active role${roles.length !== 1 ? 's' : ''}</div>
+      <div id="roles"></div>
+    `;
+
+    const rolesEl = document.getElementById('roles');
+
+    if (!roles.length) {
+      rolesEl.innerHTML = `<div class="centered" style="min-height:200px;"><div style="color:var(--muted);font-size:14px;">No roles set up yet. TalentKnight will add them shortly.</div></div>`;
+      return;
+    }
+
+    roles.forEach(role => {
+      const card = document.createElement('div');
+      card.className = 'role-card open';
+      card.innerHTML = `
+        <div class="role-header" onclick="toggleRole(this)">
+          <div class="role-meta">
+            <span class="role-title">${escHtml(role.title)}</span>
+            ${role.location ? `<span class="role-location">📍 ${escHtml(role.location)}</span>` : ''}
+            <span class="role-status ${role.status.toLowerCase()}">${escHtml(role.status)}</span>
+          </div>
+          <span class="role-count">${role.candidates.length} candidate${role.candidates.length !== 1 ? 's' : ''}</span>
+          <span class="chevron">&#8964;</span>
+        </div>
+        <div class="candidates-section">
+          ${renderCandidates(role.candidates, role.id)}
+        </div>
+      `;
+      rolesEl.appendChild(card);
+    });
+  }
+
+  function renderCandidates(candidates, roleId) {
+    if (!candidates.length) {
+      return `<div class="empty-state">No candidates in this pipeline yet.</div>`;
+    }
+    const rows = candidates.map(c => `
+      <tr>
+        <td>
+          <span class="cand-name">${escHtml(c.name)}</span>
+          <span class="cand-meta">${[c.role, c.company].filter(Boolean).map(escHtml).join(' · ')}</span>
+        </td>
+        <td style="color:var(--muted);font-size:13px;">${escHtml(c.location)}</td>
+        <td>
+          ${c.email
+            ? `<span class="email-tag">✓ ${escHtml(c.email)}</span>`
+            : `<span class="no-email">Pending consent</span>`
+          }
+        </td>
+        <td>
+          ${c.linkedinUrl
+            ? `<a class="linkedin-link" href="${escAttr(c.linkedinUrl)}" target="_blank" rel="noopener">↗ LinkedIn</a>`
+            : '—'
+          }
+        </td>
+        <td>
+          <select class="stage-select ${c.pipelineStage.toLowerCase()}"
+            onchange="updateStage('${escAttr(c.id)}', this)">
+            ${['Sourced','Contacted','Shortlisted','Interviewing','Offered','Placed','Rejected']
+              .map(s => `<option value="${s}" ${s === c.pipelineStage ? 'selected' : ''}>${s}</option>`)
+              .join('')}
+          </select>
+        </td>
+      </tr>
+    `).join('');
+
+    return `
+      <table class="candidates-table">
+        <thead><tr>
+          <th>Candidate</th>
+          <th>Location</th>
+          <th>Contact</th>
+          <th>LinkedIn</th>
+          <th>Stage</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
+  async function updateStage(candidateId, selectEl) {
+    const stage = selectEl.value;
+    const oldClass = selectEl.className.split(' ').find(c => c !== 'stage-select');
+    selectEl.className = `stage-select ${stage.toLowerCase()}`;
+    selectEl.disabled = true;
+
+    try {
+      const r = await fetch('/api/update-stage', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: TOKEN, candidateId, stage }),
+      });
+      if (!r.ok) throw new Error();
+    } catch {
+      // Revert on failure
+      selectEl.value = oldClass.charAt(0).toUpperCase() + oldClass.slice(1);
+      selectEl.className = `stage-select ${oldClass}`;
+      alert('Failed to update stage. Please try again.');
+    } finally {
+      selectEl.disabled = false;
+    }
+  }
+
+  function toggleRole(header) {
+    header.closest('.role-card').classList.toggle('open');
+  }
+
+  function showError(title, msg) {
+    document.getElementById('main').innerHTML = `
+      <div class="centered">
+        <div class="error-title">${escHtml(title)}</div>
+        <div class="error-msg">${escHtml(msg)}</div>
+      </div>`;
+  }
+
+  function escHtml(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function escAttr(s) {
+    return String(s || '').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  load();
+</script>
+
+</body>
+</html>
