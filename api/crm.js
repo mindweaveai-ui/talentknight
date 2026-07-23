@@ -32,7 +32,7 @@ async function handleDashboard(req, res) {
   const BASE = 'appnAnRSfB7bgIQVU';
   const CF = { name: 'fld7AIteYYVxT41lf', token: 'fld11Z2FSw2uQKE4b', active: 'fldBIoBDtUBN5tTPY', roles: 'fldXNHwOWNxZ6JcqF' };
   const RF = { title: 'fldO3J0Fh0JaZ5lRW', location: 'flddgoDm9N0krVu13', brief: 'fldGLYE5iZxdZsFEg', status: 'fldNdoolFfZisVSFS', candidates: 'fldU795m0fFIMZ2pc' };
-  const KF = { name: 'fld8k1UET3DWwJV3S', role: 'fldwOPyq4vmWzEquB', company: 'fldJYcW9eWMMnFPDS', location: 'fldNx4IFaKgaOnNw3', bio: 'fldtJGFbRDqFR9PPJ', linkedinUrl: 'fldOmVhPF36ULGx7K', personalEmail: 'fld0zHTu4JhuZ2LPl', outreachStatus: 'fldkzgRgl71KVUg93', pipelineStage: 'fldwlXw21bdKx5mpw' };
+  const KF = { name: 'fld8k1UET3DWwJV3S', role: 'fldwOPyq4vmWzEquB', company: 'fldJYcW9eWMMnFPDS', location: 'fldNx4IFaKgaOnNw3', linkedinUrl: 'fldOmVhPF36ULGx7K', personalEmail: 'fld0zHTu4JhuZ2LPl', outreachStatus: 'fldkzgRgl71KVUg93', pipelineStage: 'fldwlXw21bdKx5mpw' };
 
   const h = { Authorization: `Bearer ${AT_TOKEN}` };
 
@@ -55,6 +55,7 @@ async function handleDashboard(req, res) {
     id: rec.id,
     title: rec.fields[RF.title] || 'Untitled Role',
     location: rec.fields[RF.location] || '',
+    brief: rec.fields[RF.brief] || '',
     status: rec.fields[RF.status] || 'Active',
     candidateIds: rec.fields[RF.candidates] || [],
   }));
@@ -71,11 +72,14 @@ async function handleDashboard(req, res) {
     (candRes.records || []).forEach(rec => {
       const f = rec.fields;
       const consented = f[KF.outreachStatus] === 'Interested';
+      // Strip company registration numbers (purely numeric strings)
+      const rawCompany = f[KF.company] || '';
+      const company = /^\d+$/.test(rawCompany.trim()) ? '' : rawCompany;
       candidateMap[rec.id] = {
         id: rec.id,
         name: f[KF.name] || 'Unknown',
         role: f[KF.role] || '',
-        company: f[KF.company] || '',
+        company,
         location: f[KF.location] || '',
         linkedinUrl: f[KF.linkedinUrl] || '',
         email: consented ? (f[KF.personalEmail] || '') : '',
@@ -140,7 +144,6 @@ async function handleUpdateStage(req, res) {
   const BASE = 'appnAnRSfB7bgIQVU';
   const h = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
 
-  // Validate token
   const clientRes = await fetch(
     `https://api.airtable.com/v0/${BASE}/tblyRQmcdoRF51jJa?filterByFormula=${encodeURIComponent(`AND({fld11Z2FSw2uQKE4b}='${token}',{fldBIoBDtUBN5tTPY}=1)`)}&returnFieldsByFieldId=true&pageSize=1`,
     { headers: h }
@@ -149,13 +152,11 @@ async function handleUpdateStage(req, res) {
   if (!clientRes?.records?.length) return res.status(401).json({ error: 'Invalid or inactive token' });
   const clientRoleIds = clientRes.records[0].fields['fldXNHwOWNxZ6JcqF'] || [];
 
-  // Verify candidate belongs to this client
   const candRes = await fetch(`https://api.airtable.com/v0/${BASE}/tblRJLWMSOB9YEXUI/${candidateId}?returnFieldsByFieldId=true`, { headers: h }).then(r => r.json()).catch(() => null);
   if (!candRes?.id) return res.status(404).json({ error: 'Candidate not found' });
   const candRoles = candRes.fields['fld72aDuvebMTHpB0'] || [];
   if (!candRoles.some(id => clientRoleIds.includes(id))) return res.status(403).json({ error: 'Candidate not in your pipeline' });
 
-  // Update stage
   const upd = await fetch(`https://api.airtable.com/v0/${BASE}/tblRJLWMSOB9YEXUI/${candidateId}`, {
     method: 'PATCH', headers: h,
     body: JSON.stringify({ fields: { 'fldwlXw21bdKx5mpw': stage } }),
