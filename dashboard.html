@@ -65,7 +65,6 @@
       margin-left: 5px; background: var(--bg); color: var(--muted);
     }
     .role-tab.active .tab-badge { background: var(--blue-light); color: var(--blue); }
-
     .new-role-btn {
       display: inline-flex; align-items: center; gap: 5px;
       padding: 5px 11px; font-size: 12px; font-weight: 600;
@@ -90,8 +89,36 @@
     .status-closed   { background: #f1f5f9; color: #475569; }
     .role-brief { color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 500px; }
 
+    /* ── SEARCH BAR ── */
+    .search-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 20px 8px;
+    }
+    .search-wrap {
+      position: relative; flex: 1; max-width: 340px;
+    }
+    .search-icon {
+      position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+      color: var(--dim); font-size: 13px; pointer-events: none;
+    }
+    .search-input {
+      font-family: inherit; font-size: 13px; width: 100%;
+      padding: 8px 32px 8px 32px; border: 1px solid var(--border);
+      border-radius: 8px; background: var(--surface); color: var(--text);
+      transition: border-color 0.12s, box-shadow 0.12s;
+    }
+    .search-input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-light); }
+    .search-input::placeholder { color: var(--dim); }
+    .search-clear {
+      position: absolute; right: 9px; top: 50%; transform: translateY(-50%);
+      font-size: 13px; color: var(--dim); cursor: pointer; display: none;
+      background: none; border: none; padding: 2px 4px; line-height: 1;
+    }
+    .search-clear:hover { color: var(--text); }
+    .search-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
     /* ── KANBAN ── */
-    .kanban-outer { padding: 20px 20px 60px; }
+    .kanban-outer { padding: 0 20px 60px; }
     .kanban-board { display: flex; gap: 8px; align-items: flex-start; width: 100%; }
     .kanban-col {
       flex: 1; min-width: 0; display: flex; flex-direction: column;
@@ -157,7 +184,6 @@
       opacity: 0; transition: opacity 0.2s; pointer-events: none;
     }
     .drawer-backdrop.open { opacity: 1; pointer-events: all; }
-
     .drawer {
       position: fixed; top: 0; right: 0; bottom: 0; width: 400px;
       background: var(--surface); border-left: 1px solid var(--border);
@@ -166,7 +192,6 @@
       display: flex; flex-direction: column; overflow: hidden;
     }
     .drawer.open { transform: translateX(0); }
-
     .drawer-head {
       padding: 20px 20px 16px; border-bottom: 1px solid var(--border);
       display: flex; align-items: flex-start; gap: 12px; flex-shrink: 0;
@@ -186,9 +211,7 @@
       transition: background 0.1s;
     }
     .drawer-close:hover { background: var(--bg); color: var(--text); }
-
     .drawer-body { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 24px; }
-
     .drawer-section {}
     .drawer-section-label {
       font-size: 10px; font-weight: 700; text-transform: uppercase;
@@ -200,7 +223,6 @@
     }
     .drawer-detail-row:last-child { margin-bottom: 0; }
     .drawer-detail-icon { width: 16px; text-align: center; flex-shrink: 0; font-size: 13px; }
-
     .drawer-stage-select {
       font-family: inherit; font-size: 13px; font-weight: 500;
       padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px;
@@ -208,7 +230,6 @@
       transition: border-color 0.12s;
     }
     .drawer-stage-select:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-light); }
-
     .drawer-notes {
       font-family: inherit; font-size: 13px; line-height: 1.6;
       padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
@@ -216,7 +237,6 @@
       color: var(--text); transition: border-color 0.12s, background 0.12s;
     }
     .drawer-notes:focus { outline: none; border-color: var(--blue); background: var(--surface); box-shadow: 0 0 0 3px var(--blue-light); }
-
     .drawer-footer {
       padding: 14px 20px; border-top: 1px solid var(--border);
       display: flex; align-items: center; gap: 10px; flex-shrink: 0;
@@ -237,7 +257,6 @@
       opacity: 0; transition: opacity 0.18s; pointer-events: none;
     }
     .modal-overlay.open { opacity: 1; pointer-events: all; }
-
     .modal {
       background: var(--surface); border-radius: 14px; width: 100%; max-width: 460px;
       border: 1px solid var(--border); box-shadow: 0 20px 60px rgba(15,23,42,0.2);
@@ -245,7 +264,6 @@
       display: flex; flex-direction: column; overflow: hidden;
     }
     .modal-overlay.open .modal { transform: translateY(0); }
-
     .modal-header {
       padding: 20px 20px 16px; border-bottom: 1px solid var(--border);
       display: flex; align-items: center; justify-content: space-between;
@@ -254,13 +272,10 @@
     .modal-close {
       width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--border);
       background: var(--surface); cursor: pointer; display: flex; align-items: center;
-      justify-content: center; font-size: 13px; color: var(--muted);
-      transition: background 0.1s;
+      justify-content: center; font-size: 13px; color: var(--muted); transition: background 0.1s;
     }
     .modal-close:hover { background: var(--bg); color: var(--text); }
-
     .modal-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
-
     .modal-field label {
       display: block; font-size: 11px; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.6px; color: var(--dim); margin-bottom: 6px;
@@ -269,15 +284,13 @@
     .modal-input, .modal-textarea {
       font-family: inherit; font-size: 13px; width: 100%;
       padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px;
-      background: var(--bg); color: var(--text);
-      transition: border-color 0.12s, background 0.12s;
+      background: var(--bg); color: var(--text); transition: border-color 0.12s, background 0.12s;
     }
     .modal-input:focus, .modal-textarea:focus {
       outline: none; border-color: var(--blue);
       background: var(--surface); box-shadow: 0 0 0 3px var(--blue-light);
     }
     .modal-textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
-
     .modal-footer {
       padding: 14px 20px; border-top: 1px solid var(--border);
       display: flex; align-items: center; justify-content: flex-end; gap: 8px;
@@ -285,8 +298,7 @@
     .modal-cancel {
       font-family: inherit; font-size: 13px; font-weight: 500;
       padding: 8px 16px; background: var(--bg); color: var(--muted);
-      border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
-      transition: background 0.1s;
+      border: 1px solid var(--border); border-radius: 8px; cursor: pointer; transition: background 0.1s;
     }
     .modal-cancel:hover { background: var(--border); color: var(--text); }
     .modal-submit {
@@ -376,6 +388,7 @@ let roleIdx = 0;
 let dragId = null;
 let dragFrom = null;
 let openCand = null;
+let searchQuery = '';
 
 // ── Load ──────────────────────────────────────────────────────────
 async function load() {
@@ -418,18 +431,28 @@ function render() {
       <div class="role-tabs" id="roleTabs"></div>
       <div class="role-info" id="roleInfo"></div>
     </div>
-    <div class="kanban-outer"><div class="kanban-board" id="board"></div></div>`;
+    <div class="kanban-outer">
+      <div class="search-row">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input id="searchInput" class="search-input" type="search" placeholder="Search candidates…"
+            oninput="onSearch(this.value)" value="${esc(searchQuery)}" autocomplete="off" />
+          <button class="search-clear" id="searchClear" onclick="clearSearch()" title="Clear">✕</button>
+        </div>
+        <span class="search-count" id="searchCount"></span>
+      </div>
+      <div class="kanban-board" id="board"></div>
+    </div>`;
 
   const tabs = document.getElementById('roleTabs');
   roles.forEach((r, i) => {
     const t = document.createElement('div');
     t.className = 'role-tab' + (i === roleIdx ? ' active' : '');
     t.innerHTML = `${esc(r.title)}<span class="tab-badge">${r.candidates.length}</span>`;
-    t.onclick = () => { roleIdx = i; closeDrawer(); render(); };
+    t.onclick = () => { roleIdx = i; searchQuery = ''; closeDrawer(); render(); };
     tabs.appendChild(t);
   });
 
-  // New role button at end of tabs
   const btn = document.createElement('button');
   btn.className = 'new-role-btn';
   btn.innerHTML = '＋ New role';
@@ -442,16 +465,60 @@ function render() {
     ${role.location ? `<span>📍 ${esc(role.location)}</span>` : ''}
     ${role.brief ? `<span class="role-brief" title="${esc(role.brief)}">${esc(role.brief)}</span>` : ''}`;
 
+  // Restore clear button visibility if query exists
+  updateSearchClear();
   buildKanban(role);
+}
+
+// ── Search ────────────────────────────────────────────────────────
+function onSearch(val) {
+  searchQuery = val;
+  updateSearchClear();
+  const role = state.roles[roleIdx];
+  buildKanban(role);
+  updateSearchCount(role);
+}
+
+function clearSearch() {
+  searchQuery = '';
+  const input = document.getElementById('searchInput');
+  if (input) { input.value = ''; input.focus(); }
+  updateSearchClear();
+  const role = state.roles[roleIdx];
+  buildKanban(role);
+  updateSearchCount(role);
+}
+
+function updateSearchClear() {
+  const el = document.getElementById('searchClear');
+  if (el) el.style.display = searchQuery ? 'block' : 'none';
+}
+
+function updateSearchCount(role) {
+  const el = document.getElementById('searchCount');
+  if (!el) return;
+  const q = searchQuery.toLowerCase().trim();
+  if (!q) { el.textContent = ''; return; }
+  const matched = filterCandidates(role.candidates).length;
+  el.textContent = `${matched} of ${role.candidates.length} candidate${role.candidates.length !== 1 ? 's' : ''}`;
+}
+
+function filterCandidates(candidates) {
+  const q = searchQuery.toLowerCase().trim();
+  if (!q) return candidates;
+  return candidates.filter(c =>
+    [c.name, c.role, c.company, shortLoc(c.location)].some(v => v?.toLowerCase().includes(q))
+  );
 }
 
 // ── Kanban ────────────────────────────────────────────────────────
 function buildKanban(role) {
   const board = document.getElementById('board');
   board.innerHTML = '';
+  const visible = filterCandidates(role.candidates);
   const byStage = {};
   STAGES.forEach(s => byStage[s] = []);
-  role.candidates.forEach(c => { byStage[STAGES.includes(c.pipelineStage) ? c.pipelineStage : 'Sourced'].push(c); });
+  visible.forEach(c => { byStage[STAGES.includes(c.pipelineStage) ? c.pipelineStage : 'Sourced'].push(c); });
 
   STAGES.forEach(stage => {
     const cfg = STAGE_CFG[stage];
@@ -467,15 +534,21 @@ function buildKanban(role) {
       <div class="col-body" data-stage="${stage}"></div>`;
 
     const body = col.querySelector('.col-body');
-    if (!cards.length) body.innerHTML = `<div class="col-empty">Drop here</div>`;
-    else cards.forEach(c => body.appendChild(makeCard(c)));
+    if (!cards.length) {
+      body.innerHTML = `<div class="col-empty">${searchQuery ? 'No match' : 'Drop here'}</div>`;
+    } else {
+      cards.forEach(c => body.appendChild(makeCard(c)));
+    }
 
-    body.addEventListener('dragover', e => { e.preventDefault(); body.classList.add('drag-over'); });
-    body.addEventListener('dragleave', e => { if (!body.contains(e.relatedTarget)) body.classList.remove('drag-over'); });
-    body.addEventListener('drop', e => {
-      e.preventDefault(); body.classList.remove('drag-over');
-      if (dragId && dragFrom && dragFrom !== stage) applyStage(dragId, stage, dragFrom);
-    });
+    // Only wire drag-drop when not filtering
+    if (!searchQuery) {
+      body.addEventListener('dragover', e => { e.preventDefault(); body.classList.add('drag-over'); });
+      body.addEventListener('dragleave', e => { if (!body.contains(e.relatedTarget)) body.classList.remove('drag-over'); });
+      body.addEventListener('drop', e => {
+        e.preventDefault(); body.classList.remove('drag-over');
+        if (dragId && dragFrom && dragFrom !== stage) applyStage(dragId, stage, dragFrom);
+      });
+    }
     board.appendChild(col);
   });
 }
@@ -483,20 +556,29 @@ function buildKanban(role) {
 function makeCard(c) {
   const card = document.createElement('div');
   card.className = 'cand-card';
-  card.draggable = true;
+  card.draggable = !searchQuery;
   const sub = [c.role, c.company].filter(Boolean).join(' · ');
   const loc = shortLoc(c.location);
+
+  // Highlight matching text
+  const q = searchQuery.toLowerCase().trim();
+  const hl = (s) => {
+    if (!q || !s) return esc(s || '');
+    const idx = s.toLowerCase().indexOf(q);
+    if (idx === -1) return esc(s);
+    return esc(s.slice(0, idx)) + `<mark style="background:#fef08a;border-radius:2px;padding:0 1px">${esc(s.slice(idx, idx + q.length))}</mark>` + esc(s.slice(idx + q.length));
+  };
 
   card.innerHTML = `
     <div class="card-top">
       <div class="cand-avatar" style="background:${avatarColor(c.name)}">${esc(initials(c.name))}</div>
       <div class="card-body">
-        <div class="cand-name" title="${esc(c.name)}">${esc(c.name)}</div>
-        ${sub ? `<div class="cand-sub" title="${esc(sub)}">${esc(sub)}</div>` : ''}
+        <div class="cand-name" title="${esc(c.name)}">${hl(c.name)}</div>
+        ${sub ? `<div class="cand-sub" title="${esc(sub)}">${hl(sub)}</div>` : ''}
       </div>
     </div>
     <div class="card-footer">
-      <span class="card-loc">${loc ? `📍 ${esc(loc)}` : ''}</span>
+      <span class="card-loc">${loc ? `📍 ${hl(loc)}` : ''}</span>
       <div class="card-icons">
         <span class="consent-dot${c.email ? ' ok' : ''}" title="${c.email ? 'Email available' : 'Pending consent'}"></span>
         ${c.linkedinUrl ? `<a class="li-btn" href="${escA(c.linkedinUrl)}" target="_blank" title="View on LinkedIn" onclick="event.stopPropagation()">in</a>` : ''}
@@ -504,15 +586,17 @@ function makeCard(c) {
     </div>`;
 
   card.addEventListener('click', () => openDrawer(c));
-  card.addEventListener('dragstart', e => {
-    dragId = c.id; dragFrom = c.pipelineStage || 'Sourced';
-    e.dataTransfer.effectAllowed = 'move';
-    setTimeout(() => card.classList.add('dragging'), 0);
-  });
-  card.addEventListener('dragend', () => {
-    card.classList.remove('dragging');
-    document.querySelectorAll('.col-body').forEach(b => b.classList.remove('drag-over'));
-  });
+  if (!searchQuery) {
+    card.addEventListener('dragstart', e => {
+      dragId = c.id; dragFrom = c.pipelineStage || 'Sourced';
+      e.dataTransfer.effectAllowed = 'move';
+      setTimeout(() => card.classList.add('dragging'), 0);
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      document.querySelectorAll('.col-body').forEach(b => b.classList.remove('drag-over'));
+    });
+  }
   return card;
 }
 
@@ -631,12 +715,10 @@ function closeRoleModal(e) {
 async function submitNewRole() {
   const title = document.getElementById('roleTitle').value.trim();
   if (!title) { document.getElementById('roleTitle').focus(); return; }
-
   const location = document.getElementById('roleLocation').value.trim();
   const brief = document.getElementById('roleBrief').value.trim();
   const btn = document.getElementById('roleSubmitBtn');
   btn.disabled = true; btn.textContent = 'Submitting…';
-
   try {
     const r = await fetch('/api/crm?action=create-role', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -644,10 +726,9 @@ async function submitNewRole() {
     });
     if (!r.ok) throw new Error();
     const data = await r.json();
-
-    // Add new role to local state and switch to it
     state.roles.push({ id: data.roleId, title, location, brief, status: 'Active', candidates: [] });
     roleIdx = state.roles.length - 1;
+    searchQuery = '';
     document.getElementById('roleModalOverlay').classList.remove('open');
     render();
   } catch {
