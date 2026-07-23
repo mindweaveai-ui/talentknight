@@ -2,8 +2,6 @@
 // POST /api/generate-token
 // Body: { adminKey, clientName, email }
 // Protected by a simple admin key (ADMIN_KEY env var)
-import { randomBytes } from 'crypto';
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -36,7 +34,11 @@ export default async function handler(req, res) {
     created: 'fldtwEfCtHWCNqxLY',
   };
 
-  const token = randomBytes(20).toString('hex');  // 40-char hex token
+  // Generate a 40-char hex token using Web Crypto (no import needed)
+  const bytes = new Uint8Array(20);
+  crypto.getRandomValues(bytes);
+  const token = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+
   const today = new Date().toISOString().split('T')[0];
 
   const atHeaders = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
@@ -60,7 +62,7 @@ export default async function handler(req, res) {
 
     const host = req.headers.host || 'talentknight.ai';
     const protocol = host.includes('localhost') ? 'http' : 'https';
-    const dashboardUrl = `${protocol}://${host}/dashboard?token=${token}`;
+    const dashboardUrl = `${protocol}://${host}/dashboard.html?token=${token}`;
 
     return res.status(200).json({
       ok: true,
