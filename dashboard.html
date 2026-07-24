@@ -1,1 +1,891 @@
-PLACEHOLDER
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TalentKnight — Client Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script
+    async
+    crossorigin="anonymous"
+    data-clerk-publishable-key="pk_test_aGlwLXdhc3AtMzQuY2xlcmsuYWNjb3VudHMuZGV2JA"
+    src="https://hip-wasp-34.clerk.accounts.dev/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+    type="text/javascript"
+  ></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f1f5f9;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --blue: #2563eb;
+      --blue-light: #eff6ff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --dim: #94a3b8;
+      --green: #16a34a;
+      --amber: #d97706;
+      --rose: #ef4444;
+    }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── NAV ── */
+    .nav {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 0 28px; height: 58px; display: flex; align-items: center;
+      justify-content: space-between; position: sticky; top: 0; z-index: 200;
+    }
+    .nav-logo { font-size: 17px; font-weight: 700; color: var(--blue); letter-spacing: -0.5px; }
+    .nav-logo span { color: var(--text); }
+    .nav-right { display: flex; align-items: center; gap: 14px; }
+    .nav-client { font-size: 13px; color: var(--muted); font-weight: 500; }
+    .signout-btn {
+      font-family: inherit; font-size: 12px; font-weight: 600; color: var(--muted);
+      background: none; border: 1px solid var(--border); border-radius: 7px;
+      padding: 5px 11px; cursor: pointer; transition: background 0.12s;
+    }
+    .signout-btn:hover { background: var(--bg); }
+
+    /* ── PAGE HEADER ── */
+    .page-header { background: var(--surface); border-bottom: 1px solid var(--border); }
+    .header-inner { padding: 18px 28px 0; }
+    .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.4px; }
+
+    /* ── COMPANY TABS (only shown when a user has access to more than one company) ── */
+    .company-tabs { display: flex; padding: 0 28px; gap: 4px; align-items: center; background: var(--bg); border-bottom: 1px solid var(--border); overflow-x: auto; }
+    .company-tab {
+      padding: 8px 12px; font-size: 12px; font-weight: 600; color: var(--muted);
+      cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent;
+      transition: color 0.12s;
+    }
+    .company-tab:hover { color: var(--text); }
+    .company-tab.active { color: var(--text); border-bottom-color: var(--dim); }
+
+    /* ── ROLE TABS ── */
+    .role-tabs { display: flex; padding: 0 28px; margin-top: 10px; overflow-x: auto; gap: 2px; align-items: center; }
+    .role-tab {
+      padding: 10px 14px; font-size: 13px; font-weight: 500; color: var(--muted);
+      border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap;
+      transition: color 0.12s; user-select: none;
+    }
+    .role-tab:hover { color: var(--text); }
+    .role-tab.active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 600; }
+    .tab-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 10px;
+      margin-left: 5px; background: var(--bg); color: var(--muted);
+    }
+    .role-tab.active .tab-badge { background: var(--blue-light); color: var(--blue); }
+    .new-role-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 11px; font-size: 12px; font-weight: 600;
+      color: var(--blue); background: var(--blue-light); border: 1px solid #bfdbfe;
+      border-radius: 7px; cursor: pointer; white-space: nowrap;
+      transition: background 0.12s; margin-left: 6px; flex-shrink: 0;
+    }
+    .new-role-btn:hover { background: #dbeafe; }
+
+    /* ── ROLE INFO BAR ── */
+    .role-info {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 28px 12px; font-size: 12px; color: var(--muted); flex-wrap: wrap;
+    }
+    .status-badge {
+      font-size: 11px; font-weight: 600; padding: 2px 9px;
+      border-radius: 20px; text-transform: uppercase; letter-spacing: 0.4px;
+    }
+    .status-active   { background: #dcfce7; color: #166534; }
+    .status-paused   { background: #fef9c3; color: #854d0e; }
+    .status-filled   { background: #dbeafe; color: #1e40af; }
+    .status-closed   { background: #f1f5f9; color: #475569; }
+    .role-brief { color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 500px; }
+
+    /* ── SEARCH BAR ── */
+    .search-row { display: flex; align-items: center; gap: 10px; padding: 12px 20px 8px; }
+    .search-wrap { position: relative; flex: 1; max-width: 340px; }
+    .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--dim); font-size: 13px; pointer-events: none; }
+    .search-input {
+      font-family: inherit; font-size: 13px; width: 100%;
+      padding: 8px 32px 8px 32px; border: 1px solid var(--border);
+      border-radius: 8px; background: var(--surface); color: var(--text);
+      transition: border-color 0.12s, box-shadow 0.12s;
+    }
+    .search-input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-light); }
+    .search-input::placeholder { color: var(--dim); }
+    .search-clear {
+      position: absolute; right: 9px; top: 50%; transform: translateY(-50%);
+      font-size: 13px; color: var(--dim); cursor: pointer; display: none;
+      background: none; border: none; padding: 2px 4px; line-height: 1;
+    }
+    .search-clear:hover { color: var(--text); }
+    .search-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+    /* ── KANBAN ── */
+    .kanban-outer { padding: 0 20px 60px; }
+    .kanban-board { display: flex; gap: 8px; align-items: flex-start; width: 100%; }
+    .kanban-col {
+      flex: 1; min-width: 0; display: flex; flex-direction: column;
+      border-radius: 10px; background: #eef2f7; border: 1px solid #dde3ec; overflow: hidden;
+    }
+    .col-header {
+      display: flex; align-items: center; gap: 7px; padding: 10px;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+    }
+    .stage-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .stage-name {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .stage-count {
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      background: var(--bg); padding: 1px 6px; border-radius: 10px; flex-shrink: 0;
+    }
+    .col-body {
+      padding: 7px; min-height: 180px; display: flex; flex-direction: column;
+      gap: 6px; transition: background 0.12s;
+    }
+    .col-body.drag-over {
+      background: #dbeafe; outline: 2px dashed var(--blue);
+      outline-offset: -3px; border-radius: 0 0 10px 10px;
+    }
+    .col-empty { padding: 20px 8px; text-align: center; color: var(--dim); font-size: 11px; }
+
+    /* ── CANDIDATE CARDS ── */
+    .cand-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 7px; padding: 10px; cursor: pointer;
+      transition: box-shadow 0.12s, transform 0.12s, opacity 0.12s;
+    }
+    .cand-card:hover { box-shadow: 0 3px 10px rgba(15,23,42,0.1); transform: translateY(-1px); }
+    .cand-card.dragging { opacity: 0.35; cursor: grabbing; }
+    .card-top { display: flex; align-items: flex-start; gap: 8px; }
+    .cand-avatar {
+      width: 30px; height: 30px; border-radius: 50%; display: flex;
+      align-items: center; justify-content: center; font-size: 11px;
+      font-weight: 700; color: white; flex-shrink: 0; position: relative; overflow: hidden;
+    }
+    .card-body { flex: 1; min-width: 0; }
+    .cand-name { font-size: 12px; font-weight: 600; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cand-sub { font-size: 11px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }
+    .card-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); gap: 4px;
+    }
+    .card-loc { font-size: 11px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+    .stage-age {
+      font-size: 10px; font-weight: 700; padding: 1px 5px;
+      border-radius: 4px; white-space: nowrap; flex-shrink: 0;
+    }
+    .stage-age-ok     { background: #f1f5f9; color: var(--muted); }
+    .stage-age-warn   { background: #fef3c7; color: var(--amber); }
+    .stage-age-alert  { background: #fee2e2; color: var(--rose); }
+    .card-icons { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+    .li-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 18px; height: 18px; border-radius: 3px; background: #0a66c2;
+      color: white; font-size: 9px; font-weight: 800; text-decoration: none;
+    }
+    .consent-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); }
+    .consent-dot.ok { background: var(--green); }
+
+    /* ── DRAWER ── */
+    .drawer-backdrop {
+      position: fixed; inset: 0; background: rgba(15,23,42,0.25); z-index: 300;
+      opacity: 0; transition: opacity 0.2s; pointer-events: none;
+    }
+    .drawer-backdrop.open { opacity: 1; pointer-events: all; }
+    .drawer {
+      position: fixed; top: 0; right: 0; bottom: 0; width: 400px;
+      background: var(--surface); border-left: 1px solid var(--border);
+      z-index: 301; transform: translateX(100%);
+      transition: transform 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .drawer.open { transform: translateX(0); }
+    .drawer-head {
+      padding: 20px 20px 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: flex-start; gap: 12px; flex-shrink: 0;
+    }
+    .drawer-avatar {
+      width: 46px; height: 46px; border-radius: 50%; display: flex;
+      align-items: center; justify-content: center; font-size: 16px;
+      font-weight: 700; color: white; flex-shrink: 0; position: relative; overflow: hidden;
+    }
+    .drawer-name-block { flex: 1; min-width: 0; padding-top: 2px; }
+    .drawer-name { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+    .drawer-sub { font-size: 13px; color: var(--muted); margin-top: 3px; }
+    .drawer-close {
+      width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--border);
+      background: var(--surface); cursor: pointer; display: flex; align-items: center;
+      justify-content: center; font-size: 14px; color: var(--muted); flex-shrink: 0;
+      transition: background 0.1s;
+    }
+    .drawer-close:hover { background: var(--bg); color: var(--text); }
+    .drawer-body { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 24px; }
+    .drawer-section {}
+    .drawer-section-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.7px; color: var(--dim); margin-bottom: 10px;
+    }
+    .drawer-detail-row {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; color: var(--text); margin-bottom: 7px;
+    }
+    .drawer-detail-row:last-child { margin-bottom: 0; }
+    .drawer-detail-icon { width: 16px; text-align: center; flex-shrink: 0; font-size: 13px; }
+    .drawer-stage-select {
+      font-family: inherit; font-size: 13px; font-weight: 500;
+      padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px;
+      background: var(--surface); width: 100%; cursor: pointer; color: var(--text);
+      transition: border-color 0.12s;
+    }
+    .drawer-stage-select:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-light); }
+    .stage-since {
+      font-size: 12px; margin-top: 7px; padding: 6px 10px; border-radius: 7px;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .stage-since-ok    { background: #f1f5f9; color: var(--muted); }
+    .stage-since-warn  { background: #fef3c7; color: var(--amber); }
+    .stage-since-alert { background: #fee2e2; color: var(--rose); }
+    .drawer-notes {
+      font-family: inherit; font-size: 13px; line-height: 1.6;
+      padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+      background: var(--bg); width: 100%; resize: vertical; min-height: 110px;
+      color: var(--text); transition: border-color 0.12s, background 0.12s;
+    }
+    .drawer-notes:focus { outline: none; border-color: var(--blue); background: var(--surface); box-shadow: 0 0 0 3px var(--blue-light); }
+    .drawer-footer {
+      padding: 14px 20px; border-top: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+    }
+    .save-btn {
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      padding: 9px 18px; background: var(--blue); color: white;
+      border: none; border-radius: 8px; cursor: pointer; transition: background 0.12s;
+    }
+    .save-btn:hover { background: #1d4ed8; }
+    .save-btn:disabled { background: var(--dim); cursor: not-allowed; }
+    .save-status { font-size: 12px; color: var(--green); opacity: 0; transition: opacity 0.3s; }
+
+    /* ── ROLE MODAL ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(15,23,42,0.4); z-index: 400;
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+      opacity: 0; transition: opacity 0.18s; pointer-events: none;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--surface); border-radius: 14px; width: 100%; max-width: 460px;
+      border: 1px solid var(--border); box-shadow: 0 20px 60px rgba(15,23,42,0.2);
+      transform: translateY(10px); transition: transform 0.18s;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .modal-overlay.open .modal { transform: translateY(0); }
+    .modal-header {
+      padding: 20px 20px 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .modal-title { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
+    .modal-close {
+      width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--border);
+      background: var(--surface); cursor: pointer; display: flex; align-items: center;
+      justify-content: center; font-size: 13px; color: var(--muted); transition: background 0.1s;
+    }
+    .modal-close:hover { background: var(--bg); color: var(--text); }
+    .modal-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+    .modal-field label {
+      display: block; font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.6px; color: var(--dim); margin-bottom: 6px;
+    }
+    .modal-field label .req { color: var(--rose); margin-left: 2px; }
+    .modal-input, .modal-textarea {
+      font-family: inherit; font-size: 13px; width: 100%;
+      padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px;
+      background: var(--bg); color: var(--text); transition: border-color 0.12s, background 0.12s;
+    }
+    .modal-input:focus, .modal-textarea:focus {
+      outline: none; border-color: var(--blue);
+      background: var(--surface); box-shadow: 0 0 0 3px var(--blue-light);
+    }
+    .modal-textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
+    .modal-footer {
+      padding: 14px 20px; border-top: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+    }
+    .modal-cancel {
+      font-family: inherit; font-size: 13px; font-weight: 500;
+      padding: 8px 16px; background: var(--bg); color: var(--muted);
+      border: 1px solid var(--border); border-radius: 8px; cursor: pointer; transition: background 0.1s;
+    }
+    .modal-cancel:hover { background: var(--border); color: var(--text); }
+    .modal-submit {
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      padding: 9px 18px; background: var(--blue); color: white;
+      border: none; border-radius: 8px; cursor: pointer; transition: background 0.12s;
+    }
+    .modal-submit:hover { background: #1d4ed8; }
+    .modal-submit:disabled { background: var(--dim); cursor: not-allowed; }
+
+    /* ── STATES ── */
+    .centered { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 14px; text-align: center; }
+    .spinner { width: 34px; height: 34px; border: 3px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .err-title { font-size: 17px; font-weight: 600; }
+    .err-msg { color: var(--rose); font-size: 14px; }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-logo">Talent<span>Knight</span></div>
+  <div class="nav-right">
+    <div class="nav-client" id="navClient"></div>
+    <button class="signout-btn" id="signOutBtn" style="display:none;" onclick="Clerk.signOut()">Sign out</button>
+  </div>
+</nav>
+
+<div id="main">
+  <div class="centered">
+    <div class="spinner"></div>
+    <div style="color:var(--muted);font-size:14px;">Loading your pipeline…</div>
+  </div>
+</div>
+
+<!-- Candidate detail drawer -->
+<div class="drawer-backdrop" id="drawerBackdrop" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head" id="drawerHead"></div>
+  <div class="drawer-body" id="drawerBody"></div>
+  <div class="drawer-footer">
+    <button class="save-btn" id="saveBtn" onclick="saveNotes()">Save notes</button>
+    <span class="save-status" id="saveStatus">✓ Saved</span>
+  </div>
+</div>
+
+<!-- New role modal -->
+<div class="modal-overlay" id="roleModalOverlay" onclick="closeRoleModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">Request a new role</div>
+      <button class="modal-close" onclick="closeRoleModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label>Role title <span class="req">*</span></label>
+        <input id="roleTitle" class="modal-input" type="text" placeholder="e.g. Senior Tax Manager" />
+      </div>
+      <div class="modal-field">
+        <label>Location</label>
+        <input id="roleLocation" class="modal-input" type="text" placeholder="e.g. London (Hybrid)" />
+      </div>
+      <div class="modal-field">
+        <label>Brief / key requirements</label>
+        <textarea id="roleBrief" class="modal-textarea" placeholder="Qualifications, years of experience, specialisms, salary range…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-cancel" onclick="closeRoleModal()">Cancel</button>
+      <button class="modal-submit" id="roleSubmitBtn" onclick="submitNewRole()">Submit role</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STAGES = ['Sourced','Contacted','Shortlisted','Interviewing','Offered','Placed','Rejected'];
+const STAGE_CFG = {
+  Sourced:      { dot: '#94a3b8', color: '#475569' },
+  Contacted:    { dot: '#3b82f6', color: '#1d4ed8' },
+  Shortlisted:  { dot: '#06b6d4', color: '#0e7490' },
+  Interviewing: { dot: '#f59e0b', color: '#b45309' },
+  Offered:      { dot: '#f97316', color: '#c2410c' },
+  Placed:       { dot: '#22c55e', color: '#15803d' },
+  Rejected:     { dot: '#ef4444', color: '#b91c1c' },
+};
+
+let state = null;
+let companyIdx = 0;
+let roleIdx = 0;
+let dragId = null;
+let dragFrom = null;
+let openCand = null;
+let searchQuery = '';
+
+// ── Auth + load ───────────────────────────────────────────────────
+async function authHeader() {
+  const token = await Clerk.session.getToken();
+  return { Authorization: `Bearer ${token}` };
+}
+
+async function load() {
+  try {
+    await Clerk.load();
+  } catch {
+    return showErr('Connection error', 'Could not reach the sign-in service — please refresh.');
+  }
+
+  if (!Clerk.user) {
+    document.getElementById('main').innerHTML = `<div class="centered" style="min-height:80vh;"><div id="signIn"></div></div>`;
+    Clerk.mountSignIn(document.getElementById('signIn'), {
+      fallbackRedirectUrl: '/dashboard.html',
+      signUpFallbackRedirectUrl: '/dashboard.html',
+    });
+    return;
+  }
+
+  document.getElementById('signOutBtn').style.display = 'inline-block';
+
+  try {
+    const h = await authHeader();
+    const r = await fetch(`/api/crm?action=dashboard`, { headers: h });
+    if (r.status === 401) return showErr('Session expired', 'Please sign in again.');
+    if (r.status === 403) {
+      const body = await r.json().catch(() => ({}));
+      return showErr('No access yet', body.error || "Your account isn't linked to a company yet. Contact your admin.");
+    }
+    if (!r.ok) return showErr('Something went wrong', 'Please try refreshing the page.');
+    state = await r.json();
+  } catch { return showErr('Connection error', 'Please check your connection and refresh.'); }
+  render();
+}
+
+// ── Render ─────────────────────────────────────────────────────────
+function render() {
+  const { user, companies } = state;
+  document.getElementById('navClient').textContent = user.name;
+  const main = document.getElementById('main');
+
+  if (!companies.length) {
+    document.title = 'TalentKnight';
+    main.innerHTML = `
+      <div class="centered" style="min-height:70vh;">
+        <div style="font-size:36px;">📋</div>
+        <div style="font-size:16px;font-weight:600;">No companies yet</div>
+        <div style="color:var(--muted);font-size:13px;">Your account isn't linked to any company's pipeline yet.</div>
+      </div>`;
+    return;
+  }
+
+  companyIdx = Math.min(companyIdx, companies.length - 1);
+  const company = companies[companyIdx];
+  const roles = company.roles;
+  document.title = `${company.name} — TalentKnight`;
+
+  if (!roles.length) {
+    main.innerHTML = `
+      <div class="page-header"><div class="header-inner"><div class="page-title">${esc(company.name)}</div></div>
+      ${companies.length > 1 ? '<div class="company-tabs" id="companyTabs"></div>' : ''}
+      <div class="role-tabs"><button class="new-role-btn" onclick="openRoleModal()">＋ New role</button></div>
+      <div style="height:12px"></div></div>
+      <div class="centered" style="min-height:50vh;">
+        <div style="font-size:36px;">📋</div>
+        <div style="font-size:16px;font-weight:600;">No roles yet</div>
+        <div style="color:var(--muted);font-size:13px;">Click <strong>＋ New role</strong> to request your first search.</div>
+      </div>`;
+    if (companies.length > 1) buildCompanyTabs();
+    return;
+  }
+
+  roleIdx = Math.min(roleIdx, roles.length - 1);
+  const role = roles[roleIdx];
+
+  main.innerHTML = `
+    <div class="page-header">
+      <div class="header-inner"><div class="page-title">${esc(company.name)}</div></div>
+      ${companies.length > 1 ? '<div class="company-tabs" id="companyTabs"></div>' : ''}
+      <div class="role-tabs" id="roleTabs"></div>
+      <div class="role-info" id="roleInfo"></div>
+    </div>
+    <div class="kanban-outer">
+      <div class="search-row">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input id="searchInput" class="search-input" type="search" placeholder="Search candidates…"
+            oninput="onSearch(this.value)" value="${esc(searchQuery)}" autocomplete="off" />
+          <button class="search-clear" id="searchClear" onclick="clearSearch()" title="Clear">✕</button>
+        </div>
+        <span class="search-count" id="searchCount"></span>
+      </div>
+      <div class="kanban-board" id="board"></div>
+    </div>`;
+
+  if (companies.length > 1) buildCompanyTabs();
+
+  const tabs = document.getElementById('roleTabs');
+  roles.forEach((r, i) => {
+    const t = document.createElement('div');
+    t.className = 'role-tab' + (i === roleIdx ? ' active' : '');
+    t.innerHTML = `${esc(r.title)}<span class="tab-badge">${r.candidates.length}</span>`;
+    t.onclick = () => { roleIdx = i; searchQuery = ''; closeDrawer(); render(); };
+    tabs.appendChild(t);
+  });
+
+  const btn = document.createElement('button');
+  btn.className = 'new-role-btn';
+  btn.innerHTML = '＋ New role';
+  btn.onclick = openRoleModal;
+  tabs.appendChild(btn);
+
+  const info = document.getElementById('roleInfo');
+  info.innerHTML = `
+    <span class="status-badge status-${role.status.toLowerCase()}">${esc(role.status)}</span>
+    ${role.location ? `<span>📍 ${esc(role.location)}</span>` : ''}
+    ${role.brief ? `<span class="role-brief" title="${esc(role.brief)}">${esc(role.brief)}</span>` : ''}`;
+
+  updateSearchClear();
+  buildKanban(role);
+}
+
+function buildCompanyTabs() {
+  const wrap = document.getElementById('companyTabs');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  state.companies.forEach((c, i) => {
+    const t = document.createElement('div');
+    t.className = 'company-tab' + (i === companyIdx ? ' active' : '');
+    t.textContent = c.name;
+    t.onclick = () => { companyIdx = i; roleIdx = 0; searchQuery = ''; closeDrawer(); render(); };
+    wrap.appendChild(t);
+  });
+}
+
+// ── Search ────────────────────────────────────────────────────────
+function onSearch(val) {
+  searchQuery = val;
+  updateSearchClear();
+  const role = state.companies[companyIdx].roles[roleIdx];
+  buildKanban(role);
+  updateSearchCount(role);
+}
+
+function clearSearch() {
+  searchQuery = '';
+  const input = document.getElementById('searchInput');
+  if (input) { input.value = ''; input.focus(); }
+  updateSearchClear();
+  const role = state.companies[companyIdx].roles[roleIdx];
+  buildKanban(role);
+  updateSearchCount(role);
+}
+
+function updateSearchClear() {
+  const el = document.getElementById('searchClear');
+  if (el) el.style.display = searchQuery ? 'block' : 'none';
+}
+
+function updateSearchCount(role) {
+  const el = document.getElementById('searchCount');
+  if (!el) return;
+  const q = searchQuery.toLowerCase().trim();
+  if (!q) { el.textContent = ''; return; }
+  const matched = filterCandidates(role.candidates).length;
+  el.textContent = `${matched} of ${role.candidates.length} candidate${role.candidates.length !== 1 ? 's' : ''}`;
+}
+
+function filterCandidates(candidates) {
+  const q = searchQuery.toLowerCase().trim();
+  if (!q) return candidates;
+  return candidates.filter(c =>
+    [c.name, c.role, c.company, shortLoc(c.location)].some(v => v?.toLowerCase().includes(q))
+  );
+}
+
+// ── Kanban ────────────────────────────────────────────────────────
+function buildKanban(role) {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+  const visible = filterCandidates(role.candidates);
+  const byStage = {};
+  STAGES.forEach(s => byStage[s] = []);
+  visible.forEach(c => { byStage[STAGES.includes(c.pipelineStage) ? c.pipelineStage : 'Sourced'].push(c); });
+
+  STAGES.forEach(stage => {
+    const cfg = STAGE_CFG[stage];
+    const cards = byStage[stage];
+    const col = document.createElement('div');
+    col.className = 'kanban-col';
+    col.innerHTML = `
+      <div class="col-header">
+        <span class="stage-dot" style="background:${cfg.dot}"></span>
+        <span class="stage-name" style="color:${cfg.color}">${stage}</span>
+        <span class="stage-count">${cards.length}</span>
+      </div>
+      <div class="col-body" data-stage="${stage}"></div>`;
+
+    const body = col.querySelector('.col-body');
+    if (!cards.length) {
+      body.innerHTML = `<div class="col-empty">${searchQuery ? 'No match' : 'Drop here'}</div>`;
+    } else {
+      cards.forEach(c => body.appendChild(makeCard(c)));
+    }
+
+    if (!searchQuery) {
+      body.addEventListener('dragover', e => { e.preventDefault(); body.classList.add('drag-over'); });
+      body.addEventListener('dragleave', e => { if (!body.contains(e.relatedTarget)) body.classList.remove('drag-over'); });
+      body.addEventListener('drop', e => {
+        e.preventDefault(); body.classList.remove('drag-over');
+        if (dragId && dragFrom && dragFrom !== stage) applyStage(dragId, stage, dragFrom);
+      });
+    }
+    board.appendChild(col);
+  });
+}
+
+function makeCard(c) {
+  const card = document.createElement('div');
+  card.className = 'cand-card';
+  card.draggable = !searchQuery;
+  const sub = [c.role, c.company].filter(Boolean).join(' · ');
+  const loc = shortLoc(c.location);
+  const age = stageDays(c.stageChangedAt);
+
+  const q = searchQuery.toLowerCase().trim();
+  const hl = (s) => {
+    if (!q || !s) return esc(s || '');
+    const idx = s.toLowerCase().indexOf(q);
+    if (idx === -1) return esc(s);
+    return esc(s.slice(0, idx)) + `<mark style="background:#fef08a;border-radius:2px;padding:0 1px">${esc(s.slice(idx, idx + q.length))}</mark>` + esc(s.slice(idx + q.length));
+  };
+
+  const ageBadge = age !== null
+    ? `<span class="stage-age ${ageClass(age)}" title="${age === 0 ? 'Moved today' : `${age} day${age !== 1 ? 's' : ''} in this stage`}">${age === 0 ? 'today' : age + 'd'}</span>`
+    : '';
+
+  card.innerHTML = `
+    <div class="card-top">
+      <div class="cand-avatar" style="background:${avatarColor(c.name)}">${c.photoUrl ? `<img src="${escA(c.photoUrl)}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.remove()">` : ''}${esc(initials(c.name))}</div>
+      <div class="card-body">
+        <div class="cand-name" title="${esc(c.name)}">${hl(c.name)}</div>
+        ${sub ? `<div class="cand-sub" title="${esc(sub)}">${hl(sub)}</div>` : ''}
+      </div>
+    </div>
+    <div class="card-footer">
+      <span class="card-loc">${loc ? `📍 ${hl(loc)}` : ''}</span>
+      ${ageBadge}
+      <div class="card-icons">
+        <span class="consent-dot${c.email ? ' ok' : ''}" title="${c.email ? 'Email available' : 'Pending consent'}"></span>
+        ${c.linkedinUrl ? `<a class="li-btn" href="${escA(c.linkedinUrl)}" target="_blank" title="View on LinkedIn" onclick="event.stopPropagation()">in</a>` : ''}
+      </div>
+    </div>`;
+
+  card.addEventListener('click', () => openDrawer(c));
+  if (!searchQuery) {
+    card.addEventListener('dragstart', e => {
+      dragId = c.id; dragFrom = c.pipelineStage || 'Sourced';
+      e.dataTransfer.effectAllowed = 'move';
+      setTimeout(() => card.classList.add('dragging'), 0);
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      document.querySelectorAll('.col-body').forEach(b => b.classList.remove('drag-over'));
+    });
+  }
+  return card;
+}
+
+// ── Stage update ──────────────────────────────────────────────────
+async function applyStage(candidateId, newStage, oldStage) {
+  const role = state.companies[companyIdx].roles[roleIdx];
+  const cand = role.candidates.find(c => c.id === candidateId);
+  if (cand) { cand.pipelineStage = newStage; cand.stageChangedAt = todayISO(); }
+  buildKanban(role);
+  try {
+    const h = await authHeader();
+    const r = await fetch('/api/crm?action=update-stage', {
+      method: 'PATCH', headers: { ...h, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidateId, stage: newStage }),
+    });
+    if (!r.ok) throw new Error();
+  } catch {
+    if (cand) { cand.pipelineStage = oldStage; cand.stageChangedAt = cand._prevStageChangedAt; }
+    buildKanban(role);
+    alert('Stage update failed — please try again.');
+  }
+}
+
+// ── Candidate drawer ──────────────────────────────────────────────
+function openDrawer(c) {
+  openCand = c;
+  const bg = avatarColor(c.name);
+  const sub = [c.role, c.company].filter(Boolean).join(' · ');
+  const loc = shortLoc(c.location);
+  const age = stageDays(c.stageChangedAt);
+
+  document.getElementById('drawerHead').innerHTML = `
+    <div class="drawer-avatar" style="background:${bg}">${c.photoUrl ? `<img src="${escA(c.photoUrl)}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.remove()">` : ''}${esc(initials(c.name))}</div>
+    <div class="drawer-name-block">
+      <div class="drawer-name">${esc(c.name)}</div>
+      ${sub ? `<div class="drawer-sub">${esc(sub)}</div>` : ''}
+    </div>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>`;
+
+  const stageSinceHtml = age !== null
+    ? `<div class="stage-since ${ageClass(age).replace('stage-age-','stage-since-')}">
+        ⏱ ${age === 0 ? 'Moved to this stage today' : `${age} day${age !== 1 ? 's' : ''} in this stage`}
+       </div>`
+    : '';
+
+  document.getElementById('drawerBody').innerHTML = `
+    <div class="drawer-section">
+      <div class="drawer-section-label">Details</div>
+      ${loc ? `<div class="drawer-detail-row"><span class="drawer-detail-icon">📍</span><span>${esc(loc)}</span></div>` : ''}
+      ${c.linkedinUrl
+        ? `<div class="drawer-detail-row"><span class="drawer-detail-icon" style="color:#0a66c2;font-weight:800;font-size:11px;">in</span><a href="${escA(c.linkedinUrl)}" target="_blank" style="color:var(--blue);font-size:13px;text-decoration:none;">View LinkedIn profile ↗</a></div>`
+        : ''}
+      ${c.email
+        ? `<div class="drawer-detail-row"><span class="drawer-detail-icon">📧</span><span style="color:var(--green);font-weight:500;">${esc(c.email)}</span></div>`
+        : `<div class="drawer-detail-row"><span class="drawer-detail-icon">📧</span><span style="color:var(--dim);">Pending consent</span></div>`}
+    </div>
+
+    <div class="drawer-section">
+      <div class="drawer-section-label">Pipeline stage</div>
+      <select class="drawer-stage-select" id="drawerStage" onchange="drawerChangeStage(this)">
+        ${STAGES.map(s => `<option value="${s}"${s === c.pipelineStage ? ' selected' : ''}>${s}</option>`).join('')}
+      </select>
+      ${stageSinceHtml}
+    </div>
+
+    <div class="drawer-section" style="flex:1;">
+      <div class="drawer-section-label">Notes</div>
+      <textarea class="drawer-notes" id="drawerNotes" placeholder="Add notes about this candidate…">${esc(c.notes || '')}</textarea>
+    </div>`;
+
+  document.getElementById('drawerBackdrop').classList.add('open');
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('saveStatus').style.opacity = '0';
+}
+
+function closeDrawer() {
+  document.getElementById('drawerBackdrop').classList.remove('open');
+  document.getElementById('drawer').classList.remove('open');
+  openCand = null;
+}
+
+async function drawerChangeStage(sel) {
+  if (!openCand) return;
+  const newStage = sel.value;
+  const oldStage = openCand.pipelineStage;
+  if (newStage === oldStage) return;
+  openCand._prevStageChangedAt = openCand.stageChangedAt;
+  await applyStage(openCand.id, newStage, oldStage);
+  const since = document.querySelector('.stage-since');
+  if (since) {
+    since.className = 'stage-since stage-since-ok';
+    since.textContent = '⏱ Moved to this stage today';
+  }
+}
+
+async function saveNotes() {
+  if (!openCand) return;
+  const notes = document.getElementById('drawerNotes').value;
+  const btn = document.getElementById('saveBtn');
+  const status = document.getElementById('saveStatus');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const h = await authHeader();
+    const r = await fetch('/api/crm?action=save-notes', {
+      method: 'PATCH', headers: { ...h, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidateId: openCand.id, notes }),
+    });
+    if (!r.ok) throw new Error();
+    openCand.notes = notes;
+    status.style.opacity = '1';
+    setTimeout(() => { status.style.opacity = '0'; }, 2500);
+  } catch { alert('Failed to save notes — please try again.'); }
+  finally { btn.disabled = false; btn.textContent = 'Save notes'; }
+}
+
+// ── Role modal ─────────────────────────────────────────────────
+function openRoleModal() {
+  document.getElementById('roleTitle').value = '';
+  document.getElementById('roleLocation').value = '';
+  document.getElementById('roleBrief').value = '';
+  document.getElementById('roleSubmitBtn').disabled = false;
+  document.getElementById('roleSubmitBtn').textContent = 'Submit role';
+  document.getElementById('roleModalOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('roleTitle').focus(), 50);
+}
+
+function closeRoleModal(e) {
+  if (e && e.target !== document.getElementById('roleModalOverlay')) return;
+  document.getElementById('roleModalOverlay').classList.remove('open');
+}
+
+async function submitNewRole() {
+  const title = document.getElementById('roleTitle').value.trim();
+  if (!title) { document.getElementById('roleTitle').focus(); return; }
+  const location = document.getElementById('roleLocation').value.trim();
+  const brief = document.getElementById('roleBrief').value.trim();
+  const btn = document.getElementById('roleSubmitBtn');
+  btn.disabled = true; btn.textContent = 'Submitting…';
+  try {
+    const companyId = state.companies[companyIdx].id;
+    const h = await authHeader();
+    const r = await fetch('/api/crm?action=create-role', {
+      method: 'POST', headers: { ...h, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId, title, location, brief }),
+    });
+    if (!r.ok) throw new Error();
+    const data = await r.json();
+    state.companies[companyIdx].roles.push({ id: data.roleId, title, location, brief, status: 'Active', candidates: [] });
+    roleIdx = state.companies[companyIdx].roles.length - 1;
+    searchQuery = '';
+    document.getElementById('roleModalOverlay').classList.remove('open');
+    render();
+  } catch {
+    alert('Failed to create role — please try again.');
+    btn.disabled = false; btn.textContent = 'Submit role';
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────
+function stageDays(dateStr) {
+  if (!dateStr) return null;
+  const then = new Date(dateStr + 'T00:00:00');
+  const now = new Date();
+  const diff = Math.floor((now - then) / 86400000);
+  return diff < 0 ? 0 : diff;
+}
+
+function ageClass(days) {
+  if (days >= 14) return 'stage-age-alert';
+  if (days >= 7)  return 'stage-age-warn';
+  return 'stage-age-ok';
+}
+
+function todayISO() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function avatarColor(name) {
+  const p = ['#2563eb','#7c3aed','#db2777','#dc2626','#d97706','#059669','#0891b2','#4f46e5'];
+  let h = 0;
+  for (const ch of String(name)) h = (h * 31 + ch.charCodeAt(0)) & 0x7fffffff;
+  return p[h % p.length];
+}
+function initials(name) {
+  return String(name || '').split(' ').slice(0, 2).map(w => w[0] || '').join('').toUpperCase() || '?';
+}
+function shortLoc(loc) {
+  if (!loc) return '';
+  const parts = loc.split(',').map(p => p.trim());
+  if (parts.length === 1) return loc;
+  const cm = { 'United Kingdom':'UK','England':'UK','Scotland':'UK','Wales':'UK','Northern Ireland':'UK','United States':'US','United States of America':'US' };
+  return `${parts[0]}, ${cm[parts[parts.length-1]] ?? parts[parts.length-1]}`;
+}
+function esc(s)  { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escA(s) { return String(s ?? '').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function showErr(t, m) {
+  document.getElementById('main').innerHTML = `<div class="centered"><div class="err-title">${esc(t)}</div><div class="err-msg">${esc(m)}</div></div>`;
+}
+
+window.addEventListener('load', load);
+</script>
+</body>
+</html>
