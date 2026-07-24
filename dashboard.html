@@ -415,8 +415,11 @@
 </div>
 
 <script>
-const STAGES = ['Sourced','Contacted','Shortlisted','Interviewing','Offered','Placed','Rejected'];
+let STAGES = ['Sourced','Contacted','Shortlisted','Interviewing','Offered','Placed','Rejected'];
+const STAFF_STAGES = ['Matched','Sourced','Contacted','Shortlisted','Interviewing','Offered','Placed','Rejected'];
+const CONTACT_STAGES = ['Sourced','Contacted','Shortlisted','Interviewing','Offered','Placed','Rejected'];
 const STAGE_CFG = {
+  Matched:      { dot: '#8b5cf6', color: '#6d28d9' },
   Sourced:      { dot: '#94a3b8', color: '#475569' },
   Contacted:    { dot: '#3b82f6', color: '#1d4ed8' },
   Shortlisted:  { dot: '#06b6d4', color: '#0e7490' },
@@ -470,6 +473,11 @@ async function load() {
     if (!r.ok) return showErr('Something went wrong', 'Please try refreshing the page.');
     state = await r.json();
   } catch { return showErr('Connection error', 'Please check your connection and refresh.'); }
+
+  // Staff (recruiters) get a "Matched" column ahead of Sourced — this is where Vesper's
+  // AI matches land for review before a human promotes them. Company Contacts never see it.
+  STAGES = state.user?.isStaff ? STAFF_STAGES : CONTACT_STAGES;
+
   render();
 }
 
@@ -663,6 +671,7 @@ function buildKanban(role) {
   const visible = filterCandidates(role.candidates);
   const byStage = {};
   STAGES.forEach(s => byStage[s] = []);
+  byStage.Sourced = byStage.Sourced || [];
   visible.forEach(c => { byStage[STAGES.includes(c.pipelineStage) ? c.pipelineStage : 'Sourced'].push(c); });
 
   STAGES.forEach(stage => {
