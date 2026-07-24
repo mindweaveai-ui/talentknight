@@ -1,0 +1,10 @@
+{
+  "name": "talentknight",
+  "private": true,
+  "engines": {
+    "node": "20.x"
+  },
+  "dependencies": {
+    "@clerk/backend": "^3.4.14"
+  }
+}

@@ -6,6 +6,13 @@
   <title>TalentKnight — Client Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script
+    async
+    crossorigin="anonymous"
+    data-clerk-publishable-key="pk_test_aGlwLXdhc3AtMzQuY2xlcmsuYWNjb3VudHMuZGV2JA"
+    src="https://hip-wasp-34.clerk.accounts.dev/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+    type="text/javascript"
+  ></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -37,12 +44,29 @@
     }
     .nav-logo { font-size: 17px; font-weight: 700; color: var(--blue); letter-spacing: -0.5px; }
     .nav-logo span { color: var(--text); }
+    .nav-right { display: flex; align-items: center; gap: 14px; }
     .nav-client { font-size: 13px; color: var(--muted); font-weight: 500; }
+    .signout-btn {
+      font-family: inherit; font-size: 12px; font-weight: 600; color: var(--muted);
+      background: none; border: 1px solid var(--border); border-radius: 7px;
+      padding: 5px 11px; cursor: pointer; transition: background 0.12s;
+    }
+    .signout-btn:hover { background: var(--bg); }
 
     /* ── PAGE HEADER ── */
     .page-header { background: var(--surface); border-bottom: 1px solid var(--border); }
     .header-inner { padding: 18px 28px 0; }
     .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.4px; }
+
+    /* ── COMPANY TABS (only shown when a user has access to more than one company) ── */
+    .company-tabs { display: flex; padding: 0 28px; gap: 4px; align-items: center; background: var(--bg); border-bottom: 1px solid var(--border); overflow-x: auto; }
+    .company-tab {
+      padding: 8px 12px; font-size: 12px; font-weight: 600; color: var(--muted);
+      cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent;
+      transition: color 0.12s;
+    }
+    .company-tab:hover { color: var(--text); }
+    .company-tab.active { color: var(--text); border-bottom-color: var(--dim); }
 
     /* ── ROLE TABS ── */
     .role-tabs { display: flex; padding: 0 28px; margin-top: 10px; overflow-x: auto; gap: 2px; align-items: center; }
@@ -321,7 +345,10 @@
 
 <nav class="nav">
   <div class="nav-logo">Talent<span>Knight</span></div>
-  <div class="nav-client" id="navClient"></div>
+  <div class="nav-right">
+    <div class="nav-client" id="navClient"></div>
+    <button class="signout-btn" id="signOutBtn" style="display:none;" onclick="Clerk.signOut()">Sign out</button>
+  </div>
 </nav>
 
 <div id="main">
@@ -371,7 +398,6 @@
 </div>
 
 <script>
-const TOKEN = new URLSearchParams(window.location.search).get('token');
 const STAGES = ['Sourced','Contacted','Shortlisted','Interviewing','Offered','Placed','Rejected'];
 const STAGE_CFG = {
   Sourced:      { dot: '#94a3b8', color: '#475569' },
@@ -384,18 +410,42 @@ const STAGE_CFG = {
 };
 
 let state = null;
+let companyIdx = 0;
 let roleIdx = 0;
 let dragId = null;
 let dragFrom = null;
 let openCand = null;
 let searchQuery = '';
 
-// ── Load ──────────────────────────────────────────────────────────
+// ── Auth + load ───────────────────────────────────────────────────
+async function authHeader() {
+  const token = await Clerk.session.getToken();
+  return { Authorization: `Bearer ${token}` };
+}
+
 async function load() {
-  if (!TOKEN) return showErr('No access token', 'Check your dashboard link and try again.');
   try {
-    const r = await fetch(`/api/crm?action=dashboard&token=${TOKEN}`);
-    if (r.status === 401) return showErr('Access denied', 'This link is invalid or has expired.');
+    await Clerk.load();
+  } catch {
+    return showErr('Connection error', 'Could not reach the sign-in service — please refresh.');
+  }
+
+  if (!Clerk.user) {
+    document.getElementById('main').innerHTML = `<div class="centered" style="min-height:80vh;"><div id="signIn"></div></div>`;
+    Clerk.mountSignIn(document.getElementById('signIn'));
+    return;
+  }
+
+  document.getElementById('signOutBtn').style.display = 'inline-block';
+
+  try {
+    const h = await authHeader();
+    const r = await fetch(`/api/crm?action=dashboard`, { headers: h });
+    if (r.status === 401) return showErr('Session expired', 'Please sign in again.');
+    if (r.status === 403) {
+      const body = await r.json().catch(() => ({}));
+      return showErr('No access yet', body.error || "Your account isn't linked to a company yet. Contact your admin.");
+    }
     if (!r.ok) return showErr('Something went wrong', 'Please try refreshing the page.');
     state = await r.json();
   } catch { return showErr('Connection error', 'Please check your connection and refresh.'); }
@@ -404,14 +454,30 @@ async function load() {
 
 // ── Render ────────────────────────────────────────────────────────
 function render() {
-  const { client, roles } = state;
-  document.getElementById('navClient').textContent = client.name;
-  document.title = `${client.name} — TalentKnight`;
+  const { user, companies } = state;
+  document.getElementById('navClient').textContent = user.name;
   const main = document.getElementById('main');
+
+  if (!companies.length) {
+    document.title = 'TalentKnight';
+    main.innerHTML = `
+      <div class="centered" style="min-height:70vh;">
+        <div style="font-size:36px;">📋</div>
+        <div style="font-size:16px;font-weight:600;">No companies yet</div>
+        <div style="color:var(--muted);font-size:13px;">Your account isn't linked to any company's pipeline yet.</div>
+      </div>`;
+    return;
+  }
+
+  companyIdx = Math.min(companyIdx, companies.length - 1);
+  const company = companies[companyIdx];
+  const roles = company.roles;
+  document.title = `${company.name} — TalentKnight`;
 
   if (!roles.length) {
     main.innerHTML = `
-      <div class="page-header"><div class="header-inner"><div class="page-title">${esc(client.name)}</div></div>
+      <div class="page-header"><div class="header-inner"><div class="page-title">${esc(company.name)}</div></div>
+      ${companies.length > 1 ? '<div class="company-tabs" id="companyTabs"></div>' : ''}
       <div class="role-tabs"><button class="new-role-btn" onclick="openRoleModal()">＋ New role</button></div>
       <div style="height:12px"></div></div>
       <div class="centered" style="min-height:50vh;">
@@ -419,6 +485,7 @@ function render() {
         <div style="font-size:16px;font-weight:600;">No roles yet</div>
         <div style="color:var(--muted);font-size:13px;">Click <strong>＋ New role</strong> to request your first search.</div>
       </div>`;
+    if (companies.length > 1) buildCompanyTabs();
     return;
   }
 
@@ -427,7 +494,8 @@ function render() {
 
   main.innerHTML = `
     <div class="page-header">
-      <div class="header-inner"><div class="page-title">${esc(client.name)}</div></div>
+      <div class="header-inner"><div class="page-title">${esc(company.name)}</div></div>
+      ${companies.length > 1 ? '<div class="company-tabs" id="companyTabs"></div>' : ''}
       <div class="role-tabs" id="roleTabs"></div>
       <div class="role-info" id="roleInfo"></div>
     </div>
@@ -443,6 +511,8 @@ function render() {
       </div>
       <div class="kanban-board" id="board"></div>
     </div>`;
+
+  if (companies.length > 1) buildCompanyTabs();
 
   const tabs = document.getElementById('roleTabs');
   roles.forEach((r, i) => {
@@ -469,11 +539,24 @@ function render() {
   buildKanban(role);
 }
 
+function buildCompanyTabs() {
+  const wrap = document.getElementById('companyTabs');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  state.companies.forEach((c, i) => {
+    const t = document.createElement('div');
+    t.className = 'company-tab' + (i === companyIdx ? ' active' : '');
+    t.textContent = c.name;
+    t.onclick = () => { companyIdx = i; roleIdx = 0; searchQuery = ''; closeDrawer(); render(); };
+    wrap.appendChild(t);
+  });
+}
+
 // ── Search ────────────────────────────────────────────────────────
 function onSearch(val) {
   searchQuery = val;
   updateSearchClear();
-  const role = state.roles[roleIdx];
+  const role = state.companies[companyIdx].roles[roleIdx];
   buildKanban(role);
   updateSearchCount(role);
 }
@@ -483,7 +566,7 @@ function clearSearch() {
   const input = document.getElementById('searchInput');
   if (input) { input.value = ''; input.focus(); }
   updateSearchClear();
-  const role = state.roles[roleIdx];
+  const role = state.companies[companyIdx].roles[roleIdx];
   buildKanban(role);
   updateSearchCount(role);
 }
@@ -605,14 +688,15 @@ function makeCard(c) {
 
 // ── Stage update ──────────────────────────────────────────────────
 async function applyStage(candidateId, newStage, oldStage) {
-  const role = state.roles[roleIdx];
+  const role = state.companies[companyIdx].roles[roleIdx];
   const cand = role.candidates.find(c => c.id === candidateId);
   if (cand) { cand.pipelineStage = newStage; cand.stageChangedAt = todayISO(); }
   buildKanban(role);
   try {
+    const h = await authHeader();
     const r = await fetch('/api/crm?action=update-stage', {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: TOKEN, candidateId, stage: newStage }),
+      method: 'PATCH', headers: { ...h, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidateId, stage: newStage }),
     });
     if (!r.ok) throw new Error();
   } catch {
@@ -687,7 +771,6 @@ async function drawerChangeStage(sel) {
   if (newStage === oldStage) return;
   openCand._prevStageChangedAt = openCand.stageChangedAt;
   await applyStage(openCand.id, newStage, oldStage);
-  // refresh stage-since in drawer
   const since = document.querySelector('.stage-since');
   if (since) {
     since.className = 'stage-since stage-since-ok';
@@ -702,9 +785,10 @@ async function saveNotes() {
   const status = document.getElementById('saveStatus');
   btn.disabled = true; btn.textContent = 'Saving…';
   try {
+    const h = await authHeader();
     const r = await fetch('/api/crm?action=save-notes', {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: TOKEN, candidateId: openCand.id, notes }),
+      method: 'PATCH', headers: { ...h, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidateId: openCand.id, notes }),
     });
     if (!r.ok) throw new Error();
     openCand.notes = notes;
@@ -738,14 +822,16 @@ async function submitNewRole() {
   const btn = document.getElementById('roleSubmitBtn');
   btn.disabled = true; btn.textContent = 'Submitting…';
   try {
+    const companyId = state.companies[companyIdx].id;
+    const h = await authHeader();
     const r = await fetch('/api/crm?action=create-role', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: TOKEN, title, location, brief }),
+      method: 'POST', headers: { ...h, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId, title, location, brief }),
     });
     if (!r.ok) throw new Error();
     const data = await r.json();
-    state.roles.push({ id: data.roleId, title, location, brief, status: 'Active', candidates: [] });
-    roleIdx = state.roles.length - 1;
+    state.companies[companyIdx].roles.push({ id: data.roleId, title, location, brief, status: 'Active', candidates: [] });
+    roleIdx = state.companies[companyIdx].roles.length - 1;
     searchQuery = '';
     document.getElementById('roleModalOverlay').classList.remove('open');
     render();
@@ -796,7 +882,7 @@ function showErr(t, m) {
   document.getElementById('main').innerHTML = `<div class="centered"><div class="err-title">${esc(t)}</div><div class="err-msg">${esc(m)}</div></div>`;
 }
 
-load();
+window.addEventListener('load', load);
 </script>
 </body>
 </html>
