@@ -51,6 +51,11 @@ const CAF = { consultant: 'fldK640gTY74TE88t', company: 'fld8jtLa5bBgLiecA' };
 const CCF = { name: 'fldS7Oj0wFblqAMW9', clerkId: 'fldxow90zxJZebzPo', company: 'fldRIczrSKBL7blS0', active: 'flddZUcmemx9fU3rf' };
 const ORGF = { name: 'fldqGP76mkwa9AtYZ', companies: 'fldCmI1mZ1qsPDDAv' };
 
+// Stages that only Org Staff (Admin/Consultant) may see or set. "Matched" is where Vesper's
+// AI matches land before a human reviews and promotes them into Sourced — kept invisible to
+// Company Contacts so clients only ever see candidates a recruiter has vetted.
+const STAFF_ONLY_STAGES = ['Matched'];
+
 // ── Clerk session verification ───────────────────────────────────
 async function getClerkUserId(req) {
   const auth = req.headers.authorization || '';
@@ -70,6 +75,8 @@ async function getClerkUserId(req) {
 // Checks Org Staff first (Admin = every Company in their Organization, Consultant = only
 // assigned Companies via Consultant Assignments), then falls back to Company Contacts
 // (single-company viewer). Returns null if the Clerk user isn't provisioned in either table.
+// viewerType is 'staff' for Org Staff (sees the Matched queue) or 'contact' for Company
+// Contacts (never sees Matched — only recruiter-vetted stages).
 async function resolveAccess(clerkUserId, h) {
   const staffRes = await fetch(
     `https://api.airtable.com/v0/${BASE}/${ORG_STAFF}?filterByFormula=${encodeURIComponent(`AND({${OSF.clerkId}}='${clerkUserId}',{${OSF.active}}=1)`)}&returnFieldsByFieldId=true&pageSize=1`,
@@ -84,7 +91,7 @@ async function resolveAccess(clerkUserId, h) {
 
     if (tier === 'Admin') {
       const orgRec = await fetch(`https://api.airtable.com/v0/${BASE}/${ORGANIZATIONS}/${orgId}?returnFieldsByFieldId=true`, { headers: h }).then(r => r.json()).catch(() => null);
-      return { name: staff.fields[OSF.name] || 'Admin', companyIds: orgRec?.fields?.[ORGF.companies] || [] };
+      return { name: staff.fields[OSF.name] || 'Admin', companyIds: orgRec?.fields?.[ORGF.companies] || [], viewerType: 'staff' };
     }
 
     // Consultant: fetch assignments and filter client-side — Airtable's filterByFormula
@@ -93,7 +100,7 @@ async function resolveAccess(clerkUserId, h) {
     const companyIds = (asgRes.records || [])
       .filter(a => (a.fields[CAF.consultant] || []).includes(staff.id))
       .flatMap(a => a.fields[CAF.company] || []);
-    return { name: staff.fields[OSF.name] || 'Consultant', companyIds: [...new Set(companyIds)] };
+    return { name: staff.fields[OSF.name] || 'Consultant', companyIds: [...new Set(companyIds)], viewerType: 'staff' };
   }
 
   const contactRes = await fetch(
@@ -103,7 +110,7 @@ async function resolveAccess(clerkUserId, h) {
 
   if (contactRes?.records?.length) {
     const contact = contactRes.records[0];
-    return { name: contact.fields[CCF.name] || 'Guest', companyIds: contact.fields[CCF.company] || [] };
+    return { name: contact.fields[CCF.name] || 'Guest', companyIds: contact.fields[CCF.company] || [], viewerType: 'contact' };
   }
 
   return null;
@@ -132,7 +139,8 @@ async function handleDashboard(req, res) {
   const h = { Authorization: `Bearer ${AT_TOKEN}` };
   const access = await resolveAccess(clerkUserId, h);
   if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet. Contact your admin." });
-  if (!access.companyIds.length) return res.status(200).json({ user: { name: access.name }, companies: [] });
+  const isStaff = access.viewerType === 'staff';
+  if (!access.companyIds.length) return res.status(200).json({ user: { name: access.name, isStaff }, companies: [] });
 
   const companiesRes = await fetch(
     `https://api.airtable.com/v0/${BASE}/${COMPANIES}?filterByFormula=${encodeURIComponent(`OR(${access.companyIds.map(id => `RECORD_ID()='${id}'`).join(',')})`)}&returnFieldsByFieldId=true`,
@@ -180,6 +188,12 @@ async function handleDashboard(req, res) {
       const consented = f[KF.outreachStatus] === 'Interested';
       const rawCompany = f[KF.company] || '';
       const company = /^\d+$/.test(rawCompany.trim()) ? '' : rawCompany;
+      const stage = f[KF.pipelineStage] || 'Sourced';
+
+      // Company Contacts never see staff-only stages (e.g. "Matched" — AI matches
+      // awaiting recruiter review) even if a candidate is linked to their role.
+      if (!isStaff && STAFF_ONLY_STAGES.includes(stage)) return;
+
       candidateMap[rec.id] = {
         id: rec.id,
         name: f[KF.name] || 'Unknown',
@@ -190,7 +204,7 @@ async function handleDashboard(req, res) {
         email: consented ? (f[KF.personalEmail] || '') : '',
         phone: consented ? (f[KF.mobile] || '') : '',
         outreachStatus: f[KF.outreachStatus] || '',
-        pipelineStage: f[KF.pipelineStage] || 'Sourced',
+        pipelineStage: stage,
         notes: f[KF.notes] || '',
         stageChangedAt: f[KF.stageChangedAt] || '',
         photoUrl: f[KF.photoUrl] || '',
@@ -221,7 +235,7 @@ async function handleDashboard(req, res) {
     })),
   }));
 
-  return res.status(200).json({ user: { name: access.name }, companies });
+  return res.status(200).json({ user: { name: access.name, isStaff }, companies });
 }
 
 // ── UPDATE STAGE ──────────────────────────────────────────────────
@@ -233,7 +247,7 @@ async function handleUpdateStage(req, res) {
   const { candidateId, stage } = req.body || {};
   if (!candidateId || !stage) return res.status(400).json({ error: 'Missing fields' });
 
-  const VALID = ['Sourced','Contacted','Shortlisted','Interviewing','Offered','Placed','Rejected'];
+  const VALID = ['Matched','Sourced','Contacted','Shortlisted','Interviewing','Offered','Placed','Rejected'];
   if (!VALID.includes(stage)) return res.status(400).json({ error: 'Invalid stage' });
 
   const clerkUserId = await getClerkUserId(req);
@@ -242,6 +256,10 @@ async function handleUpdateStage(req, res) {
   const h = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
   const access = await resolveAccess(clerkUserId, h);
   if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet." });
+
+  if (STAFF_ONLY_STAGES.includes(stage) && access.viewerType !== 'staff') {
+    return res.status(403).json({ error: 'Only recruiters can set this stage.' });
+  }
 
   const check = await candidateAllowed(candidateId, access.companyIds, h);
   if (!check.ok) return res.status(check.status).json({ error: check.error });
