@@ -58,44 +58,61 @@
     .header-inner { padding: 18px 28px 0; }
     .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.4px; }
 
-    /* ── COMPANY TABS (only shown when a user has access to more than one company) ── */
-    .company-tabs { display: flex; padding: 0 28px; gap: 4px; align-items: center; background: var(--bg); border-bottom: 1px solid var(--border); overflow-x: auto; }
-    .company-tab {
-      padding: 8px 12px; font-size: 12px; font-weight: 600; color: var(--muted);
-      cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent;
-      transition: color 0.12s;
+    /* ── APP LAYOUT (sidebar + content) ── */
+    .app-layout { display: flex; height: calc(100vh - 58px); overflow: hidden; }
+    .sidebar {
+      width: 260px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
     }
-    .company-tab:hover { color: var(--text); }
-    .company-tab.active { color: var(--text); border-bottom-color: var(--dim); }
+    .sidebar-top { padding: 16px 16px 12px; border-bottom: 1px solid var(--border); }
+    .sidebar-company-name { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+    .company-select {
+      font-family: inherit; font-size: 13px; font-weight: 600; width: 100%;
+      padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px;
+      background: var(--bg); color: var(--text); cursor: pointer;
+    }
+    .company-select:focus { outline: none; border-color: var(--blue); }
+    .sidebar-search { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    .role-search-input {
+      font-family: inherit; font-size: 12px; width: 100%;
+      padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px;
+      background: var(--bg); color: var(--text); transition: border-color 0.12s;
+    }
+    .role-search-input:focus { outline: none; border-color: var(--blue); background: var(--surface); }
+    .role-search-input::placeholder { color: var(--dim); }
+    .role-list { flex: 1; overflow-y: auto; padding: 6px; }
+    .role-list-empty { padding: 20px 10px; text-align: center; color: var(--dim); font-size: 12px; }
+    .role-item {
+      padding: 9px 10px; border-radius: 8px; cursor: pointer; margin-bottom: 2px;
+      border-left: 3px solid transparent; transition: background 0.12s;
+    }
+    .role-item:hover { background: var(--bg); }
+    .role-item.active { background: var(--blue-light); border-left-color: var(--blue); }
+    .role-item-top { display: flex; align-items: center; gap: 7px; }
+    .role-item-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .role-item-title {
+      font-size: 13px; font-weight: 600; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .role-item.active .role-item-title { color: var(--blue); }
+    .role-item-meta {
+      font-size: 11px; color: var(--muted); margin-top: 2px; padding-left: 14px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .new-role-btn-sidebar {
+      font-family: inherit; font-size: 12px; font-weight: 600; color: var(--blue);
+      background: var(--blue-light); border: none; border-top: 1px solid var(--border);
+      padding: 11px; cursor: pointer; transition: background 0.12s; flex-shrink: 0;
+    }
+    .new-role-btn-sidebar:hover { background: #dbeafe; }
 
-    /* ── ROLE TABS ── */
-    .role-tabs { display: flex; padding: 0 28px; margin-top: 10px; overflow-x: auto; gap: 2px; align-items: center; }
-    .role-tab {
-      padding: 10px 14px; font-size: 13px; font-weight: 500; color: var(--muted);
-      border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap;
-      transition: color 0.12s; user-select: none;
-    }
-    .role-tab:hover { color: var(--text); }
-    .role-tab.active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 600; }
-    .tab-badge {
-      display: inline-flex; align-items: center; justify-content: center;
-      font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 10px;
-      margin-left: 5px; background: var(--bg); color: var(--muted);
-    }
-    .role-tab.active .tab-badge { background: var(--blue-light); color: var(--blue); }
-    .new-role-btn {
-      display: inline-flex; align-items: center; gap: 5px;
-      padding: 5px 11px; font-size: 12px; font-weight: 600;
-      color: var(--blue); background: var(--blue-light); border: 1px solid #bfdbfe;
-      border-radius: 7px; cursor: pointer; white-space: nowrap;
-      transition: background 0.12s; margin-left: 6px; flex-shrink: 0;
-    }
-    .new-role-btn:hover { background: #dbeafe; }
+    .content-area { flex: 1; min-width: 0; overflow-y: auto; padding: 18px 24px 60px; }
+    .content-header { margin-bottom: 4px; }
 
     /* ── ROLE INFO BAR ── */
     .role-info {
       display: flex; align-items: center; gap: 10px;
-      padding: 8px 28px 12px; font-size: 12px; color: var(--muted); flex-wrap: wrap;
+      padding: 6px 0 14px; font-size: 12px; color: var(--muted); flex-wrap: wrap;
     }
     .status-badge {
       font-size: 11px; font-weight: 600; padding: 2px 9px;
@@ -107,8 +124,8 @@
     .status-closed   { background: #f1f5f9; color: #475569; }
     .role-brief { color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 500px; }
 
-    /* ── SEARCH BAR ── */
-    .search-row { display: flex; align-items: center; gap: 10px; padding: 12px 20px 8px; }
+    /* ── SEARCH BAR (candidates) ── */
+    .search-row { display: flex; align-items: center; gap: 10px; padding: 0 0 12px; }
     .search-wrap { position: relative; flex: 1; max-width: 340px; }
     .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--dim); font-size: 13px; pointer-events: none; }
     .search-input {
@@ -128,7 +145,7 @@
     .search-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
 
     /* ── KANBAN ── */
-    .kanban-outer { padding: 0 20px 60px; }
+    .kanban-outer { }
     .kanban-board { display: flex; gap: 8px; align-items: flex-start; width: 100%; }
     .kanban-col {
       flex: 1; min-width: 0; display: flex; flex-direction: column;
@@ -416,6 +433,7 @@ let dragId = null;
 let dragFrom = null;
 let openCand = null;
 let searchQuery = '';
+let roleSearchQuery = '';
 
 // ── Auth + load ───────────────────────────────────────────────────
 async function authHeader() {
@@ -479,16 +497,21 @@ function render() {
 
   if (!roles.length) {
     main.innerHTML = `
-      <div class="page-header"><div class="header-inner"><div class="page-title">${esc(company.name)}</div></div>
-      ${companies.length > 1 ? '<div class="company-tabs" id="companyTabs"></div>' : ''}
-      <div class="role-tabs"><button class="new-role-btn" onclick="openRoleModal()">＋ New role</button></div>
-      <div style="height:12px"></div></div>
-      <div class="centered" style="min-height:50vh;">
-        <div style="font-size:36px;">📋</div>
-        <div style="font-size:16px;font-weight:600;">No roles yet</div>
-        <div style="color:var(--muted);font-size:13px;">Click <strong>＋ New role</strong> to request your first search.</div>
+      <div class="app-layout">
+        <aside class="sidebar">
+          <div class="sidebar-top">${companySelectHtml(companies)}</div>
+          <div class="role-list"><div class="role-list-empty">No roles yet</div></div>
+          <button class="new-role-btn-sidebar" onclick="openRoleModal()">＋ New role</button>
+        </aside>
+        <div class="content-area">
+          <div class="centered" style="min-height:50vh;">
+            <div style="font-size:36px;">📋</div>
+            <div style="font-size:16px;font-weight:600;">No roles yet</div>
+            <div style="color:var(--muted);font-size:13px;">Click <strong>＋ New role</strong> to request your first search.</div>
+          </div>
+        </div>
       </div>`;
-    if (companies.length > 1) buildCompanyTabs();
+    attachCompanySelectListener();
     return;
   }
 
@@ -496,62 +519,99 @@ function render() {
   const role = roles[roleIdx];
 
   main.innerHTML = `
-    <div class="page-header">
-      <div class="header-inner"><div class="page-title">${esc(company.name)}</div></div>
-      ${companies.length > 1 ? '<div class="company-tabs" id="companyTabs"></div>' : ''}
-      <div class="role-tabs" id="roleTabs"></div>
-      <div class="role-info" id="roleInfo"></div>
-    </div>
-    <div class="kanban-outer">
-      <div class="search-row">
-        <div class="search-wrap">
-          <span class="search-icon">🔍</span>
-          <input id="searchInput" class="search-input" type="search" placeholder="Search candidates…"
-            oninput="onSearch(this.value)" value="${esc(searchQuery)}" autocomplete="off" />
-          <button class="search-clear" id="searchClear" onclick="clearSearch()" title="Clear">✕</button>
+    <div class="app-layout">
+      <aside class="sidebar">
+        <div class="sidebar-top">${companySelectHtml(companies)}</div>
+        <div class="sidebar-search">
+          <input id="roleSearchInput" class="role-search-input" type="search" placeholder="Search roles…"
+            oninput="onRoleSearch(this.value)" value="${esc(roleSearchQuery)}" autocomplete="off" />
         </div>
-        <span class="search-count" id="searchCount"></span>
+        <div class="role-list" id="roleList"></div>
+        <button class="new-role-btn-sidebar" onclick="openRoleModal()">＋ New role</button>
+      </aside>
+      <div class="content-area">
+        <div class="content-header">
+          <div class="page-title">${esc(role.title)}</div>
+          <div class="role-info">
+            <span class="status-badge status-${role.status.toLowerCase()}">${esc(role.status)}</span>
+            ${role.location ? `<span>📍 ${esc(role.location)}</span>` : ''}
+            ${role.brief ? `<span class="role-brief" title="${esc(role.brief)}">${esc(role.brief)}</span>` : ''}
+          </div>
+        </div>
+        <div class="search-row">
+          <div class="search-wrap">
+            <span class="search-icon">🔍</span>
+            <input id="searchInput" class="search-input" type="search" placeholder="Search candidates…"
+              oninput="onSearch(this.value)" value="${esc(searchQuery)}" autocomplete="off" />
+            <button class="search-clear" id="searchClear" onclick="clearSearch()" title="Clear">✕</button>
+          </div>
+          <span class="search-count" id="searchCount"></span>
+        </div>
+        <div class="kanban-board" id="board"></div>
       </div>
-      <div class="kanban-board" id="board"></div>
     </div>`;
 
-  if (companies.length > 1) buildCompanyTabs();
-
-  const tabs = document.getElementById('roleTabs');
-  roles.forEach((r, i) => {
-    const t = document.createElement('div');
-    t.className = 'role-tab' + (i === roleIdx ? ' active' : '');
-    t.innerHTML = `${esc(r.title)}<span class="tab-badge">${r.candidates.length}</span>`;
-    t.onclick = () => { roleIdx = i; searchQuery = ''; closeDrawer(); render(); };
-    tabs.appendChild(t);
-  });
-
-  const btn = document.createElement('button');
-  btn.className = 'new-role-btn';
-  btn.innerHTML = '＋ New role';
-  btn.onclick = openRoleModal;
-  tabs.appendChild(btn);
-
-  const info = document.getElementById('roleInfo');
-  info.innerHTML = `
-    <span class="status-badge status-${role.status.toLowerCase()}">${esc(role.status)}</span>
-    ${role.location ? `<span>📍 ${esc(role.location)}</span>` : ''}
-    ${role.brief ? `<span class="role-brief" title="${esc(role.brief)}">${esc(role.brief)}</span>` : ''}`;
-
+  attachCompanySelectListener();
+  buildRoleList();
   updateSearchClear();
   buildKanban(role);
 }
 
-function buildCompanyTabs() {
-  const wrap = document.getElementById('companyTabs');
+function companySelectHtml(companies) {
+  if (companies.length > 1) {
+    return `<select class="company-select" id="companySelect">
+      ${companies.map((c, i) => `<option value="${i}"${i === companyIdx ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}
+    </select>`;
+  }
+  return `<div class="sidebar-company-name">${esc(companies[0].name)}</div>`;
+}
+
+function attachCompanySelectListener() {
+  const sel = document.getElementById('companySelect');
+  if (sel) sel.addEventListener('change', (e) => onCompanyChange(e.target.value));
+}
+
+function onCompanyChange(val) {
+  companyIdx = Number(val);
+  roleIdx = 0;
+  searchQuery = '';
+  roleSearchQuery = '';
+  closeDrawer();
+  render();
+}
+
+function onRoleSearch(val) {
+  roleSearchQuery = val;
+  buildRoleList();
+}
+
+function buildRoleList() {
+  const wrap = document.getElementById('roleList');
   if (!wrap) return;
+  const company = state.companies[companyIdx];
+  const q = roleSearchQuery.toLowerCase().trim();
+  const filtered = company.roles
+    .map((r, i) => ({ r, i }))
+    .filter(({ r }) => !q || r.title.toLowerCase().includes(q));
+
+  if (!filtered.length) {
+    wrap.innerHTML = `<div class="role-list-empty">No roles match "${esc(roleSearchQuery)}"</div>`;
+    return;
+  }
+
+  const dotColor = { active: '#16a34a', paused: '#d97706', filled: '#2563eb', closed: '#94a3b8' };
   wrap.innerHTML = '';
-  state.companies.forEach((c, i) => {
-    const t = document.createElement('div');
-    t.className = 'company-tab' + (i === companyIdx ? ' active' : '');
-    t.textContent = c.name;
-    t.onclick = () => { companyIdx = i; roleIdx = 0; searchQuery = ''; closeDrawer(); render(); };
-    wrap.appendChild(t);
+  filtered.forEach(({ r, i }) => {
+    const item = document.createElement('div');
+    item.className = 'role-item' + (i === roleIdx ? ' active' : '');
+    item.innerHTML = `
+      <div class="role-item-top">
+        <span class="role-item-dot" style="background:${dotColor[r.status.toLowerCase()] || '#94a3b8'}"></span>
+        <span class="role-item-title">${esc(r.title)}</span>
+      </div>
+      <div class="role-item-meta">${r.candidates.length} candidate${r.candidates.length !== 1 ? 's' : ''}${r.location ? ` · ${esc(shortLoc(r.location))}` : ''}</div>`;
+    item.onclick = () => { roleIdx = i; searchQuery = ''; closeDrawer(); render(); };
+    wrap.appendChild(item);
   });
 }
 
@@ -801,7 +861,7 @@ async function saveNotes() {
   finally { btn.disabled = false; btn.textContent = 'Save notes'; }
 }
 
-// ── Role modal ─────────────────────────────────────────────────
+// ── Role modal ───────────────────────────────────────────────────
 function openRoleModal() {
   document.getElementById('roleTitle').value = '';
   document.getElementById('roleLocation').value = '';
@@ -836,6 +896,7 @@ async function submitNewRole() {
     state.companies[companyIdx].roles.push({ id: data.roleId, title, location, brief, status: 'Active', candidates: [] });
     roleIdx = state.companies[companyIdx].roles.length - 1;
     searchQuery = '';
+    roleSearchQuery = '';
     document.getElementById('roleModalOverlay').classList.remove('open');
     render();
   } catch {
