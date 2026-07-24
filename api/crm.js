@@ -39,6 +39,12 @@ const KF = {
   pipelineStage: 'fldwlXw21bdKx5mpw', notes: 'fld15lbm2amuugdrv',
   stageChangedAt: 'fldVM6xsL7tXN1pvM', photoUrl: 'fldLjRmZdkPpNzqRF',
   assignedRole: 'fld72aDuvebMTHpB0',
+  // Richer candidate profile fields — already present in Airtable, now surfaced in the dashboard.
+  sector: 'fldQjqjDdx2oV4KqA', yearsExperience: 'fldvniEirssDClM9N', seniority: 'fldZdGN4Ic6tVLAyR',
+  workPreference: 'fld8yRrgggiAVo7I6', salaryMin: 'fldukD1lSgSMk5QP3', salaryMax: 'fld7s9k8DA4xZRDfB',
+  noticePeriod: 'fld6bjkGxD9O17rZL', willingToRelocate: 'fldDcb78CT8XBCch8', rightToWorkUK: 'fldA5fQDWE5D3HwoV',
+  skills: 'fldjzxELfOSU8M0dC', certifications: 'fldgTtC0PqkPoL69R', educationLevel: 'fldWagGVvad1qKxKu',
+  mobile: 'fldpCX8EWARrz4xjN', bio: 'fldtJGFbRDqFR9PPJ',
 };
 const OSF = { name: 'fldIMiB64MXLRln82', clerkId: 'fld9qiWYAWe9mPx8i', organization: 'fldm9cJR6urVDzKLS', tier: 'fldMJlsUHuFX1yJOy', active: 'fldN7VcJ9fKx676dL' };
 const CAF = { consultant: 'fldK640gTY74TE88t', company: 'fld8jtLa5bBgLiecA' };
@@ -182,11 +188,25 @@ async function handleDashboard(req, res) {
         location: f[KF.location] || '',
         linkedinUrl: f[KF.linkedinUrl] || '',
         email: consented ? (f[KF.personalEmail] || '') : '',
+        phone: consented ? (f[KF.mobile] || '') : '',
         outreachStatus: f[KF.outreachStatus] || '',
         pipelineStage: f[KF.pipelineStage] || 'Sourced',
         notes: f[KF.notes] || '',
         stageChangedAt: f[KF.stageChangedAt] || '',
         photoUrl: f[KF.photoUrl] || '',
+        sector: f[KF.sector] || '',
+        yearsExperience: f[KF.yearsExperience] || '',
+        seniority: f[KF.seniority] || '',
+        workPreference: f[KF.workPreference] || '',
+        salaryMin: typeof f[KF.salaryMin] === 'number' ? f[KF.salaryMin] : null,
+        salaryMax: typeof f[KF.salaryMax] === 'number' ? f[KF.salaryMax] : null,
+        noticePeriod: f[KF.noticePeriod] || '',
+        willingToRelocate: f[KF.willingToRelocate] || '',
+        rightToWorkUK: f[KF.rightToWorkUK] || '',
+        skills: f[KF.skills] || '',
+        certifications: f[KF.certifications] || '',
+        educationLevel: f[KF.educationLevel] || '',
+        bio: f[KF.bio] || '',
       };
     });
   }
