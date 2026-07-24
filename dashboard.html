@@ -791,6 +791,27 @@ function openDrawer(c) {
        </div>`
     : '';
 
+  const salary = formatSalary(c.salaryMin, c.salaryMax);
+  const profileRows = [
+    c.seniority ? ['🎖', c.seniority] : null,
+    c.yearsExperience ? ['⏳', `${c.yearsExperience} experience`] : null,
+    c.sector ? ['🏷', c.sector] : null,
+    c.workPreference ? ['🏢', c.workPreference] : null,
+    c.willingToRelocate ? ['🚚', `Relocate: ${c.willingToRelocate}`] : null,
+    c.rightToWorkUK ? ['🛲', c.rightToWorkUK] : null,
+  ].filter(Boolean);
+
+  const compRows = [
+    salary ? ['💷', salary] : null,
+    c.noticePeriod ? ['📅', `${c.noticePeriod} notice`] : null,
+  ].filter(Boolean);
+
+  const skillRows = [
+    c.skills ? ['Skills', c.skills] : null,
+    c.certifications ? ['Certifications', c.certifications] : null,
+    c.educationLevel ? ['Education', c.educationLevel] : null,
+  ].filter(Boolean);
+
   document.getElementById('drawerBody').innerHTML = `
     <div class="drawer-section">
       <div class="drawer-section-label">Details</div>
@@ -801,7 +822,29 @@ function openDrawer(c) {
       ${c.email
         ? `<div class="drawer-detail-row"><span class="drawer-detail-icon">📧</span><span style="color:var(--green);font-weight:500;">${esc(c.email)}</span></div>`
         : `<div class="drawer-detail-row"><span class="drawer-detail-icon">📧</span><span style="color:var(--dim);">Pending consent</span></div>`}
+      ${c.phone
+        ? `<div class="drawer-detail-row"><span class="drawer-detail-icon">📱</span><span style="color:var(--green);font-weight:500;">${esc(c.phone)}</span></div>`
+        : ''}
     </div>
+
+    ${(profileRows.length || compRows.length) ? `
+    <div class="drawer-section">
+      <div class="drawer-section-label">Profile</div>
+      ${profileRows.map(([icon, text]) => `<div class="drawer-detail-row"><span class="drawer-detail-icon">${icon}</span><span>${esc(text)}</span></div>`).join('')}
+      ${compRows.length ? `<div style="height:8px"></div>${compRows.map(([icon, text]) => `<div class="drawer-detail-row"><span class="drawer-detail-icon">${icon}</span><span style="font-weight:600;">${esc(text)}</span></div>`).join('')}` : ''}
+    </div>` : ''}
+
+    ${skillRows.length ? `
+    <div class="drawer-section">
+      <div class="drawer-section-label">Skills &amp; Qualifications</div>
+      ${skillRows.map(([label, val]) => `<div class="drawer-detail-row" style="align-items:flex-start;"><span style="font-weight:600;font-size:12px;color:var(--muted);min-width:88px;flex-shrink:0;">${esc(label)}</span><span>${esc(val)}</span></div>`).join('')}
+    </div>` : ''}
+
+    ${c.bio ? `
+    <div class="drawer-section">
+      <div class="drawer-section-label">About</div>
+      <div style="font-size:13px;line-height:1.6;color:var(--text);">${esc(c.bio)}</div>
+    </div>` : ''}
 
     <div class="drawer-section">
       <div class="drawer-section-label">Pipeline stage</div>
@@ -939,6 +982,13 @@ function shortLoc(loc) {
   if (parts.length === 1) return loc;
   const cm = { 'United Kingdom':'UK','England':'UK','Scotland':'UK','Wales':'UK','Northern Ireland':'UK','United States':'US','United States of America':'US' };
   return `${parts[0]}, ${cm[parts[parts.length-1]] ?? parts[parts.length-1]}`;
+}
+function formatSalary(min, max) {
+  const fmt = (n) => `£${Math.round(n / 1000)}k`;
+  if (min != null && max != null) return `${fmt(min)} – ${fmt(max)}`;
+  if (min != null) return `${fmt(min)}+`;
+  if (max != null) return `Up to ${fmt(max)}`;
+  return '';
 }
 function esc(s)  { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function escA(s) { return String(s ?? '').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
