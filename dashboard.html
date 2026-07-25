@@ -123,6 +123,14 @@
     .status-filled   { background: #dbeafe; color: #1e40af; }
     .status-closed   { background: #f1f5f9; color: #475569; }
     .role-brief { color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 500px; }
+    .find-matches-btn {
+      font-family: inherit; font-size: 11px; font-weight: 600; color: var(--blue);
+      background: var(--blue-light); border: 1px solid #bfdbfe; border-radius: 20px;
+      padding: 3px 10px; cursor: pointer; transition: background 0.12s;
+    }
+    .find-matches-btn:hover { background: #dbeafe; }
+    .find-matches-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .find-matches-status { font-size: 11px; color: var(--muted); }
 
     /* ── SEARCH BAR (candidates) ── */
     .search-row { display: flex; align-items: center; gap: 10px; padding: 0 0 12px; }
@@ -569,6 +577,7 @@ function render() {
             <span class="status-badge status-${role.status.toLowerCase()}">${esc(role.status)}</span>
             ${role.location ? `<span>📍 ${esc(role.location)}</span>` : ''}
             ${role.brief ? `<span class="role-brief" title="${esc(role.brief)}">${esc(role.brief)}</span>` : ''}
+            ${user.isStaff ? `<button class="find-matches-btn" id="findMatchesBtn" onclick="findMatches('${role.id}')">🔍 Find matches</button><span class="find-matches-status" id="findMatchesStatus"></span>` : ''}
           </div>
         </div>
         <div class="search-row">
@@ -824,6 +833,78 @@ async function applyStage(candidateId, newStage, oldStage) {
     buildKanban(role);
     alert('Stage update failed — please try again.');
   }
+}
+
+// ── Find matches (Vesper, scoped to a Role) ─────────────────────────
+// Same instant-pool + Claude-ranking + live-Apify-top-up pattern the public Vesper search
+// on demo.html uses, pointed at this Role's brief. Results land straight in the Matched
+// column via api/crm.js's find-matches / find-matches-poll actions.
+async function findMatches(roleId) {
+  const btn = document.getElementById('findMatchesBtn');
+  const status = document.getElementById('findMatchesStatus');
+  if (!btn) return;
+  btn.disabled = true; btn.textContent = '🔍 Searching…';
+  if (status) status.textContent = '';
+  try {
+    const h = await authHeader();
+    const r = await fetch('/api/crm?action=find-matches', {
+      method: 'POST', headers: { ...h, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roleId }),
+    });
+    if (!r.ok) throw new Error();
+    const data = await r.json();
+    if (status) status.textContent = `${data.matchedCount} matched from pool`;
+    if (data.matchedCount) await refreshDashboard();
+    if (data.runId) {
+      btn.textContent = '🔍 Live search…';
+      pollFindMatches(data.runId, roleId, 0);
+    } else {
+      btn.disabled = false; btn.textContent = '🔍 Find matches';
+    }
+  } catch {
+    if (status) status.textContent = 'Search failed';
+    btn.disabled = false; btn.textContent = '🔍 Find matches';
+  }
+}
+
+function pollFindMatches(runId, roleId, attempt) {
+  if (attempt >= 20) {
+    const btn = document.getElementById('findMatchesBtn');
+    const status = document.getElementById('findMatchesStatus');
+    if (btn) { btn.disabled = false; btn.textContent = '🔍 Find matches'; }
+    if (status) status.textContent = 'Live search timed out';
+    return;
+  }
+  setTimeout(async () => {
+    const btn = document.getElementById('findMatchesBtn');
+    const status = document.getElementById('findMatchesStatus');
+    try {
+      const h = await authHeader();
+      const r = await fetch(`/api/crm?action=find-matches-poll&runId=${encodeURIComponent(runId)}&roleId=${encodeURIComponent(roleId)}`, { headers: h });
+      const data = await r.json();
+      if (data.status === 'RUNNING') return pollFindMatches(runId, roleId, attempt + 1);
+      if (btn) { btn.disabled = false; btn.textContent = '🔍 Find matches'; }
+      if (data.status === 'SUCCEEDED') {
+        if (status) status.textContent = data.matchedCount ? `+${data.matchedCount} more from live search` : 'No new live matches';
+        if (data.matchedCount) await refreshDashboard();
+      } else if (status) {
+        status.textContent = 'Live search unavailable';
+      }
+    } catch {
+      if (btn) { btn.disabled = false; btn.textContent = '🔍 Find matches'; }
+      if (status) status.textContent = 'Live search failed';
+    }
+  }, 3000);
+}
+
+async function refreshDashboard() {
+  try {
+    const h = await authHeader();
+    const r = await fetch('/api/crm?action=dashboard', { headers: h });
+    if (!r.ok) return;
+    state = await r.json();
+    render();
+  } catch { /* keep showing existing state if refresh fails */ }
 }
 
 // ── Candidate drawer ──────────────────────────────────────────────
