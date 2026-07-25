@@ -1,5 +1,5 @@
 // api/crm.js — TalentKnight CRM
-// Actions: dashboard | update-stage | save-notes | create-role
+// Actions: dashboard | update-stage | save-notes | create-role | find-matches | find-matches-poll
 // Auth: Clerk session tokens (Authorization: Bearer <token>), replacing the old magic-link token flow.
 import { verifyToken } from '@clerk/backend';
 
@@ -12,10 +12,12 @@ export default async function handler(req, res) {
   const action = req.query.action;
   if (!action) return res.status(400).json({ error: 'Missing ?action= parameter' });
 
-  if (action === 'dashboard')      return handleDashboard(req, res);
-  if (action === 'update-stage')   return handleUpdateStage(req, res);
-  if (action === 'save-notes')     return handleSaveNotes(req, res);
-  if (action === 'create-role')    return handleCreateRole(req, res);
+  if (action === 'dashboard')          return handleDashboard(req, res);
+  if (action === 'update-stage')       return handleUpdateStage(req, res);
+  if (action === 'save-notes')         return handleSaveNotes(req, res);
+  if (action === 'create-role')        return handleCreateRole(req, res);
+  if (action === 'find-matches')       return handleFindMatches(req, res);
+  if (action === 'find-matches-poll')  return handleFindMatchesPoll(req, res);
   if (action === 'generate-token') return res.status(410).json({ error: 'Magic-link tokens are retired. Sign in via Clerk instead.' });
   return res.status(400).json({ error: 'Unknown action' });
 }
@@ -29,6 +31,9 @@ const ORGANIZATIONS = 'tblKDRFNdB2UhLQxo';
 const ORG_STAFF = 'tblPM0Btn9BzBvnhG';
 const CONSULTANT_ASSIGNMENTS = 'tbl5hhfM2SWa6i5Lw';
 const COMPANY_CONTACTS = 'tblw8aIC6fGAVKRi8';
+
+// Same Apify actor the public Vesper search on demo.html uses for live LinkedIn top-up.
+const APIFY_ACTOR = 'harvestapi~linkedin-profile-search';
 
 const CF = { name: 'fld7AIteYYVxT41lf', active: 'fldBIoBDtUBN5tTPY', roles: 'fldXNHwOWNxZ6JcqF' };
 const RF = { title: 'fldO3J0Fh0JaZ5lRW', location: 'flddgoDm9N0krVu13', brief: 'fldGLYE5iZxdZsFEg', status: 'fldNdoolFfZisVSFS', candidates: 'fldU795m0fFIMZ2pc', company: 'fldPOW3SzPV0mfg0B' };
@@ -45,6 +50,9 @@ const KF = {
   noticePeriod: 'fld6bjkGxD9O17rZL', willingToRelocate: 'fldDcb78CT8XBCch8', rightToWorkUK: 'fldA5fQDWE5D3HwoV',
   skills: 'fldjzxELfOSU8M0dC', certifications: 'fldgTtC0PqkPoL69R', educationLevel: 'fldWagGVvad1qKxKu',
   mobile: 'fldpCX8EWARrz4xjN', bio: 'fldtJGFbRDqFR9PPJ',
+  // Used by find-matches / find-matches-poll — same fields the public Vesper search reads/writes.
+  type: 'fldU5qaydUaqg8GxQ', firstName: 'fldcs3RwQaCDfb5F0', lastName: 'fldHxBcnOl6PvotSu',
+  candidateSource: 'flda47WcrjAHQM3En', enrichmentStatus: 'fldHX3Q6XduR3q6JJ',
 };
 const OSF = { name: 'fldIMiB64MXLRln82', clerkId: 'fld9qiWYAWe9mPx8i', organization: 'fldm9cJR6urVDzKLS', tier: 'fldMJlsUHuFX1yJOy', active: 'fldN7VcJ9fKx676dL' };
 const CAF = { consultant: 'fldK640gTY74TE88t', company: 'fld8jtLa5bBgLiecA' };
@@ -55,6 +63,10 @@ const ORGF = { name: 'fldqGP76mkwa9AtYZ', companies: 'fldCmI1mZ1qsPDDAv' };
 // AI matches land before a human reviews and promotes them into Sourced — kept invisible to
 // Company Contacts so clients only ever see candidates a recruiter has vetted.
 const STAFF_ONLY_STAGES = ['Matched'];
+
+// Candidates already actively engaged elsewhere are never reassigned by find-matches —
+// protects a live pipeline from being silently bumped onto a different Role's Matched queue.
+const PROTECTED_STAGES = ['Interviewing', 'Offered', 'Placed'];
 
 // ── Clerk session verification ───────────────────────────────────
 async function getClerkUserId(req) {
@@ -151,6 +163,102 @@ async function candidateAllowed(candidateId, companyIds, h) {
   const roleCompanyIds = roleRec?.fields?.[RF.company] || [];
   if (!roleCompanyIds.some(id => companyIds.includes(id))) return { ok: false, status: 403, error: 'Candidate not in your pipeline' };
   return { ok: true };
+}
+
+// ── Find-matches helpers ──────────────────────────────────────────
+// Same stopword-filtering keyword extraction candidates.js uses for the public search,
+// applied here to a Role's title/location/brief instead of a visitor-typed brief.
+function extractKeywords(text) {
+  const stopwords = new Set([
+    'with', 'that', 'this', 'have', 'from', 'they', 'will', 'been', 'were', 'their', 'there',
+    'about', 'would', 'could', 'should', 'looking', 'seeking', 'need', 'want', 'hire', 'find',
+    'recruit', 'ideal', 'good', 'great', 'level', 'years', 'year', 'experience', 'experienced',
+    'someone', 'person', 'candidate', 'professional', 'team', 'work', 'based', 'must', 'also',
+    'some', 'very', 'well', 'able', 'into', 'over', 'more', 'make', 'what', 'just', 'like',
+  ]);
+  return (text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length >= 3 && !stopwords.has(w))
+    .slice(0, 10);
+}
+
+// Thin wrapper around the same Claude call parse-brief.js and demo.html's rankWithClaude
+// already use in production, just pointed at ANTHROPIC_API_KEY server-side.
+async function callClaude(system, userText, maxTokens = 300) {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) return null;
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: maxTokens,
+        system,
+        messages: [{ role: 'user', content: userText }],
+      }),
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    const text = (data.content || []).map(b => b.text || '').join('');
+    return text.replace(/```json|```/g, '').trim();
+  } catch {
+    return null;
+  }
+}
+
+// Ranks a candidate pool against a Role's brief, same idea as demo.html's rankWithClaude
+// but returns the actual candidate objects (keyed by list position) instead of names —
+// avoids any name-collision ambiguity when writing Assigned Role back to Airtable.
+async function rankPoolAgainstRole(briefText, pool, limit = 8) {
+  if (!pool.length) return [];
+  const listText = pool.slice(0, 40).map((c, i) => {
+    const parts = [c.name];
+    if (c.role) parts.push(c.role);
+    if (c.company) parts.push(c.company);
+    if (c.location) parts.push(c.location);
+    if (c.sector) parts.push(c.sector);
+    let line = `${i + 1}. ${parts.join(' · ')}`;
+    if (c.bio) line += ` — ${c.bio.slice(0, 160)}`;
+    return line;
+  }).join('\n');
+
+  const system = `You are a recruitment matching assistant. Given a role brief and a numbered list of candidates, return ONLY a JSON array of the candidate numbers (integers) that are the strongest matches for the role, best match first, maximum ${limit} entries. No markdown, no preamble, no explanation. Example: [3, 1, 7]`;
+  const raw = await callClaude(system, `Role brief: ${briefText}\n\nCandidates:\n${listText}`, 300);
+  if (!raw) return [];
+  try {
+    const nums = JSON.parse(raw);
+    if (!Array.isArray(nums)) return [];
+    return nums.map(n => pool[n - 1]).filter(Boolean).slice(0, limit);
+  } catch {
+    return [];
+  }
+}
+
+// Writes Assigned Role + Pipeline Stage='Matched' onto a batch of candidate record IDs —
+// the one write path that actually lands a search result in the CRM's Matched column.
+async function patchCandidatesStage(recordIds, roleId, h) {
+  if (!recordIds.length) return;
+  const today = new Date().toISOString().split('T')[0];
+  for (let i = 0; i < recordIds.length; i += 10) {
+    const batch = recordIds.slice(i, i + 10);
+    await fetch(`https://api.airtable.com/v0/${BASE}/${CANDIDATES}`, {
+      method: 'PATCH',
+      headers: h,
+      body: JSON.stringify({
+        records: batch.map(id => ({
+          id,
+          fields: {
+            [KF.assignedRole]: [roleId],
+            [KF.pipelineStage]: 'Matched',
+            [KF.stageChangedAt]: today,
+          },
+        })),
+      }),
+    }).catch(() => null);
+  }
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────
@@ -376,4 +484,284 @@ async function handleCreateRole(req, res) {
 
   if (!roleRes.id) return res.status(500).json({ error: 'Failed to create role' });
   return res.status(200).json({ ok: true, roleId: roleRes.id, title: title.trim() });
+}
+
+// ── FIND MATCHES (start) ─────────────────────────────────────────
+// Staff-only. Same instant-pool-search + Claude-ranking pattern the public Vesper search
+// on demo.html uses, pointed at a specific Role's brief instead of a visitor's typed text.
+// Matches picked from the existing pool are written straight to Assigned Role + Matched
+// stage; a live Apify LinkedIn run is also kicked off and its runId handed back so the
+// dashboard can poll find-matches-poll for a background top-up, exactly like demo.html's
+// pollAndUpgrade() does for the public search.
+async function handleFindMatches(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const AT_TOKEN = process.env.AT_TOKEN;
+  if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
+
+  const { roleId } = req.body || {};
+  if (!roleId) return res.status(400).json({ error: 'roleId is required' });
+
+  const clerkUserId = await getClerkUserId(req);
+  if (!clerkUserId) return res.status(401).json({ error: 'Invalid or missing session' });
+
+  const h = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
+  const access = await resolveAccess(clerkUserId, h);
+  if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet." });
+  if (access.viewerType !== 'staff') return res.status(403).json({ error: 'Only recruiters can search for matches.' });
+
+  const allCompanyIds = access.organizations.flatMap(o => o.companyIds);
+
+  const roleRec = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLES}/${roleId}?returnFieldsByFieldId=true`, { headers: h }).then(r => r.json()).catch(() => null);
+  if (!roleRec?.id) return res.status(404).json({ error: 'Role not found' });
+  const roleCompanyIds = roleRec.fields[RF.company] || [];
+  if (!roleCompanyIds.some(id => allCompanyIds.includes(id))) return res.status(403).json({ error: 'Role not in your access scope' });
+
+  const title = roleRec.fields[RF.title] || '';
+  const location = roleRec.fields[RF.location] || '';
+  const brief = roleRec.fields[RF.brief] || '';
+  const briefText = [title, location, brief].filter(Boolean).join(' — ');
+
+  const keywords = extractKeywords(briefText);
+  let matched = [];
+
+  if (keywords.length) {
+    const ALLOWED_TYPES = ['LinkedIn', 'live'];
+    const fieldChecks = keywords.map(kw => {
+      const safe = kw.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      return `OR(
+        SEARCH("${safe}", LOWER(IF({${KF.role}}, {${KF.role}}, ""))),
+        SEARCH("${safe}", LOWER(IF({${KF.bio}}, {${KF.bio}}, ""))),
+        SEARCH("${safe}", LOWER(IF({${KF.skills}}, {${KF.skills}}, ""))),
+        SEARCH("${safe}", LOWER(IF({${KF.sector}}, {${KF.sector}}, ""))),
+        SEARCH("${safe}", LOWER(IF({${KF.location}}, {${KF.location}}, ""))),
+        SEARCH("${safe}", LOWER(IF({${KF.company}}, {${KF.company}}, "")))
+      )`;
+    });
+    const typeFilter = `OR(${ALLOWED_TYPES.map(t => `{${KF.type}} = '${t}'`).join(',')})`;
+    const stageProtectFilter = `NOT(OR(${PROTECTED_STAGES.map(s => `{${KF.pipelineStage}} = '${s}'`).join(',')}))`;
+    const keywordFilter = `OR(${fieldChecks.join(',')})`;
+    const formula = `AND(${typeFilter}, ${stageProtectFilter}, ${keywordFilter})`;
+
+    const poolRes = await fetch(
+      `https://api.airtable.com/v0/${BASE}/${CANDIDATES}?filterByFormula=${encodeURIComponent(formula)}&pageSize=60&returnFieldsByFieldId=true`,
+      { headers: h }
+    ).then(r => r.json()).catch(() => ({ records: [] }));
+
+    const pool = (poolRes.records || []).map(rec => ({
+      id: rec.id,
+      name: rec.fields[KF.name] || '',
+      role: rec.fields[KF.role] || '',
+      company: rec.fields[KF.company] || '',
+      location: rec.fields[KF.location] || '',
+      sector: rec.fields[KF.sector] || '',
+      bio: rec.fields[KF.bio] || '',
+    })).filter(c => c.name);
+
+    matched = await rankPoolAgainstRole(briefText, pool, 8);
+  }
+
+  if (matched.length) {
+    await patchCandidatesStage(matched.map(c => c.id), roleId, h);
+  }
+
+  // Kick off a live LinkedIn top-up in the background — frontend polls find-matches-poll
+  // separately, this call only needs to start the run and hand back its ID.
+  let runId = null;
+  const APIFY_TOKEN = process.env.APIFY_TOKEN;
+  if (APIFY_TOKEN && title) {
+    try {
+      const actorInput = { profileScraperMode: 'Short', maxItems: 25, searchQuery: title, currentJobTitles: [title] };
+      if (location) actorInput.locations = [location];
+      const startUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/runs?token=${APIFY_TOKEN}&memory=256`;
+      const r = await fetch(startUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(actorInput) });
+      if (r.ok) {
+        const d = await r.json();
+        runId = d?.data?.id || null;
+      }
+    } catch { /* live top-up is best-effort — pool results above still stand */ }
+  }
+
+  return res.status(200).json({
+    ok: true,
+    matchedCount: matched.length,
+    matched: matched.map(c => ({ id: c.id, name: c.name })),
+    runId,
+  });
+}
+
+// ── FIND MATCHES (poll) ───────────────────────────────────────────
+// Mirrors apify-poll.js: checks the Apify run, dedupes/saves any new LinkedIn profiles
+// into the master All Candidates table — but additionally ranks the live batch against
+// the Role's brief and writes Assigned Role + Matched stage onto the best matches, which
+// apify-poll.js (used by the public search) deliberately never does.
+async function handleFindMatchesPoll(req, res) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  const AT_TOKEN = process.env.AT_TOKEN;
+  const APIFY_TOKEN = process.env.APIFY_TOKEN;
+  if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
+  if (!APIFY_TOKEN) return res.status(500).json({ error: 'APIFY_TOKEN not configured' });
+
+  const { runId, roleId } = req.query;
+  if (!runId || !roleId) return res.status(400).json({ error: 'runId and roleId are required' });
+
+  const clerkUserId = await getClerkUserId(req);
+  if (!clerkUserId) return res.status(401).json({ error: 'Invalid or missing session' });
+
+  const h = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
+  const access = await resolveAccess(clerkUserId, h);
+  if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet." });
+  if (access.viewerType !== 'staff') return res.status(403).json({ error: 'Only recruiters can do this.' });
+  const allCompanyIds = access.organizations.flatMap(o => o.companyIds);
+
+  const roleRec = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLES}/${roleId}?returnFieldsByFieldId=true`, { headers: h }).then(r => r.json()).catch(() => null);
+  if (!roleRec?.id) return res.status(404).json({ error: 'Role not found' });
+  const roleCompanyIds = roleRec.fields[RF.company] || [];
+  if (!roleCompanyIds.some(id => allCompanyIds.includes(id))) return res.status(403).json({ error: 'Role not in your access scope' });
+
+  const statusUrl = `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`;
+  let status;
+  try {
+    const r = await fetch(statusUrl);
+    if (!r.ok) return res.status(200).json({ status: 'ERROR' });
+    const d = await r.json();
+    status = d?.data?.status;
+  } catch {
+    return res.status(200).json({ status: 'ERROR' });
+  }
+
+  if (status === 'RUNNING' || status === 'READY' || status === 'CREATED') return res.status(200).json({ status: 'RUNNING' });
+  if (status !== 'SUCCEEDED') return res.status(200).json({ status: 'FAILED', reason: status });
+
+  const datasetUrl = `https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${APIFY_TOKEN}&limit=25`;
+  let raw = [];
+  try {
+    const r = await fetch(datasetUrl);
+    if (!r.ok) return res.status(200).json({ status: 'FAILED' });
+    raw = await r.json();
+  } catch {
+    return res.status(200).json({ status: 'FAILED' });
+  }
+
+  function str(v) {
+    if (!v) return '';
+    if (typeof v === 'string') return v.trim();
+    if (typeof v === 'object') return (v.full || v.city || v.country || Object.values(v).filter(x => typeof x === 'string').join(', ')).trim();
+    return String(v).trim();
+  }
+  function extractPhoto(p) {
+    const rawUrl = p.profilePicture || p.profilePic || p.photo || p.photoUrl || p.pictureUrl || p.profilePhoto || p.avatar || p.profileImageUrl || p.imgUrl || p.image || p.picture || '';
+    return (typeof rawUrl === 'string' && rawUrl.startsWith('https://')) ? rawUrl.trim() : '';
+  }
+
+  const scraped = (Array.isArray(raw) ? raw : [])
+    .map(p => ({
+      name: str([p.firstName, p.lastName].filter(Boolean).join(' ') || p.fullName || ''),
+      firstName: str(p.firstName || ''),
+      lastName: str(p.lastName || ''),
+      role: str(p.headline || p.title || ''),
+      company: str(p.companyName || p.currentCompany || (p.currentPosition?.[0]?.companyName) || ''),
+      location: str(p.location || p.addressWithCountry || ''),
+      bio: str(p.summary || p.about || '').slice(0, 400),
+      skills: Array.isArray(p.skills) ? p.skills.slice(0, 10).join(', ') : str(p.skills),
+      sector: str(p.industry || ''),
+      linkedinUrl: str(p.profileUrl || p.linkedinUrl || p.url || ''),
+      photoUrl: extractPhoto(p),
+    }))
+    .filter(c => c.name);
+
+  // Dedupe against the existing pool — reuse the record if one already exists (by LinkedIn
+  // URL, then by name), otherwise create it. Either way we end up with a real record ID to
+  // link to this Role, which is the piece the public search's apify-poll.js never needed.
+  const withUrl = scraped.filter(c => c.linkedinUrl);
+  const withoutUrl = scraped.filter(c => !c.linkedinUrl);
+  const resolved = [];
+
+  if (withUrl.length) {
+    const filters = withUrl.map(c => `{${KF.linkedinUrl}} = '${c.linkedinUrl.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`);
+    const checkRes = await fetch(
+      `https://api.airtable.com/v0/${BASE}/${CANDIDATES}?filterByFormula=${encodeURIComponent(`OR(${filters.join(',')})`)}&returnFieldsByFieldId=true`,
+      { headers: h }
+    ).then(r => r.json()).catch(() => ({ records: [] }));
+    const existingByUrl = {};
+    (checkRes.records || []).forEach(rec => { existingByUrl[(rec.fields[KF.linkedinUrl] || '').trim().toLowerCase()] = rec.id; });
+
+    const toCreate = [];
+    withUrl.forEach(c => {
+      const key = c.linkedinUrl.trim().toLowerCase();
+      if (existingByUrl[key]) resolved.push({ ...c, id: existingByUrl[key] });
+      else toCreate.push(c);
+    });
+
+    for (let i = 0; i < toCreate.length; i += 10) {
+      const batch = toCreate.slice(i, i + 10);
+      const created = await fetch(`https://api.airtable.com/v0/${BASE}/${CANDIDATES}`, {
+        method: 'POST', headers: h,
+        body: JSON.stringify({
+          records: batch.map(c => ({ fields: {
+            [KF.name]: c.name,
+            [KF.firstName]: c.firstName || c.name.split(' ')[0] || '',
+            [KF.lastName]: c.lastName || c.name.split(' ').slice(1).join(' ') || '',
+            [KF.location]: c.location, [KF.role]: c.role, [KF.company]: c.company,
+            [KF.bio]: c.bio, [KF.skills]: c.skills, [KF.sector]: c.sector,
+            [KF.type]: 'LinkedIn', [KF.linkedinUrl]: c.linkedinUrl,
+            [KF.candidateSource]: 'Apify', [KF.enrichmentStatus]: 'Pending',
+            ...(c.photoUrl ? { [KF.photoUrl]: c.photoUrl } : {}),
+          } })),
+          typecast: true,
+        }),
+      }).then(r => r.json()).catch(() => ({ records: [] }));
+      (created.records || []).forEach((rec, idx) => resolved.push({ ...batch[idx], id: rec.id }));
+    }
+  }
+
+  if (withoutUrl.length) {
+    const filters = withoutUrl.map(c => `{${KF.name}} = '${c.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`);
+    const checkRes = await fetch(
+      `https://api.airtable.com/v0/${BASE}/${CANDIDATES}?filterByFormula=${encodeURIComponent(`OR(${filters.join(',')})`)}&returnFieldsByFieldId=true`,
+      { headers: h }
+    ).then(r => r.json()).catch(() => ({ records: [] }));
+    const existingByName = {};
+    (checkRes.records || []).forEach(rec => { existingByName[(rec.fields[KF.name] || '').trim().toLowerCase()] = rec.id; });
+
+    const toCreate = [];
+    withoutUrl.forEach(c => {
+      const key = c.name.trim().toLowerCase();
+      if (existingByName[key]) resolved.push({ ...c, id: existingByName[key] });
+      else toCreate.push(c);
+    });
+
+    for (let i = 0; i < toCreate.length; i += 10) {
+      const batch = toCreate.slice(i, i + 10);
+      const created = await fetch(`https://api.airtable.com/v0/${BASE}/${CANDIDATES}`, {
+        method: 'POST', headers: h,
+        body: JSON.stringify({
+          records: batch.map(c => ({ fields: {
+            [KF.name]: c.name,
+            [KF.firstName]: c.firstName || c.name.split(' ')[0] || '',
+            [KF.lastName]: c.lastName || c.name.split(' ').slice(1).join(' ') || '',
+            [KF.location]: c.location, [KF.role]: c.role, [KF.company]: c.company,
+            [KF.bio]: c.bio, [KF.skills]: c.skills, [KF.sector]: c.sector,
+            [KF.type]: 'LinkedIn', [KF.candidateSource]: 'Apify', [KF.enrichmentStatus]: 'Pending',
+            ...(c.photoUrl ? { [KF.photoUrl]: c.photoUrl } : {}),
+          } })),
+          typecast: true,
+        }),
+      }).then(r => r.json()).catch(() => ({ records: [] }));
+      (created.records || []).forEach((rec, idx) => resolved.push({ ...batch[idx], id: rec.id }));
+    }
+  }
+
+  const roleTitle = roleRec.fields[RF.title] || '';
+  const roleLoc = roleRec.fields[RF.location] || '';
+  const roleBrief = roleRec.fields[RF.brief] || '';
+  const briefText = [roleTitle, roleLoc, roleBrief].filter(Boolean).join(' — ');
+
+  const ranked = await rankPoolAgainstRole(briefText, resolved, 8);
+  if (ranked.length) await patchCandidatesStage(ranked.map(c => c.id), roleId, h);
+
+  return res.status(200).json({
+    status: 'SUCCEEDED',
+    matchedCount: ranked.length,
+    matched: ranked.map(c => ({ id: c.id, name: c.name })),
+  });
 }
