@@ -71,36 +71,55 @@ async function getClerkUserId(req) {
   }
 }
 
-// ── Resolve Clerk user → accessible Company IDs ──────────────────
-// Checks Org Staff first (Admin = every Company in their Organization, Consultant = only
-// assigned Companies via Consultant Assignments), then falls back to Company Contacts
-// (single-company viewer). Returns null if the Clerk user isn't provisioned in either table.
-// viewerType is 'staff' for Org Staff (sees the Matched queue) or 'contact' for Company
-// Contacts (never sees Matched — only recruiter-vetted stages).
+// ── Resolve Clerk user → accessible Organizations/Companies ──────
+// Checks Org Staff first, then falls back to Company Contacts (single-company viewer).
+// Returns null if the Clerk user isn't provisioned in either table.
+//
+// A single person can be Org Staff in more than one Organization (e.g. Darren Cox is
+// Admin for both "Essex Recruitment Partners" and "Cyber Knight" — sibling recruiting
+// brands under the same Armstrong Knight group). Every active Org Staff record for
+// their Clerk user ID is resolved, so the dashboard can offer an organization switcher
+// rather than arbitrarily picking whichever record Airtable happens to return first.
+//
+// viewerType is 'staff' for Org Staff (sees the Matched queue, may span multiple orgs)
+// or 'contact' for Company Contacts (single company, never sees Matched).
 async function resolveAccess(clerkUserId, h) {
   const staffRes = await fetch(
-    `https://api.airtable.com/v0/${BASE}/${ORG_STAFF}?filterByFormula=${encodeURIComponent(`AND({${OSF.clerkId}}='${clerkUserId}',{${OSF.active}}=1)`)}&returnFieldsByFieldId=true&pageSize=1`,
+    `https://api.airtable.com/v0/${BASE}/${ORG_STAFF}?filterByFormula=${encodeURIComponent(`AND({${OSF.clerkId}}='${clerkUserId}',{${OSF.active}}=1)`)}&returnFieldsByFieldId=true&pageSize=100`,
     { headers: h }
   ).then(r => r.json()).catch(() => null);
 
   if (staffRes?.records?.length) {
-    const staff = staffRes.records[0];
-    const tier = staff.fields[OSF.tier];
-    const orgId = (staff.fields[OSF.organization] || [])[0];
-    if (!orgId) return null;
+    let name = 'Staff';
+    const organizations = [];
+    let assignmentsCache = null;
 
-    if (tier === 'Admin') {
+    for (const staff of staffRes.records) {
+      name = staff.fields[OSF.name] || name;
+      const tier = staff.fields[OSF.tier];
+      const orgId = (staff.fields[OSF.organization] || [])[0];
+      if (!orgId) continue;
+
       const orgRec = await fetch(`https://api.airtable.com/v0/${BASE}/${ORGANIZATIONS}/${orgId}?returnFieldsByFieldId=true`, { headers: h }).then(r => r.json()).catch(() => null);
-      return { name: staff.fields[OSF.name] || 'Admin', companyIds: orgRec?.fields?.[ORGF.companies] || [], viewerType: 'staff' };
+      const orgName = orgRec?.fields?.[ORGF.name] || 'Organization';
+
+      let companyIds;
+      if (tier === 'Admin') {
+        companyIds = orgRec?.fields?.[ORGF.companies] || [];
+      } else {
+        // Consultant: fetch assignments once and filter client-side — Airtable's
+        // filterByFormula can't reliably match linked-record fields against a record ID.
+        if (!assignmentsCache) {
+          assignmentsCache = await fetch(`https://api.airtable.com/v0/${BASE}/${CONSULTANT_ASSIGNMENTS}?returnFieldsByFieldId=true&pageSize=100`, { headers: h }).then(r => r.json()).catch(() => ({ records: [] }));
+        }
+        companyIds = [...new Set((assignmentsCache.records || [])
+          .filter(a => (a.fields[CAF.consultant] || []).includes(staff.id))
+          .flatMap(a => a.fields[CAF.company] || []))];
+      }
+      organizations.push({ id: orgId, name: orgName, companyIds });
     }
 
-    // Consultant: fetch assignments and filter client-side — Airtable's filterByFormula
-    // can't reliably match linked-record fields against a record ID string.
-    const asgRes = await fetch(`https://api.airtable.com/v0/${BASE}/${CONSULTANT_ASSIGNMENTS}?returnFieldsByFieldId=true&pageSize=100`, { headers: h }).then(r => r.json()).catch(() => ({ records: [] }));
-    const companyIds = (asgRes.records || [])
-      .filter(a => (a.fields[CAF.consultant] || []).includes(staff.id))
-      .flatMap(a => a.fields[CAF.company] || []);
-    return { name: staff.fields[OSF.name] || 'Consultant', companyIds: [...new Set(companyIds)], viewerType: 'staff' };
+    return { name, viewerType: 'staff', organizations };
   }
 
   const contactRes = await fetch(
@@ -110,7 +129,14 @@ async function resolveAccess(clerkUserId, h) {
 
   if (contactRes?.records?.length) {
     const contact = contactRes.records[0];
-    return { name: contact.fields[CCF.name] || 'Guest', companyIds: contact.fields[CCF.company] || [], viewerType: 'contact' };
+    // Company Contacts aren't linked to an Organization at all — wrap their single
+    // company in a synthetic one-entry "organizations" list so the response shape
+    // matches the staff case and the frontend can treat both uniformly.
+    return {
+      name: contact.fields[CCF.name] || 'Guest',
+      viewerType: 'contact',
+      organizations: [{ id: null, name: null, companyIds: contact.fields[CCF.company] || [] }],
+    };
   }
 
   return null;
@@ -140,10 +166,11 @@ async function handleDashboard(req, res) {
   const access = await resolveAccess(clerkUserId, h);
   if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet. Contact your admin." });
   const isStaff = access.viewerType === 'staff';
-  if (!access.companyIds.length) return res.status(200).json({ user: { name: access.name, isStaff }, companies: [] });
+  const allCompanyIds = [...new Set(access.organizations.flatMap(o => o.companyIds))];
+  if (!allCompanyIds.length) return res.status(200).json({ user: { name: access.name, isStaff }, organizations: [] });
 
   const companiesRes = await fetch(
-    `https://api.airtable.com/v0/${BASE}/${COMPANIES}?filterByFormula=${encodeURIComponent(`OR(${access.companyIds.map(id => `RECORD_ID()='${id}'`).join(',')})`)}&returnFieldsByFieldId=true`,
+    `https://api.airtable.com/v0/${BASE}/${COMPANIES}?filterByFormula=${encodeURIComponent(`OR(${allCompanyIds.map(id => `RECORD_ID()='${id}'`).join(',')})`)}&returnFieldsByFieldId=true`,
     { headers: h }
   ).then(r => r.json()).catch(() => ({ records: [] }));
 
@@ -152,6 +179,7 @@ async function handleDashboard(req, res) {
     name: rec.fields[CF.name] || 'Untitled Company',
     roleIds: rec.fields[CF.roles] || [],
   }));
+  const companyById = Object.fromEntries(companiesData.map(c => [c.id, c]));
 
   const allRoleIds = [...new Set(companiesData.flatMap(c => c.roleIds))];
   const roleMap = {};
@@ -225,17 +253,29 @@ async function handleDashboard(req, res) {
     });
   }
 
-  const companies = companiesData.map(c => ({
-    id: c.id,
-    name: c.name,
-    roles: c.roleIds.map(id => roleMap[id]).filter(Boolean).map(role => ({
-      ...role,
-      candidateIds: undefined,
-      candidates: role.candidateIds.map(id => candidateMap[id]).filter(Boolean),
-    })),
-  }));
+  // Assemble per-organization: lets a user with access to more than one Organization
+  // (e.g. an Admin working across sibling agency brands) switch between them in the UI,
+  // instead of only ever seeing whichever one happened to resolve first.
+  const organizations = access.organizations
+    .map(org => ({
+      id: org.id,
+      name: org.name,
+      companies: org.companyIds
+        .map(id => companyById[id])
+        .filter(Boolean)
+        .map(c => ({
+          id: c.id,
+          name: c.name,
+          roles: c.roleIds.map(id => roleMap[id]).filter(Boolean).map(role => ({
+            ...role,
+            candidateIds: undefined,
+            candidates: role.candidateIds.map(id => candidateMap[id]).filter(Boolean),
+          })),
+        })),
+    }))
+    .filter(org => org.companies.length);
 
-  return res.status(200).json({ user: { name: access.name, isStaff }, companies });
+  return res.status(200).json({ user: { name: access.name, isStaff }, organizations });
 }
 
 // ── UPDATE STAGE ──────────────────────────────────────────────────
@@ -261,7 +301,8 @@ async function handleUpdateStage(req, res) {
     return res.status(403).json({ error: 'Only recruiters can set this stage.' });
   }
 
-  const check = await candidateAllowed(candidateId, access.companyIds, h);
+  const allCompanyIds = access.organizations.flatMap(o => o.companyIds);
+  const check = await candidateAllowed(candidateId, allCompanyIds, h);
   if (!check.ok) return res.status(check.status).json({ error: check.error });
 
   const today = new Date().toISOString().split('T')[0];
@@ -291,7 +332,8 @@ async function handleSaveNotes(req, res) {
   const access = await resolveAccess(clerkUserId, h);
   if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet." });
 
-  const check = await candidateAllowed(candidateId, access.companyIds, h);
+  const allCompanyIds = access.organizations.flatMap(o => o.companyIds);
+  const check = await candidateAllowed(candidateId, allCompanyIds, h);
   if (!check.ok) return res.status(check.status).json({ error: check.error });
 
   const upd = await fetch(`https://api.airtable.com/v0/${BASE}/${CANDIDATES}/${candidateId}`, {
@@ -317,7 +359,9 @@ async function handleCreateRole(req, res) {
   const h = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
   const access = await resolveAccess(clerkUserId, h);
   if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet." });
-  if (!access.companyIds.includes(companyId)) return res.status(403).json({ error: 'Company not in your access scope' });
+
+  const allCompanyIds = access.organizations.flatMap(o => o.companyIds);
+  if (!allCompanyIds.includes(companyId)) return res.status(403).json({ error: 'Company not in your access scope' });
 
   const roleRes = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLES}`, {
     method: 'POST', headers: h,
