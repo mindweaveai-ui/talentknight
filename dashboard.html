@@ -430,6 +430,7 @@ const STAGE_CFG = {
 };
 
 let state = null;
+let orgIdx = 0;
 let companyIdx = 0;
 let roleIdx = 0;
 let dragId = null;
@@ -482,10 +483,33 @@ async function load() {
 }
 
 // ── Render ─────────────────────────────────────────────────────────
+function currentCompany() {
+  return state.organizations[orgIdx]?.companies[companyIdx];
+}
+
 function render() {
-  const { user, companies } = state;
-  document.getElementById('navClient').textContent = user.name;
+  const { user, organizations } = state;
   const main = document.getElementById('main');
+
+  if (!organizations.length) {
+    document.getElementById('navClient').textContent = user.name;
+    document.title = 'TalentKnight';
+    main.innerHTML = `
+      <div class="centered" style="min-height:70vh;">
+        <div style="font-size:36px;">📋</div>
+        <div style="font-size:16px;font-weight:600;">No companies yet</div>
+        <div style="color:var(--muted);font-size:13px;">Your account isn't linked to any company's pipeline yet.</div>
+      </div>`;
+    return;
+  }
+
+  orgIdx = Math.min(orgIdx, organizations.length - 1);
+  const org = organizations[orgIdx];
+  const companies = org.companies;
+
+  document.getElementById('navClient').textContent = (organizations.length > 1 && org.name)
+    ? `${user.name} · ${org.name}`
+    : user.name;
 
   if (!companies.length) {
     document.title = 'TalentKnight';
@@ -493,7 +517,7 @@ function render() {
       <div class="centered" style="min-height:70vh;">
         <div style="font-size:36px;">📋</div>
         <div style="font-size:16px;font-weight:600;">No companies yet</div>
-        <div style="color:var(--muted);font-size:13px;">Your account isn't linked to any company's pipeline yet.</div>
+        <div style="color:var(--muted);font-size:13px;">${org.name ? esc(org.name) + ' has no companies yet.' : "Your account isn't linked to any company's pipeline yet."}</div>
       </div>`;
     return;
   }
@@ -507,7 +531,7 @@ function render() {
     main.innerHTML = `
       <div class="app-layout">
         <aside class="sidebar">
-          <div class="sidebar-top">${companySelectHtml(companies)}</div>
+          <div class="sidebar-top">${orgSelectHtml(organizations)}${companySelectHtml(companies)}</div>
           <div class="role-list"><div class="role-list-empty">No roles yet</div></div>
           <button class="new-role-btn-sidebar" onclick="openRoleModal()">＋ New role</button>
         </aside>
@@ -520,6 +544,7 @@ function render() {
         </div>
       </div>`;
     attachCompanySelectListener();
+    attachOrgSelectListener();
     return;
   }
 
@@ -529,7 +554,7 @@ function render() {
   main.innerHTML = `
     <div class="app-layout">
       <aside class="sidebar">
-        <div class="sidebar-top">${companySelectHtml(companies)}</div>
+        <div class="sidebar-top">${orgSelectHtml(organizations)}${companySelectHtml(companies)}</div>
         <div class="sidebar-search">
           <input id="roleSearchInput" class="role-search-input" type="search" placeholder="Search roles…"
             oninput="onRoleSearch(this.value)" value="${esc(roleSearchQuery)}" autocomplete="off" />
@@ -560,9 +585,32 @@ function render() {
     </div>`;
 
   attachCompanySelectListener();
+  attachOrgSelectListener();
   buildRoleList();
   updateSearchClear();
   buildKanban(role);
+}
+
+function orgSelectHtml(organizations) {
+  if (organizations.length <= 1) return '';
+  return `<select class="company-select" id="orgSelect" style="margin-bottom:8px;">
+    ${organizations.map((o, i) => `<option value="${i}"${i === orgIdx ? ' selected' : ''}>${esc(o.name || 'Organization')}</option>`).join('')}
+  </select>`;
+}
+
+function attachOrgSelectListener() {
+  const sel = document.getElementById('orgSelect');
+  if (sel) sel.addEventListener('change', (e) => onOrgChange(e.target.value));
+}
+
+function onOrgChange(val) {
+  orgIdx = Number(val);
+  companyIdx = 0;
+  roleIdx = 0;
+  searchQuery = '';
+  roleSearchQuery = '';
+  closeDrawer();
+  render();
 }
 
 function companySelectHtml(companies) {
@@ -596,7 +644,7 @@ function onRoleSearch(val) {
 function buildRoleList() {
   const wrap = document.getElementById('roleList');
   if (!wrap) return;
-  const company = state.companies[companyIdx];
+  const company = currentCompany();
   const q = roleSearchQuery.toLowerCase().trim();
   const filtered = company.roles
     .map((r, i) => ({ r, i }))
@@ -627,7 +675,7 @@ function buildRoleList() {
 function onSearch(val) {
   searchQuery = val;
   updateSearchClear();
-  const role = state.companies[companyIdx].roles[roleIdx];
+  const role = currentCompany().roles[roleIdx];
   buildKanban(role);
   updateSearchCount(role);
 }
@@ -637,7 +685,7 @@ function clearSearch() {
   const input = document.getElementById('searchInput');
   if (input) { input.value = ''; input.focus(); }
   updateSearchClear();
-  const role = state.companies[companyIdx].roles[roleIdx];
+  const role = currentCompany().roles[roleIdx];
   buildKanban(role);
   updateSearchCount(role);
 }
@@ -760,7 +808,7 @@ function makeCard(c) {
 
 // ── Stage update ──────────────────────────────────────────────────
 async function applyStage(candidateId, newStage, oldStage) {
-  const role = state.companies[companyIdx].roles[roleIdx];
+  const role = currentCompany().roles[roleIdx];
   const cand = role.candidates.find(c => c.id === candidateId);
   if (cand) { cand.pipelineStage = newStage; cand.stageChangedAt = todayISO(); }
   buildKanban(role);
@@ -937,7 +985,7 @@ async function submitNewRole() {
   const btn = document.getElementById('roleSubmitBtn');
   btn.disabled = true; btn.textContent = 'Submitting…';
   try {
-    const companyId = state.companies[companyIdx].id;
+    const companyId = currentCompany().id;
     const h = await authHeader();
     const r = await fetch('/api/crm?action=create-role', {
       method: 'POST', headers: { ...h, 'Content-Type': 'application/json' },
@@ -945,8 +993,9 @@ async function submitNewRole() {
     });
     if (!r.ok) throw new Error();
     const data = await r.json();
-    state.companies[companyIdx].roles.push({ id: data.roleId, title, location, brief, status: 'Active', candidates: [] });
-    roleIdx = state.companies[companyIdx].roles.length - 1;
+    const company = currentCompany();
+    company.roles.push({ id: data.roleId, title, location, brief, status: 'Active', candidates: [] });
+    roleIdx = company.roles.length - 1;
     searchQuery = '';
     roleSearchQuery = '';
     document.getElementById('roleModalOverlay').classList.remove('open');
