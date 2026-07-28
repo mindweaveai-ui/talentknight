@@ -18,6 +18,8 @@ export default async function handler(req, res) {
   if (action === 'create-role')        return handleCreateRole(req, res);
   if (action === 'find-matches')       return handleFindMatches(req, res);
   if (action === 'find-matches-poll')  return handleFindMatchesPoll(req, res);
+  if (action === 'update-role-terms')  return handleUpdateRoleTerms(req, res);
+  if (action === 'save-placement-salary') return handleSavePlacementSalary(req, res);
   if (action === 'generate-token') return res.status(410).json({ error: 'Magic-link tokens are retired. Sign in via Clerk instead.' });
   return res.status(400).json({ error: 'Unknown action' });
 }
@@ -36,7 +38,12 @@ const COMPANY_CONTACTS = 'tblw8aIC6fGAVKRi8';
 const APIFY_ACTOR = 'harvestapi~linkedin-profile-search';
 
 const CF = { name: 'fld7AIteYYVxT41lf', active: 'fldBIoBDtUBN5tTPY', roles: 'fldXNHwOWNxZ6JcqF' };
-const RF = { title: 'fldO3J0Fh0JaZ5lRW', location: 'flddgoDm9N0krVu13', brief: 'fldGLYE5iZxdZsFEg', status: 'fldNdoolFfZisVSFS', candidates: 'fldU795m0fFIMZ2pc', company: 'fldPOW3SzPV0mfg0B' };
+const RF = {
+  title: 'fldO3J0Fh0JaZ5lRW', location: 'flddgoDm9N0krVu13', brief: 'fldGLYE5iZxdZsFEg', status: 'fldNdoolFfZisVSFS',
+  candidates: 'fldU795m0fFIMZ2pc', company: 'fldPOW3SzPV0mfg0B',
+  // Earnings pipeline — staff-only commercial terms, never sent to Company Contacts.
+  feePercent: 'fld8HSTILHFybW4Hj', targetSalary: 'fldVH9W53ozEm4N6G',
+};
 const KF = {
   name: 'fld8k1UET3DWwJV3S', role: 'fldwOPyq4vmWzEquB', company: 'fldJYcW9eWMMnFPDS',
   location: 'fldNx4IFaKgaOnNw3', linkedinUrl: 'fldOmVhPF36ULGx7K',
@@ -53,6 +60,8 @@ const KF = {
   // Used by find-matches / find-matches-poll — same fields the public Vesper search reads/writes.
   type: 'fldU5qaydUaqg8GxQ', firstName: 'fldcs3RwQaCDfb5F0', lastName: 'fldHxBcnOl6PvotSu',
   candidateSource: 'flda47WcrjAHQM3En', enrichmentStatus: 'fldHX3Q6XduR3q6JJ',
+  // Earnings pipeline — staff-only, the actual agreed salary once a candidate is Placed.
+  placementSalary: 'fldhomjZl7P3B6180',
 };
 const OSF = { name: 'fldIMiB64MXLRln82', clerkId: 'fld9qiWYAWe9mPx8i', organization: 'fldm9cJR6urVDzKLS', tier: 'fldMJlsUHuFX1yJOy', active: 'fldN7VcJ9fKx676dL' };
 const CAF = { consultant: 'fldK640gTY74TE88t', company: 'fld8jtLa5bBgLiecA' };
@@ -67,6 +76,16 @@ const STAFF_ONLY_STAGES = ['Matched'];
 // Candidates already actively engaged elsewhere are never reassigned by find-matches —
 // protects a live pipeline from being silently bumped onto a different Role's Matched queue.
 const PROTECTED_STAGES = ['Interviewing', 'Offered', 'Placed'];
+
+// ── Earnings pipeline ──────────────────────────────────────────────
+// Rough probability-of-closing weight per pipeline stage, used to turn a Role's
+// Fee % × Target Salary into a forecasted (weighted) value rather than treating every
+// active Role as equally likely to land. A Role's weight is taken from its most-advanced
+// candidate. Staff-only — Company Contacts never see fee/salary/forecast data.
+const STAGE_WEIGHTS = {
+  Matched: 0.1, Sourced: 0.15, Contacted: 0.25, Shortlisted: 0.4,
+  Interviewing: 0.6, Offered: 0.8, Placed: 1, Rejected: 0,
+};
 
 // ── Clerk session verification ───────────────────────────────────
 async function getClerkUserId(req) {
@@ -306,6 +325,8 @@ async function handleDashboard(req, res) {
         brief: rec.fields[RF.brief] || '',
         status: rec.fields[RF.status] || 'Active',
         candidateIds: rec.fields[RF.candidates] || [],
+        feePercent: typeof rec.fields[RF.feePercent] === 'number' ? rec.fields[RF.feePercent] : null,
+        targetSalary: typeof rec.fields[RF.targetSalary] === 'number' ? rec.fields[RF.targetSalary] : null,
       };
     });
   }
@@ -357,6 +378,8 @@ async function handleDashboard(req, res) {
         certifications: f[KF.certifications] || '',
         educationLevel: f[KF.educationLevel] || '',
         bio: f[KF.bio] || '',
+        // Earnings pipeline — commercial data, never sent to Company Contacts.
+        placementSalary: isStaff && typeof f[KF.placementSalary] === 'number' ? f[KF.placementSalary] : null,
       };
     });
   }
@@ -374,11 +397,38 @@ async function handleDashboard(req, res) {
         .map(c => ({
           id: c.id,
           name: c.name,
-          roles: c.roleIds.map(id => roleMap[id]).filter(Boolean).map(role => ({
-            ...role,
-            candidateIds: undefined,
-            candidates: role.candidateIds.map(id => candidateMap[id]).filter(Boolean),
-          })),
+          roles: c.roleIds.map(id => roleMap[id]).filter(Boolean).map(role => {
+            const roleCandidates = role.candidateIds.map(id => candidateMap[id]).filter(Boolean);
+            const base = { ...role, candidateIds: undefined, candidates: roleCandidates };
+
+            if (!isStaff) {
+              // Commercial terms are staff-only — never expose fee/salary data to clients.
+              delete base.feePercent;
+              delete base.targetSalary;
+              return base;
+            }
+
+            // Forecast = Fee % × Target Salary × probability-of-closing, where probability
+            // is taken from this Role's most-advanced candidate stage (STAGE_WEIGHTS).
+            // A Role with no candidates yet, or missing fee/salary terms, forecasts as null
+            // rather than 0 — lets the UI distinguish "no data" from "genuinely worthless."
+            const probability = roleCandidates.reduce((max, c) => Math.max(max, STAGE_WEIGHTS[c.pipelineStage] ?? 0), 0);
+            base.probability = probability;
+            base.forecastValue = (role.feePercent && role.targetSalary)
+              ? Math.round(role.feePercent * role.targetSalary * probability)
+              : null;
+
+            // Actual (billed) earnings only apply to Placed candidates — computed here
+            // rather than in the candidate loop above because it needs this Role's Fee %.
+            base.candidates = roleCandidates.map(c => {
+              if (c.pipelineStage !== 'Placed') return c;
+              const salary = c.placementSalary ?? role.targetSalary ?? null;
+              const actualEarnings = (role.feePercent && salary) ? Math.round(role.feePercent * salary) : null;
+              return { ...c, actualEarnings };
+            });
+
+            return base;
+          }),
         })),
     }))
     .filter(org => org.companies.length);
@@ -785,4 +835,81 @@ async function handleFindMatchesPoll(req, res) {
     matchedCount: ranked.length,
     matched: ranked.map(c => ({ id: c.id, name: c.name })),
   });
+}
+
+// ── UPDATE ROLE TERMS ─────────────────────────────────────────────
+// Staff-only. Sets a Role's commercial terms (Fee % and Target Salary), which drive the
+// earnings forecast in handleDashboard. Either field may be cleared by sending null.
+async function handleUpdateRoleTerms(req, res) {
+  if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed' });
+  const AT_TOKEN = process.env.AT_TOKEN;
+  if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
+
+  const { roleId, feePercent, targetSalary } = req.body || {};
+  if (!roleId) return res.status(400).json({ error: 'roleId is required' });
+  if (feePercent != null && (typeof feePercent !== 'number' || feePercent < 0 || feePercent > 1)) {
+    return res.status(400).json({ error: 'feePercent must be a fraction between 0 and 1' });
+  }
+  if (targetSalary != null && (typeof targetSalary !== 'number' || targetSalary < 0)) {
+    return res.status(400).json({ error: 'targetSalary must be a non-negative number' });
+  }
+
+  const clerkUserId = await getClerkUserId(req);
+  if (!clerkUserId) return res.status(401).json({ error: 'Invalid or missing session' });
+
+  const h = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
+  const access = await resolveAccess(clerkUserId, h);
+  if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet." });
+  if (access.viewerType !== 'staff') return res.status(403).json({ error: 'Only recruiters can set deal terms.' });
+
+  const allCompanyIds = access.organizations.flatMap(o => o.companyIds);
+  const roleRec = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLES}/${roleId}?returnFieldsByFieldId=true`, { headers: h }).then(r => r.json()).catch(() => null);
+  if (!roleRec?.id) return res.status(404).json({ error: 'Role not found' });
+  const roleCompanyIds = roleRec.fields[RF.company] || [];
+  if (!roleCompanyIds.some(id => allCompanyIds.includes(id))) return res.status(403).json({ error: 'Role not in your access scope' });
+
+  const fields = {};
+  if (feePercent !== undefined) fields[RF.feePercent] = feePercent;
+  if (targetSalary !== undefined) fields[RF.targetSalary] = targetSalary;
+
+  const upd = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLES}/${roleId}`, {
+    method: 'PATCH', headers: h,
+    body: JSON.stringify({ fields }),
+  }).then(r => r.json());
+
+  return upd.id ? res.status(200).json({ ok: true }) : res.status(500).json({ error: 'Update failed' });
+}
+
+// ── SAVE PLACEMENT SALARY ─────────────────────────────────────────
+// Staff-only. Records the actual agreed salary once a candidate is Placed — the basis
+// for actual (billed) earnings, as opposed to the Role-level forecast.
+async function handleSavePlacementSalary(req, res) {
+  if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed' });
+  const AT_TOKEN = process.env.AT_TOKEN;
+  if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
+
+  const { candidateId, placementSalary } = req.body || {};
+  if (!candidateId) return res.status(400).json({ error: 'candidateId is required' });
+  if (placementSalary != null && (typeof placementSalary !== 'number' || placementSalary < 0)) {
+    return res.status(400).json({ error: 'placementSalary must be a non-negative number' });
+  }
+
+  const clerkUserId = await getClerkUserId(req);
+  if (!clerkUserId) return res.status(401).json({ error: 'Invalid or missing session' });
+
+  const h = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
+  const access = await resolveAccess(clerkUserId, h);
+  if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet." });
+  if (access.viewerType !== 'staff') return res.status(403).json({ error: 'Only recruiters can set placement salary.' });
+
+  const allCompanyIds = access.organizations.flatMap(o => o.companyIds);
+  const check = await candidateAllowed(candidateId, allCompanyIds, h);
+  if (!check.ok) return res.status(check.status).json({ error: check.error });
+
+  const upd = await fetch(`https://api.airtable.com/v0/${BASE}/${CANDIDATES}/${candidateId}`, {
+    method: 'PATCH', headers: h,
+    body: JSON.stringify({ fields: { [KF.placementSalary]: placementSalary } }),
+  }).then(r => r.json());
+
+  return upd.id ? res.status(200).json({ ok: true }) : res.status(500).json({ error: 'Save failed' });
 }
