@@ -1080,7 +1080,21 @@ async function submitNewRole() {
     searchQuery = '';
     roleSearchQuery = '';
     document.getElementById('roleModalOverlay').classList.remove('open');
-    render();
+
+    // Find Matches now auto-runs server-side when a Role is created (handleCreateRole
+    // calls the same runMatchSearch the manual button uses) — any pool hits are already
+    // written to Matched, so refresh from the server to show them, then pick up the
+    // live Apify top-up exactly like the manual "Find matches" button does.
+    if (data.matchedCount) await refreshDashboard();
+    else render();
+
+    if (data.runId) {
+      const fmBtn = document.getElementById('findMatchesBtn');
+      const fmStatus = document.getElementById('findMatchesStatus');
+      if (fmBtn) { fmBtn.disabled = true; fmBtn.textContent = '🔍 Live search…'; }
+      if (fmStatus) fmStatus.textContent = data.matchedCount ? `${data.matchedCount} matched from pool` : '';
+      pollFindMatches(data.runId, data.roleId, 0);
+    }
   } catch {
     alert('Failed to create role — please try again.');
     btn.disabled = false; btn.textContent = 'Submit role';
