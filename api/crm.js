@@ -483,7 +483,15 @@ async function handleCreateRole(req, res) {
   }).then(r => r.json());
 
   if (!roleRes.id) return res.status(500).json({ error: 'Failed to create role' });
-  return res.status(200).json({ ok: true, roleId: roleRes.id, title: title.trim() });
+
+  // Auto-run the same live-search that "Find matches" does, so a brand-new Role starts
+  // building a relevant candidate pool immediately instead of waiting for someone to click
+  // the button. Best-effort — a failure here never blocks role creation itself.
+  const searchResult = await runMatchSearch(
+    roleRes.id, title.trim(), (location || '').trim(), (brief || '').trim(), h
+  ).catch(() => ({ matchedCount: 0, matched: [], runId: null }));
+
+  return res.status(200).json({ ok: true, roleId: roleRes.id, title: title.trim(), ...searchResult });
 }
 
 // ── FIND MATCHES (start) ─────────────────────────────────────────
@@ -519,8 +527,20 @@ async function handleFindMatches(req, res) {
   const title = roleRec.fields[RF.title] || '';
   const location = roleRec.fields[RF.location] || '';
   const brief = roleRec.fields[RF.brief] || '';
-  const briefText = [title, location, brief].filter(Boolean).join(' — ');
 
+  const result = await runMatchSearch(roleId, title, location, brief, h);
+  return res.status(200).json({ ok: true, ...result });
+}
+
+// Core of Find Matches, shared by the manual button (handleFindMatches) and the
+// auto-run-on-create path (handleCreateRole): instant pool search + Claude ranking,
+// writes Assigned Role + Matched stage onto pool hits, then kicks off a live Apify
+// LinkedIn run in "Full" profile mode — richer per-candidate data (skills, industry,
+// full summary, not just name/headline) so every candidate the live search saves is
+// actually usable for future keyword matching, not just this one Role. Returns the
+// runId so the caller can poll find-matches-poll for the background top-up.
+async function runMatchSearch(roleId, title, location, brief, h) {
+  const briefText = [title, location, brief].filter(Boolean).join(' — ');
   const keywords = extractKeywords(briefText);
   let matched = [];
 
@@ -565,12 +585,14 @@ async function handleFindMatches(req, res) {
   }
 
   // Kick off a live LinkedIn top-up in the background — frontend polls find-matches-poll
-  // separately, this call only needs to start the run and hand back its ID.
+  // separately, this call only needs to start the run and hand back its ID. "Full" mode
+  // captures skills/industry/summary per profile (not just name+headline like "Short"),
+  // so every candidate this saves is genuinely searchable later, not more sparse-pool rubbish.
   let runId = null;
   const APIFY_TOKEN = process.env.APIFY_TOKEN;
   if (APIFY_TOKEN && title) {
     try {
-      const actorInput = { profileScraperMode: 'Short', maxItems: 25, searchQuery: title, currentJobTitles: [title] };
+      const actorInput = { profileScraperMode: 'Full', maxItems: 25, searchQuery: title, currentJobTitles: [title] };
       if (location) actorInput.locations = [location];
       const startUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/runs?token=${APIFY_TOKEN}&memory=256`;
       const r = await fetch(startUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(actorInput) });
@@ -581,12 +603,11 @@ async function handleFindMatches(req, res) {
     } catch { /* live top-up is best-effort — pool results above still stand */ }
   }
 
-  return res.status(200).json({
-    ok: true,
+  return {
     matchedCount: matched.length,
     matched: matched.map(c => ({ id: c.id, name: c.name })),
     runId,
-  });
+  };
 }
 
 // ── FIND MATCHES (poll) ───────────────────────────────────────────
