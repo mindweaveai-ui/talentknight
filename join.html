@@ -6,7 +6,7 @@
 <title>Join TalentKnight — Register as a Pre-Vetted Candidate</title>
 <meta name="description" content="Register with TalentKnight to be matched with employers in crypto, tech, finance and healthcare. AI-matched. GDPR compliant. No CV blasting.">
 <meta name="robots" content="index, follow">
-<link rel="canonical" href="https://talentknight.ai/join.html" />
+<link rel="canonical" href="https://www.talentknight.ai/join.html" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -407,7 +407,7 @@
     arr.forEach(s=>{
       const tag=document.createElement('div');
       tag.className='tag-pill';
-      tag.innerHTML=esc(s)+'<button onclick="removeTag(\''+type+'\',\''+s.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\''+")" type='button'>×</button>";
+      tag.innerHTML=esc(s)+'<button onclick="removeTag(\''+type+'\',\''+s.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\''+")\" type='button'>×</button>";
       wrap.insertBefore(tag,input);
     });
   }
