@@ -1,997 +1,1533 @@
-  leads: []
-};
-
-let state = { activeScenarioId: '', scenarios: [] };
-let editingId = null;
-let lastBrief = '';
-
-// ============ INIT ============
-async function init() {
-  const stored = await loadState();
-  state = stored || structuredClone(SEED);
-  if (!stored) await saveState();
-  renderAdmin();
-  updateScenarioIndicator();
-  showAIIndicator();
-}
-
-// ============ VIEW SWITCHING ============
-function showView(name) {
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  const idMap = {
-    brief: 'screen-brief',
-    loading: 'screen-loading',
-    results: 'screen-results',
-    fallback: 'screen-fallback',
-    admin: 'admin-view'
-  };
-  document.getElementById(idMap[name]).classList.add('active');
-  document.getElementById('adminToggle').textContent = name === 'admin' ? 'Back to app' : 'Admin';
-  if (name === 'brief') {
-    document.getElementById('briefInput').value = '';
-    document.getElementById('errorNotice').style.display = 'none';
-    document.getElementById('contactSection').classList.remove('visible');
-    document.getElementById('cvUploadSection').classList.remove('visible');
-    document.getElementById('contactForm').style.display = '';
-    document.getElementById('contactConfirm').classList.remove('visible');
-    document.getElementById('cf-name').value = '';
-    document.getElementById('cf-company').value = '';
-    document.getElementById('cf-email').value = '';
-    document.getElementById('cf-phone').value = '';
-  }
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function toggleAdmin() {
-  const isAdmin = document.getElementById('admin-view').classList.contains('active');
-  showView(isAdmin ? 'brief' : 'admin');
-}
-
-function showAIIndicator() {
-  document.getElementById('vesperIndicator').style.display = 'inline-block';
-}
-
-// ============ CLAUDE AI CALL (real Airtable candidates) ============
-async function callClaudeAPI(brief) {
-  // ── Step 0: parse brief with Claude for smarter search ────────────────────
-  let parsed = null;
-  try {
-    const parseRes = await fetch('/api/parse-brief', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brief }),
-    });
-    if (parseRes.ok) {
-      const parseData = await parseRes.json();
-      parsed = parseData.parsed || null;
-    }
-  } catch(e) {}
-
-  // ── Step 1: fire both sources in parallel ──────────────────────────────────
-  const [candRes, apifyStartRes] = await Promise.allSettled([
-    fetch('/api/candidates', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brief, parsed }),
-    }),
-    fetch('/api/apify-start', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brief, parsed }),
-    }),
-  ]);
-
-  // ── Step 2: get Airtable pool (fast fallback) ──────────────────────────────
-  let airtablePool = [];
-  if (candRes.status === 'fulfilled' && candRes.value.ok) {
-    const { candidates } = await candRes.value.json();
-    airtablePool = candidates || [];
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TalentKnight — Vesper-matched candidates, ready when you are</title>
+<meta name="description" content="See TalentKnight's Vesper AI matching engine in action. Describe a role in plain English and get a ranked shortlist of pre-vetted candidates in seconds.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://www.talentknight.ai/demo.html" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-soft: #f8fafc;
+    --surface: #f1f5f9;
+    --surface-raised: #e2e8f0;
+    --border: #e2e8f0;
+    --border-strong: #cbd5e1;
+    --gold: #2563eb;
+    --gold-bright: #3b82f6;
+    --gold-dim: #1d4ed8;
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --text-dim: #94a3b8;
+    --sage: #10b981;
+    --amber: #f59e0b;
+    --rose: #ef4444;
+    --shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+    --serif: 'Inter', -apple-system, sans-serif;
+    --sans: 'Inter', -apple-system, sans-serif;
   }
 
-  // ── Step 3: get Apify runId ────────────────────────────────────────────────
-  let runId = null;
-  if (apifyStartRes.status === 'fulfilled' && apifyStartRes.value.ok) {
-    const startData = await apifyStartRes.value.json();
-    runId = startData.runId || null;
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    overflow-x: hidden;
   }
 
-  // ── Step 4: show Airtable results immediately (if any good matches) ────────
-  if (airtablePool.length > 0 && runId) {
-    try {
-      const initialCandidates = await rankWithClaude(brief, airtablePool);
-      if (initialCandidates && initialCandidates.length > 0) {
-        // Good Airtable matches — show now, upgrade with LinkedIn in background
-        pollAndUpgrade(brief, runId, airtablePool, initialCandidates);
-        return initialCandidates;
-      }
-      // Airtable had candidates but none matched — fall through to wait for LinkedIn
-    } catch(e) {
-      // Ranking failed — fall through to wait for LinkedIn
-    }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 0%, rgba(37, 99, 235, 0.04) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 100%, rgba(37, 99, 235, 0.02) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
   }
 
-  // ── Step 5: if no Airtable results, wait for Apify ────────────────────────
-  if (runId) {
-    const liveCandidates = await pollUntilDone(runId);
-    const pool = liveCandidates.length > 0 ? liveCandidates : airtablePool;
-    if (pool.length === 0) throw new Error('no_matches');
-    return await rankWithClaude(brief, pool);
+  /* ============ NAVIGATION ============ */
+  nav {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 48px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
   }
 
-  // ── Step 6: Apify didn't start — use Airtable only ────────────────────────
-  if (airtablePool.length === 0) throw new Error('no_matches');
-  return await rankWithClaude(brief, airtablePool);
-}
-
-// Poll Apify every 3s until SUCCEEDED or FAILED (max 10 attempts = 30s)
-async function pollUntilDone(runId, maxAttempts = 20) {
-  for (let i = 0; i < maxAttempts; i++) {
-    await new Promise(r => setTimeout(r, 3000));
-    try {
-      const r = await fetch(`/api/apify-poll?runId=${runId}`);
-      if (!r.ok) continue;
-      const data = await r.json();
-      if (data.status === 'SUCCEEDED') return data.candidates || [];
-      if (data.status === 'FAILED') return [];
-    } catch (e) {
-      // network hiccup — keep trying
-    }
-  }
-  return [];
-}
-
-// Show/hide the "finding more matches" indicator while the live LinkedIn upgrade runs
-function showEnrichingIndicator() {
-  const el = document.getElementById('enrichingIndicator');
-  if (el) el.classList.add('active');
-}
-function hideEnrichingIndicator() {
-  const el = document.getElementById('enrichingIndicator');
-  if (el) el.classList.remove('active');
-}
-
-// Background upgrade: poll Apify, then re-rank merged pool and update UI
-async function pollAndUpgrade(brief, runId, airtablePool, initialCandidates) {
-  showEnrichingIndicator();
-  try {
-    const liveCandidates = await pollUntilDone(runId);
-    if (liveCandidates.length === 0) return;
-
-    const liveUrls = new Set(liveCandidates.map(c => c.linkedinUrl).filter(Boolean));
-    const uniqueAirtable = airtablePool.filter(c => !liveUrls.has(c.linkedinUrl));
-    const mergedPool = [...liveCandidates, ...uniqueAirtable];
-
-    try {
-      const upgraded = await rankWithClaude(brief, mergedPool);
-      if (typeof window !== 'undefined' && typeof window.onApifyUpgrade === 'function') {
-        window.onApifyUpgrade(upgraded);
-      }
-    } catch (e) {
-      console.warn('Apify upgrade ranking failed:', e);
-    }
-  } finally {
-    hideEnrichingIndicator();
-  }
-}
-
-// Ask Claude to rank a candidate pool against the brief, return top 5
-async function rankWithClaude(brief, pool) {
-  const candText = pool.slice(0, 40).map((c, i) => {
-    const parts = [c.name];
-    if (c.location) parts.push(c.location);
-    if (c.role)     parts.push(c.role);
-    if (c.sector)   parts.push(c.sector);
-    if (c.company)  parts.push(c.company);
-    if (c.skills)   parts.push('Skills: ' + c.skills);
-    if (c.openToWork) parts.push('Open to work');
-    let line = `${i + 1}. ${parts.join(' · ')}`;
-    if (c.bio) line += `\n   ${c.bio.slice(0, 200)}`;
-    return line;
-  }).join('\n');
-
-  const resp = await fetch('/api/ai', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1200,
-      system: `You are a recruitment matching AI for TalentKnight. You will be given a job brief and a list of REAL candidates from our database. Select the 5 best matches and score them.\n\nReturn ONLY a valid JSON object in this exact format — no other text, no markdown, no preamble:\n{"candidates":[{"name":"First L.","headline":"Role · Location · Key skills","score":95,"why":"2-3 sentences explaining specifically why this person fits the brief."}]}\n\nRules:\n- Select exactly 5 candidates from the list provided (or all available if fewer than 5)\n- Use the REAL names from the list — abbreviate to first name + last initial only\n- Scores: range from 65 to 97, listed highest first\n- Build a concise headline from their role/sector/location/skills\n- Why text: specific and confident — reference details from their actual profile\n- Do NOT invent candidates — only choose from the provided list`,
-      messages: [{ role: 'user', content: `Job brief: ${brief}\n\nAvailable candidates:\n${candText}` }]
-    })
-  });
-
-  if (!resp.ok) throw new Error(`AI API ${resp.status}`);
-  const data = await resp.json();
-  const text = data.content.map(b => b.text || '').join('');
-  const clean = text.replace(/```json|```/g, '').trim();
-  // Extract just the JSON object — ignore any explanation text Claude adds after it
-  const jsonMatch = clean.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('No JSON found in AI response');
-  const parsed = JSON.parse(jsonMatch[0]);
-  if (!parsed.candidates) throw new Error('Bad AI response');
-  return mergeCandidateDetails(parsed.candidates, pool);
-}
-
-// Merge richer self-submitted fields (salary, notice period, experience,
-// certifications, education) from the original candidate pool back onto the
-// AI-ranked results, matched by name (AI returns "First L." abbreviated names).
-function mergeCandidateDetails(ranked, pool) {
-  const DETAIL_FIELDS = ['salaryMin', 'salaryMax', 'noticePeriod', 'yearsExp', 'certifications', 'educationLevel', 'degreeSubject', 'linkedinUrl'];
-  return ranked.map(cand => {
-    const parts = (cand.name || '').trim().split(/\s+/);
-    const first = (parts[0] || '').toLowerCase();
-    const lastInitial = (parts[1] || '').replace(/\./g, '').toLowerCase();
-    const src = pool.find(p => {
-      if (!p.name) return false;
-      const pParts = p.name.trim().split(/\s+/);
-      const pFirst = (pParts[0] || '').toLowerCase();
-      const pLast = (pParts[pParts.length - 1] || '').toLowerCase();
-      return pFirst === first && (!lastInitial || pLast.startsWith(lastInitial));
-    });
-    if (src) {
-      DETAIL_FIELDS.forEach(f => {
-        const v = src[f];
-        if (v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)) {
-          cand[f] = v;
-        }
-      });
-    }
-    return cand;
-  });
-}
-
-window.onApifyUpgrade = function(upgraded) {
-  renderCandidates(upgraded, lastBrief, 'live');
-};
-
-// ============ CLIENT FLOW ============
-async function submitBrief() {
-  const brief = document.getElementById('briefInput').value.trim();
-  if (!brief) { document.getElementById('briefInput').focus(); return; }
-  lastBrief = brief;
-  hideEnrichingIndicator();
-
-  showView('loading');
-  setStage(0, 'active');
-
-  // If admin has locked a specific scenario, use it directly (override mode)
-  if (state.activeScenarioId) {
-    await sleep(1400);
-    setStage(0, 'done'); setStage(1, 'active');
-    await sleep(1800);
-    setStage(1, 'done'); setStage(2, 'active');
-    await sleep(1400);
-    setStage(2, 'done');
-    await sleep(500);
-    const active = state.scenarios.find(s => s.id === state.activeScenarioId);
-    if (active) {
-      renderCandidates(active.candidates, false);
-      showView('results');
-    } else {
-      showView('fallback');
-    }
-    [0,1,2].forEach(i => setStage(i, ''));
-    return;
+  .brand {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
   }
 
-  // Start Claude AI call immediately in the background
-  const apiPromise = callClaudeAPI(brief);
-
-  // Animate loading stages while Claude thinks
-  await sleep(1200);
-  setStage(0, 'done'); setStage(1, 'active');
-  await sleep(1000);
-  setStage(1, 'done'); setStage(2, 'active');
-
-  try {
-    // Wait for Claude to finish
-    const candidates = await apiPromise;
-    setStage(2, 'done');
-    await sleep(400);
-
-    if (candidates && candidates.length) {
-      renderCandidates(candidates, true);
-      showView('results');
-    } else {
-      showView('fallback');
-    }
-  } catch(e) {
-    console.warn('Claude API unavailable, falling back to scenarios:', e.message);
-
-    if (e.message === 'no_matches') {
-      document.getElementById('fallbackHeading').textContent = 'No exact matches found';
-      document.getElementById('fallbackBody').textContent = 'Vesper searched LinkedIn live but couldn\'t find an exact match. Try broadening your brief or search again in a moment.';
-      setStage(2, 'done');
-      await sleep(400);
-      showView('fallback');
-    } else {
-      // Restore default fallback text in case it was previously changed
-      document.getElementById('fallbackHeading').textContent = 'Your brief is with our team';
-      document.getElementById('fallbackBody').textContent = 'We\'ve received the role and our sourcing team is building your shortlist now. You\'ll see matches in your dashboard within 24 hours — usually much sooner.';
-
-      // Silently fall back to keyword-matched scenarios
-      const match = findKeywordMatch(brief);
-      setStage(2, 'done');
-      await sleep(400);
-
-      if (match) {
-        document.getElementById('errorNotice').style.display = 'block';
-        renderCandidates(match.candidates, false);
-        showView('results');
-      } else {
-        showView('fallback');
-      }
-    }
+  .brand-mark {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    background: var(--gold);
   }
 
-  [0,1,2].forEach(i => setStage(i, ''));
-}
-
-function setStage(i, cls) {
-  const li = document.querySelector(`#loaderStages li[data-stage="${i}"]`);
-  li.classList.remove('active', 'done');
-  if (cls) li.classList.add(cls);
-}
-
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-// ============ KEYWORD FALLBACK MATCHING ============
-function findKeywordMatch(brief) {
-  const text = brief.toLowerCase();
-  const scored = state.scenarios.map(s => ({
-    scenario: s,
-    score: s.keywords.reduce((n, k) => n + (text.includes(k.toLowerCase()) ? 1 : 0), 0)
-  })).filter(x => x.score > 0).sort((a,b) => b.score - a.score);
-
-  return scored.length ? scored[0].scenario : null;
-}
-
-// ============ RENDERING ============
-let viewMode = 'client';function refCode(i) {  return 'Candidate ' + String(i + 1).padStart(3, '0');}function selectView(mode) {  viewMode = mode;  document.getElementById('viewBtnClient').classList.toggle('active', mode === 'client');  document.getElementById('viewBtnInternal').classList.toggle('active', mode === 'internal');  const note = document.getElementById('viewNote');  if (mode === 'client') {    note.textContent = 'Client view: names are replaced with a reference code so this list can be shared safely. Full names and contact details are released after you request a profile.';  } else {    note.textContent = 'Internal view: full candidate names, for your team only.';  }  if (window.lastRenderedCandidates) {    renderCandidates(window.lastRenderedCandidates, window.lastRenderedIsAI);  }}function renderCandidates(candidates, isAI) {  window.lastRenderedCandidates = candidates;  window.lastRenderedIsAI = isAI;
-  const grid = document.getElementById('candidatesGrid');
-  grid.innerHTML = '';
-
-  const sorted = [...candidates].sort((a, b) => b.score - a.score);
-  document.getElementById('resultsCount').textContent = sorted.length;
-
-  const subtitle = document.getElementById('resultsSubtitle');
-  if (isAI) {
-    subtitle.innerHTML = 'Ranked by fit score. Click anyone to register interest. <span class="ai-badge">Matched by Vesper</span>';
-  } else {
-    subtitle.innerHTML = 'Ranked by fit score. Click anyone to register interest.';
+  .brand-mark svg {
+    width: 18px;
+    height: 18px;
+    fill: #ffffff;
   }
 
-  sorted.forEach((c, i) => {
-    const initials = c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-    const fitClass = c.score >= 85 ? '' : c.score >= 75 ? 'sage' : 'amber';
-    const snapshotFields = buildSnapshotFields(c);
-    const showDetails = snapshotFields.length > 0 || !!c.linkedinUrl;
-
-    const el = document.createElement('div');
-    el.className = 'candidate';
-    el.innerHTML = `
-      <div class="avatar">${viewMode === 'client' ? String(i + 1).padStart(2, '0') : initials}</div>
-      <div class="candidate-body">
-        <div class="candidate-name">${escapeHtml(viewMode === 'client' ? refCode(i) : c.name)}</div>
-        <div class="candidate-headline">${escapeHtml(c.headline)}</div>
-        <div class="candidate-why">${escapeHtml(c.why)}</div>
-      </div>
-      <div class="candidate-right">
-        <div class="fit-score">
-          <div class="fit-score-label">Fit score</div>
-          <div class="fit-score-value">${c.score}<span class="max">/100</span></div>
-          <div class="fit-bar"><div class="fit-bar-fill ${fitClass}" data-fill="${c.score}"></div></div>
-        </div>
-        <div class="candidate-actions">
-          <button class="btn-pass" onclick="passCandidate(this)">Not a fit</button>
-          <button class="btn-linkedin" onclick="requestProfile(this, '${escapeHtml(c.name)}')">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
-            Request profile
-          </button>
-          <button class="btn-interest" onclick="showInterest(this)">I'm interested</button>
-          ${showDetails ? `<button class="btn-details" onclick="toggleSnapshot(this)">Details</button>` : ''}
-        </div>
-      </div>
-      <div class="interest-confirm">Noted — we'll reach out to ${escapeHtml(c.name)} on your behalf and be in touch within 24 hours.</div>
-      ${showDetails ? `<div class="candidate-snapshot" hidden data-linkedin="${escapeHtml(c.linkedinUrl || '')}" data-has-edu="${(c.educationLevel || c.degreeSubject) ? '1' : '0'}" data-has-certs="${(c.certifications && c.certifications.length) ? '1' : '0'}"><div class="snapshot-grid">${snapshotFields.map(f => `<div class="snapshot-field"><span class="snapshot-label">${escapeHtml(f.label)}</span><span class="snapshot-value">${escapeHtml(f.value)}</span></div>`).join('')}</div></div>` : ''}
-    `;
-    grid.appendChild(el);
-  });
-
-  requestAnimationFrame(() => {
-    setTimeout(() => {
-      document.querySelectorAll('.fit-bar-fill').forEach(bar => {
-        bar.style.width = bar.dataset.fill + '%';
-      });
-      document.getElementById('contactSection').classList.add('visible');
-      document.getElementById('cvUploadSection').classList.add('visible');
-    }, 300);
-  });
-}
-
-// Build the optional "Details" snapshot fields for a candidate, from
-// self-submitted data (salary, notice period, experience, education, certs).
-function buildSnapshotFields(c) {
-  const fields = [];
-  if (c.salaryMin || c.salaryMax) {
-    let val;
-    if (c.salaryMin && c.salaryMax) val = `£${Number(c.salaryMin).toLocaleString()} – £${Number(c.salaryMax).toLocaleString()}`;
-    else val = `£${Number(c.salaryMin || c.salaryMax).toLocaleString()}`;
-    fields.push({ label: 'Salary expectation', value: val });
-  }
-  if (c.noticePeriod) fields.push({ label: 'Notice period', value: c.noticePeriod });
-  if (c.yearsExp) fields.push({ label: 'Experience', value: `${c.yearsExp} yrs` });
-  if (c.educationLevel || c.degreeSubject) {
-    fields.push({ label: 'Education', value: [c.educationLevel, c.degreeSubject].filter(Boolean).join(' · ') });
-  }
-  if (c.certifications && c.certifications.length) {
-    fields.push({ label: 'Certifications', value: c.certifications.join(', ') });
-  }
-  return fields;
-}
-
-// Build extra snapshot fields from a LinkedIn profile enrichment result
-// (api/apify-enrich.js), skipping fields already covered by self-submitted
-// (Bucket 1) data.
-function buildEnrichedFields(panel, enriched) {
-  const fields = [];
-  if (enriched.tenure) fields.push({ label: 'Tenure (current role)', value: enriched.tenure });
-  if (panel.dataset.hasEdu !== '1' && enriched.education && enriched.education.length) {
-    const eduStr = enriched.education
-      .map(e => [e.degree, e.field, e.school].filter(Boolean).join(' · '))
-      .filter(Boolean)
-      .join('; ');
-    if (eduStr) fields.push({ label: 'Education', value: eduStr });
-  }
-  if (panel.dataset.hasCerts !== '1' && enriched.certifications && enriched.certifications.length) {
-    fields.push({ label: 'Certifications', value: enriched.certifications.join(', ') });
-  }
-  if (enriched.skills && enriched.skills.length) {
-    fields.push({ label: 'Skills', value: enriched.skills.slice(0, 8).join(', ') });
-  }
-  return fields;
-}
-
-// Toggle the "Details" snapshot panel for a candidate card. On first expand,
-// if the candidate has a LinkedIn URL, fetch a fuller profile enrichment
-// (tenure, education, certifications, skills) and append it to the panel.
-async function toggleSnapshot(btn) {
-  const card = btn.closest('.candidate');
-  const panel = card && card.querySelector('.candidate-snapshot');
-  if (!panel) return;
-  const hidden = panel.hasAttribute('hidden');
-  if (hidden) panel.removeAttribute('hidden');
-  else panel.setAttribute('hidden', '');
-  btn.textContent = hidden ? 'Hide details' : 'Details';
-
-  if (!hidden || panel.dataset.enriched || !panel.dataset.linkedin) return;
-  panel.dataset.enriched = 'pending';
-
-  const grid = panel.querySelector('.snapshot-grid');
-  const loading = document.createElement('div');
-  loading.className = 'snapshot-field snapshot-loading';
-  loading.innerHTML = '<span class="snapshot-label">LinkedIn details</span><span class="snapshot-value">Loading…</span>';
-  grid.appendChild(loading);
-
-  try {
-    const resp = await fetch('/api/apify-enrich', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ linkedinUrl: panel.dataset.linkedin }),
-    });
-    const data = await resp.json();
-    loading.remove();
-
-    const extra = data && data.enriched ? buildEnrichedFields(panel, data.enriched) : [];
-    if (extra.length) {
-      extra.forEach(f => {
-        const el = document.createElement('div');
-        el.className = 'snapshot-field';
-        el.innerHTML = `<span class="snapshot-label">${escapeHtml(f.label)}</span><span class="snapshot-value">${escapeHtml(f.value)}</span>`;
-        grid.appendChild(el);
-      });
-    } else if (!grid.children.length) {
-      const el = document.createElement('div');
-      el.className = 'snapshot-field';
-      el.innerHTML = '<span class="snapshot-label">LinkedIn details</span><span class="snapshot-value">No additional details available</span>';
-      grid.appendChild(el);
-    }
-    panel.dataset.enriched = 'done';
-  } catch (err) {
-    loading.remove();
-    panel.dataset.enriched = '';
-  }
-}
-
-function showInterest(btn) {
-  btn.closest('.candidate').classList.add('interested');
-}
-
-function passCandidate(btn) {
-  btn.closest('.candidate').classList.add('passed');
-}
-
-function requestProfile(btn, name) {
-  const contact = document.getElementById('contactSection');
-  if (contact) {
-    contact.classList.add('visible');
-    contact.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    const msg = contact.querySelector('.contact-sub');
-    if (msg) {
-      msg.innerHTML = `You requested the full profile for <strong style="color:var(--gold)">${name}</strong>. Leave your details and we'll send it over within 24 hours.`;
-    }
-    const input = contact.querySelector('input[type="text"]');
-    if (input) setTimeout(() => input.focus(), 600);
-  }
-}
-
-// ============ CV UPLOAD & SCORING ============
-const cvDropZone = document.getElementById('cvDropZone');
-if (cvDropZone) {
-  cvDropZone.addEventListener('dragover', e => { e.preventDefault(); cvDropZone.classList.add('dragover'); });
-  cvDropZone.addEventListener('dragleave', () => cvDropZone.classList.remove('dragover'));
-  cvDropZone.addEventListener('drop', e => {
-    e.preventDefault();
-    cvDropZone.classList.remove('dragover');
-    const file = e.dataTransfer.files[0];
-    if (file) handleCVFile(file);
-  });
-}
-
-async function handleCVFile(file) {
-  if (!file) return;
-  const maxSize = 5 * 1024 * 1024;
-  if (file.size > maxSize) { showCVError('File too large — please upload a CV under 5MB.'); return; }
-
-  const uploading = document.getElementById('cvUploading');
-  const dropZone = document.getElementById('cvDropZone');
-  const errorEl = document.getElementById('cvError');
-
-  dropZone.style.display = 'none';
-  uploading.classList.add('visible');
-  errorEl.classList.remove('visible');
-
-  try {
-    const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-    let candidate;
-
-    if (isPDF) {
-      const base64 = await readFileAsBase64(file);
-      candidate = await scoreCVPDF(base64, lastBrief || 'general recruitment');
-    } else {
-      const text = await readFileAsText(file);
-      candidate = await scoreCVText(text, lastBrief || 'general recruitment');
-    }
-
-    uploading.classList.remove('visible');
-    dropZone.style.display = 'block';
-    document.getElementById('cvFileInput').value = '';
-
-    injectCVCandidate(candidate, file.name);
-  } catch (err) {
-    console.error('CV scoring error:', err);
-    uploading.classList.remove('visible');
-    dropZone.style.display = 'block';
-    showCVError('Something went wrong scoring this CV. Please try again.');
-  }
-}
-
-function showCVError(msg) {
-  const el = document.getElementById('cvError');
-  el.textContent = msg;
-  el.classList.add('visible');
-}
-
-function readFileAsBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-function readFileAsText(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsText(file);
-  });
-}
-
-async function scoreCVPDF(base64Data, brief) {
-  const response = await fetch('/api/ai', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 600,
-      system: `You are a recruitment AI. Score a CV against a job brief and return ONLY valid JSON — no markdown, no preamble:\n{"name":"Full Name","headline":"Role · X yrs · Key skills · Location","score":82,"why":"2-3 sentences on fit."}`,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64Data } },
-          { type: 'text', text: `Job brief: ${brief}\n\nScore this CV against the brief. Use the candidate's real name from the CV. Score 0-100.` }
-        ]
-      }]
-    })
-  });
-  if (!response.ok) throw new Error(`API ${response.status}`);
-  const data = await response.json();
-  const text = data.content.map(b => b.text || '').join('');
-  return JSON.parse(text.replace(/```json|```/g, '').trim());
-}
-
-async function scoreCVText(cvText, brief) {
-  const truncated = cvText.slice(0, 6000);
-  const response = await fetch('/api/ai', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 600,
-      system: `You are a recruitment AI. Score a CV against a job brief and return ONLY valid JSON — no markdown, no preamble:\n{"name":"Full Name","headline":"Role · X yrs · Key skills · Location","score":82,"why":"2-3 sentences on fit."}`,
-      messages: [{
-        role: 'user',
-        content: `CV:\n${truncated}\n\nJob brief: ${brief}\n\nScore this CV against the brief. Use the candidate's real name from the CV. Score 0-100.`
-      }]
-    })
-  });
-  if (!response.ok) throw new Error(`API ${response.status}`);
-  const data = await response.json();
-  const text = data.content.map(b => b.text || '').join('');
-  return JSON.parse(text.replace(/```json|```/g, '').trim());
-}
-
-function injectCVCandidate(c, filename) {
-  const grid = document.getElementById('candidatesGrid');
-  const initials = c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-  const fitClass = c.score >= 85 ? '' : c.score >= 75 ? 'sage' : 'amber';
-
-  const el = document.createElement('div');
-  el.className = 'candidate cv-upload-card';
-  el.style.animation = 'candidateIn 0.4s ease forwards';
-  el.innerHTML = `
-    <div class="avatar">${initials}</div>
-    <div class="candidate-body">
-      <div class="cv-badge">Uploaded CV</div>
-      <div class="candidate-name">${escapeHtml(c.name)}</div>
-      <div class="candidate-headline">${escapeHtml(c.headline)}</div>
-      <div class="candidate-why">${escapeHtml(c.why)}</div>
-    </div>
-    <div class="candidate-right">
-      <div class="fit-score">
-        <div class="fit-score-label">Fit score</div>
-        <div class="fit-score-value">${c.score}<span class="max">/100</span></div>
-        <div class="fit-bar"><div class="fit-bar-fill ${fitClass}" data-fill="${c.score}"></div></div>
-      </div>
-      <div class="candidate-actions">
-        <button class="btn-pass" onclick="passCandidate(this)">Not a fit</button>
-        <button class="btn-interest" onclick="showInterest(this)">I'm interested</button>
-      </div>
-    </div>
-    <div class="interest-confirm">Noted — we'll reach out to ${escapeHtml(c.name)} on your behalf and be in touch within 24 hours.</div>
-  `;
-
-  // Insert at position based on score
-  const cards = Array.from(grid.querySelectorAll('.candidate:not(.cv-upload-card)'));
-  let inserted = false;
-  for (const card of cards) {
-    const scoreEl = card.querySelector('.fit-score-value');
-    if (scoreEl) {
-      const existingScore = parseInt(scoreEl.textContent);
-      if (c.score > existingScore) {
-        grid.insertBefore(el, card);
-        inserted = true;
-        break;
-      }
-    }
-  }
-  if (!inserted) grid.appendChild(el);
-
-  requestAnimationFrame(() => {
-    setTimeout(() => {
-      el.querySelectorAll('.fit-bar-fill').forEach(bar => {
-        bar.style.width = bar.dataset.fill + '%';
-      });
-    }, 100);
-  });
-
-  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-  const count = grid.querySelectorAll('.candidate').length;
-  document.getElementById('resultsCount').textContent = count;
-}
-
-function escapeHtml(s) {
-  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
-// ============ CONTACT FORM ============
-async function submitContact(e) {
-  e.preventDefault();
-  const name = document.getElementById('cf-name').value.trim();
-  const company = document.getElementById('cf-company').value.trim();
-  const email = document.getElementById('cf-email').value.trim();
-  const phone = document.getElementById('cf-phone').value.trim();
-
-  const lead = {
-    id: 'l' + Date.now(),
-    name, company, email, phone,
-    brief: lastBrief,
-    timestamp: new Date().toISOString()
-  };
-
-  state.leads = state.leads || [];
-  state.leads.push(lead);
-  await saveState();
-
-  // Send email notification
-  try {
-    await emailjs.send('service_ydnjq8l', 'template_hidyipr', {
-      from_name: name,
-      company: company || 'Not provided',
-      email: email,
-      phone: phone || 'Not provided',
-      brief: lastBrief || 'Not recorded',
-      time: new Date().toLocaleString('en-GB')
-    });
-  } catch(e) { console.warn('Email notification failed', e); }
-
-  document.getElementById('contactForm').style.display = 'none';
-  document.getElementById('contactConfirm').classList.add('visible');
-  document.getElementById('confirmEmail').textContent = email;
-}
-
-// ============ LEADS ============
-function renderLeads() {
-  const container = document.getElementById('leadsList');
-  if (!container) return;
-  const leads = state.leads || [];
-
-  if (!leads.length) {
-    container.innerHTML = '<p class="leads-empty">No leads yet. When someone submits their details during the demo, they\'ll appear here.</p>';
-    return;
+  .brand-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1;
   }
 
-  container.innerHTML = '';
-  [...leads].reverse().forEach(lead => {
-    const el = document.createElement('div');
-    el.className = 'lead-card';
-    const date = new Date(lead.timestamp).toLocaleDateString('en-GB', {
-      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-    });
-    el.innerHTML = `
-      <div class="lead-head">
-        <div>
-          <div class="lead-name">${escapeHtml(lead.name)}${lead.company ? ' · ' + escapeHtml(lead.company) : ''}</div>
-          <div class="lead-timestamp">${date}</div>
-        </div>
-        <a href="mailto:${escapeHtml(lead.email)}?subject=Your TalentKnight shortlist&body=Hi ${escapeHtml(lead.name)}," class="btn-small">Email ↗</a>
-      </div>
-      <div class="lead-contact">
-        <span class="lead-email">${escapeHtml(lead.email)}</span>
-        ${lead.phone ? `<span>${escapeHtml(lead.phone)}</span>` : ''}
-      </div>
-      ${lead.brief ? `<div class="lead-brief">"${escapeHtml(lead.brief.slice(0, 120))}${lead.brief.length > 120 ? '…' : ''}"</div>` : ''}
-    `;
-    container.appendChild(el);
-  });
-
-  const clearBtn = document.createElement('button');
-  clearBtn.className = 'btn-small danger';
-  clearBtn.style.marginTop = '16px';
-  clearBtn.textContent = 'Clear all leads';
-  clearBtn.onclick = clearLeads;
-  container.appendChild(clearBtn);
-}
-
-async function clearLeads() {
-  if (!confirm('Clear all leads? This cannot be undone.')) return;
-  state.leads = [];
-  await saveState();
-  renderLeads();
-}
-
-// ============ ADMIN ============
-function renderAdmin() {
-  renderLeads();
-  renderScenariosList();
-  renderActiveScenarioSelect();
-}
-
-function renderScenariosList() {
-  const container = document.getElementById('scenariosList');
-  container.innerHTML = state.scenarios.length
-    ? ''
-    : '<p style="color:var(--text-dim);font-style:italic;padding:12px 0">No saved scenarios yet. The AI handles everything automatically.</p>';
-  state.scenarios.forEach(s => container.appendChild(scenarioCardEl(s)));
-}
-
-function scenarioCardEl(s) {
-  const el = document.createElement('div');
-  el.className = 'scenario-card';
-  el.innerHTML = `
-    <div class="scenario-card-head">
-      <div>
-        <div class="scenario-card-title">${escapeHtml(s.name)}</div>
-        <div class="scenario-card-meta">${s.candidates.length} candidates · ${s.keywords.length} keywords</div>
-      </div>
-      <div class="scenario-card-actions">
-        <button class="btn-small" onclick="editScenario('${s.id}')">Edit</button>
-        <button class="btn-small danger" onclick="deleteScenario('${s.id}')">Delete</button>
-      </div>
-    </div>
-    <div class="keywords">
-      ${s.keywords.map(k => `<span class="keyword">${escapeHtml(k)}</span>`).join('')}
-    </div>
-  `;
-  return el;
-}
-
-function renderActiveScenarioSelect() {
-  const sel = document.getElementById('activeScenarioSelect');
-  sel.innerHTML = '<option value="">— No scenario locked (AI generates live results) —</option>';
-  state.scenarios.forEach(s => {
-    const opt = document.createElement('option');
-    opt.value = s.id;
-    opt.textContent = s.name;
-    if (s.id === state.activeScenarioId) opt.selected = true;
-    sel.appendChild(opt);
-  });
-}
-
-function updateScenarioIndicator() {
-  const ind = document.getElementById('scenarioIndicator');
-  const text = document.getElementById('scenarioIndicatorText');
-  const aiInd = document.getElementById('vesperIndicator');
-  if (state.activeScenarioId) {
-    const s = state.scenarios.find(x => x.id === state.activeScenarioId);
-    if (s) {
-      ind.style.display = 'inline-block';
-      aiInd.style.display = 'none';
-      text.textContent = s.name + ' locked';
-      return;
-    }
-  }
-  ind.style.display = 'none';
-  aiInd.style.display = 'inline-block';
-}
-
-async function setActiveScenario(id) {
-  state.activeScenarioId = id;
-  await saveState();
-  updateScenarioIndicator();
-}
-
-function deleteScenario(id) {
-  if (!confirm('Delete this scenario? This cannot be undone.')) return;
-  state.scenarios = state.scenarios.filter(s => s.id !== id);
-  if (state.activeScenarioId === id) state.activeScenarioId = '';
-  saveState();
-  renderAdmin();
-  updateScenarioIndicator();
-}
-
-// ============ SCENARIO EDITOR ============
-function openScenarioEditor(id = null) {
-  editingId = id;
-  document.getElementById('editorTitle').textContent = id ? 'Edit scenario' : 'New scenario';
-  document.getElementById('editorDesc').textContent = 'Saved scenarios can be locked before a meeting to override the live AI.';
-
-  let scenario;
-  if (id) {
-    scenario = state.scenarios.find(s => s.id === id);
-  } else {
-    scenario = { name: '', keywords: [], candidates: [] };
+  .brand-name {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text);
   }
 
-  document.getElementById('fldName').value = scenario.name;
-  document.getElementById('fldKeywords').value = scenario.keywords.join(', ');
+  .brand-name .k-accent { color: var(--gold); }
 
-  const editor = document.getElementById('candidatesEditor');
-  editor.innerHTML = '';
-  const list = scenario.candidates.length
-    ? scenario.candidates
-    : [blankCandidate(), blankCandidate(), blankCandidate(), blankCandidate(), blankCandidate()];
-  list.forEach(c => editor.appendChild(candidateEditorEl(c)));
-  relabelCandidates();
-
-  document.getElementById('editorModal').classList.add('active');
-}
-
-function editScenario(id) { openScenarioEditor(id); }
-
-function closeEditor() {
-  document.getElementById('editorModal').classList.remove('active');
-  editingId = null;
-}
-
-function blankCandidate() { return { name: '', headline: '', score: 85, why: '' }; }
-
-function candidateEditorEl(c) {
-  const el = document.createElement('div');
-  el.className = 'candidate-editor';
-  el.innerHTML = `
-    <div class="candidate-editor-head">
-      <div class="candidate-editor-title">Candidate</div>
-      <button class="remove-candidate" onclick="this.closest('.candidate-editor').remove(); relabelCandidates();">Remove</button>
-    </div>
-    <div class="cand-grid">
-      <input type="text" class="cf-name" placeholder="Name (e.g. Sarah M.)" value="${escapeHtml(c.name)}">
-      <input type="text" class="cf-headline" placeholder="Headline (role · years · skills · location)" value="${escapeHtml(c.headline)}">
-      <input type="number" class="cf-score" min="0" max="100" placeholder="Fit /100" value="${c.score}">
-    </div>
-    <textarea class="cf-why" placeholder="Why this match — 2-3 sentences explaining the fit">${escapeHtml(c.why)}</textarea>
-  `;
-  return el;
-}
-
-function addCandidateEditor() {
-  document.getElementById('candidatesEditor').appendChild(candidateEditorEl(blankCandidate()));
-  relabelCandidates();
-}
-
-function relabelCandidates() {
-  document.querySelectorAll('#candidatesEditor .candidate-editor-title').forEach((el, i) => {
-    el.textContent = `Candidate ${i + 1}`;
-  });
-}
-
-async function saveScenario() {
-  const name = document.getElementById('fldName').value.trim();
-  const keywords = document.getElementById('fldKeywords').value.split(',').map(s => s.trim()).filter(Boolean);
-
-  if (!name) { alert('Scenario needs a name.'); return; }
-
-  const cards = Array.from(document.querySelectorAll('#candidatesEditor .candidate-editor'));
-  const candidates = cards.map(el => ({
-    name: el.querySelector('.cf-name').value.trim(),
-    headline: el.querySelector('.cf-headline').value.trim(),
-    score: Math.max(0, Math.min(100, parseInt(el.querySelector('.cf-score').value) || 0)),
-    why: el.querySelector('.cf-why').value.trim()
-  })).filter(c => c.name);
-
-  if (!candidates.length) { alert('Add at least one candidate.'); return; }
-
-  const payload = {
-    id: editingId || 's' + Date.now(),
-    name,
-    keywords: keywords.length ? keywords : [],
-    candidates
-  };
-
-  if (editingId) {
-    const idx = state.scenarios.findIndex(s => s.id === editingId);
-    state.scenarios[idx] = payload;
-  } else {
-    state.scenarios.push(payload);
+  .brand-tag {
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-top: 6px;
   }
 
-  await saveState();
-  renderAdmin();
-  updateScenarioIndicator();
-  closeEditor();
-}
-
-// ============ KEYBOARD ============
-document.addEventListener('keydown', (e) => {
-  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-    if (document.getElementById('screen-brief').classList.contains('active')) submitBrief();
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
   }
-  if (e.key === 'Escape') {
-    if (document.getElementById('editorModal').classList.contains('active')) closeEditor();
+
+  .scenario-indicator {
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    background: rgba(37, 99, 235, 0.04);
   }
-});
 
-document.getElementById('editorModal').addEventListener('click', (e) => {
-  if (e.target.id === 'editorModal') closeEditor();
-});
+  .scenario-indicator .dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    margin-right: 8px;
+    vertical-align: middle;
+    box-shadow: 0 0 8px var(--gold);
+  }
 
-// ============ BOOT ============
-emailjs.init('oDkTH93FdFLH1gN_-');
-init();
-</script>
-</body>
-</html>
+  .vesper-indicator {
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--sage);
+    padding: 6px 14px;
+    border: 1px solid rgba(138, 166, 131, 0.25);
+    border-radius: 2px;
+    background: rgba(138, 166, 131, 0.05);
+    display: none;
+  }
+
+  .vesper-indicator .dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--sage);
+    margin-right: 8px;
+    vertical-align: middle;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  .admin-toggle {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: var(--sans);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    border-radius: 2px;
+  }
+
+  .admin-toggle:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+    background: rgba(37, 99, 235, 0.06);
+  }
+
+  /* ============ LAYOUT ============ */
+  main {
+    position: relative;
+    z-index: 5;
+    min-height: calc(100vh - 91px);
+    padding: 0 48px;
+  }
+
+  .view { display: none; animation: fadeIn 0.6s ease; }
+  .view.active { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ============ SCREEN 1: BRIEF INPUT ============ */
+  #screen-brief {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 100px 0 60px;
+  }
+
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .eyebrow::before {
+    content: '';
+    width: 24px;
+    height: 1px;
+    background: var(--gold);
+  }
+
+  h1.headline {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: clamp(40px, 5vw, 58px);
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    margin-bottom: 24px;
+    color: var(--text);
+  }
+
+  h1.headline em {
+    font-style: italic;
+    color: var(--gold);
+    font-weight: 400;
+  }
+
+  .sub {
+    font-size: 17px;
+    color: var(--text-muted);
+    max-width: 560px;
+    margin-bottom: 56px;
+    line-height: 1.7;
+  }
+
+  .brief-field {
+    position: relative;
+    margin-bottom: 28px;
+  }
+
+  .brief-field label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 14px;
+  }
+
+  textarea#briefInput {
+    width: 100%;
+    min-height: 160px;
+    padding: 24px 26px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 18px;
+    line-height: 1.5;
+    resize: vertical;
+    transition: all 0.25s ease;
+    outline: none;
+  }
+
+  textarea#briefInput::placeholder {
+    color: var(--text-dim);
+    font-style: italic;
+  }
+
+  textarea#briefInput:focus {
+    border-color: var(--gold);
+    background: var(--surface-raised);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12), 0 4px 12px rgba(0,0,0,0.06);
+  }
+
+  .brief-actions {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-top: 40px;
+  }
+
+  button.primary {
+    background: var(--gold);
+    border: none;
+    color: #ffffff;
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0;
+    padding: 16px 36px;
+    cursor: pointer;
+    border-radius: 999px;
+    transition: all 0.25s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  button.primary:hover {
+    background: var(--gold-dim);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(37, 99, 235, 0.25);
+  }
+
+  button.primary:active { transform: translateY(0); }
+
+  .brief-hint {
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+  }
+
+  .brief-hint kbd {
+    background: rgba(37, 99, 235, 0.06);
+    border: 1px solid var(--border);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: var(--sans);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* ============ SCREEN 2: LOADING ============ */
+  #screen-loading {
+    max-width: 540px;
+    margin: 0 auto;
+    padding: 160px 0;
+    text-align: center;
+  }
+
+  .loader-mark {
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 48px;
+    position: relative;
+  }
+
+  .loader-mark svg {
+    width: 100%;
+    height: 100%;
+    animation: slowSpin 3s linear infinite;
+  }
+
+  @keyframes slowSpin {
+    to { transform: rotate(360deg); }
+  }
+
+  .loader-stages {
+    list-style: none;
+    text-align: left;
+    max-width: 380px;
+    margin: 0 auto;
+  }
+
+  .loader-stages li {
+    padding: 14px 0;
+    font-size: 15px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    opacity: 0.3;
+    transition: all 0.5s ease;
+  }
+
+  .loader-stages li.active {
+    opacity: 1;
+    color: var(--text);
+  }
+
+  .loader-stages li.done {
+    opacity: 0.7;
+    color: var(--text-muted);
+  }
+
+  .stage-marker {
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--border-strong);
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .loader-stages li.active .stage-marker::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--gold);
+    animation: pulse 1s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.7); }
+  }
+
+  .loader-stages li.done .stage-marker {
+    background: var(--gold);
+    border-color: var(--gold);
+  }
+
+  .loader-stages li.done .stage-marker::after {
+    content: '';
+    width: 8px;
+    height: 4px;
+    border-left: 1.5px solid #ffffff;
+    border-bottom: 1.5px solid #ffffff;
+    transform: rotate(-45deg) translate(1px, -1px);
+  }
+
+  /* ============ SCREEN 3: RESULTS ============ */
+  #screen-results {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 60px 0 100px;
+  }
+
+  .results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 48px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .results-title {
+    font-family: var(--serif);
+    font-size: 34px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+
+  .results-title em {
+    font-style: italic;
+    color: var(--gold);
+  }
+
+  .results-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+    margin-top: 10px;
+  }
+
+  .results-subtitle .ai-badge {
+    display: inline-block;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--sage);
+    border: 1px solid rgba(138, 166, 131, 0.3);
+    padding: 2px 8px;
+    border-radius: 2px;
+    margin-left: 10px;
+    vertical-align: middle;
+  }
+
+  .new-search {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: var(--sans);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 10px 20px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.25s ease;
+  }
+
+  .new-search:hover { border-color: var(--gold); color: var(--gold); }
+
+  .candidates-grid {
+    display: grid;
+    gap: 20px;
+  }
+
+  .candidate {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 28px 32px;
+    display: grid;
+    grid-template-columns: 60px 1fr auto;
+    gap: 28px;
+    align-items: start;
+    transition: all 0.3s ease;
+    opacity: 0;
+    transform: translateY(12px);
+    animation: slideIn 0.5s ease forwards;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .candidate::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--gold);
+    transform: scaleY(0);
+    transform-origin: top;
+    transition: transform 0.4s ease;
+  }
+
+  .candidate:hover {
+    border-color: var(--border-strong);
+    background: var(--surface-raised);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+  }
+
+  .candidate:hover::before { transform: scaleY(1); }
+
+  @keyframes slideIn {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .candidate:nth-child(1) { animation-delay: 0.1s; }
+  .candidate:nth-child(2) { animation-delay: 0.2s; }
+  .candidate:nth-child(3) { animation-delay: 0.3s; }
+  .candidate:nth-child(4) { animation-delay: 0.4s; }
+  .candidate:nth-child(5) { animation-delay: 0.5s; }
+
+  .avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(37, 99, 235, 0.04));
+    border: 1px solid var(--border-strong);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--gold);
+    letter-spacing: 0.02em;
+  }
+
+  .candidate-body { min-width: 0; }
+
+  .candidate-name {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    color: var(--text);
+  }
+
+  .candidate-headline {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+    letter-spacing: 0.02em;
+  }
+
+  .candidate-why {
+    font-style: italic;
+    font-family: var(--serif);
+    font-size: 16px;
+    color: var(--text-muted);
+    line-height: 1.65;
+    max-width: 580px;
+  }
+
+  .candidate-why::before {
+    content: '"';
+    color: var(--gold);
+    font-size: 22px;
+    margin-right: 2px;
+    opacity: 0.6;
+  }
+
+  .candidate-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 16px;
+    min-width: 180px;
+  }
+
+  .fit-score {
+    text-align: right;
+  }
+
+  .fit-score-label {
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+
+  .fit-score-value {
+    font-family: var(--serif);
+    font-size: 36px;
+    font-weight: 500;
+    line-height: 1;
+    color: var(--gold);
+  }
+
+  .fit-score-value .max {
+    font-size: 14px;
+    color: var(--text-dim);
+    margin-left: 2px;
+  }
+
+  .fit-bar {
+    width: 140px;
+    height: 3px;
+    background: rgba(37, 99, 235, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+
+  .fit-bar-fill {
+    height: 100%;
+    background: var(--gold);
+    width: 0;
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1) 0.3s;
+  }
+
+  .fit-bar-fill.sage { background: var(--sage); }
+  .fit-bar-fill.amber { background: var(--amber); }
+
+  .candidate-actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  .btn-interest, .btn-pass {
+    font-family: var(--sans);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 10px 16px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s ease;
+    font-weight: 500;
+  }
+
+  .btn-interest {
+    background: var(--gold);
+    border: 1px solid var(--gold);
+    color: #ffffff;
+  }
+
+  .btn-interest:hover {
+    background: var(--gold-bright);
+    border-color: var(--gold-bright);
+  }
+
+  .btn-pass {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+
+  .btn-pass:hover {
+    border-color: var(--text-muted);
+    color: var(--text-muted);
+  }
+
+  .btn-linkedin {
+    flex: 1;
+    padding: 11px 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: 2px;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .btn-linkedin svg {
+    width: 13px; height: 13px;
+    flex-shrink: 0; opacity: 0.6;
+    fill: currentColor;
+  }
+  .btn-linkedin:hover {
+    border-color: #0a66c2;
+    color: #5ba4f5;
+  }
+  .btn-linkedin:hover svg { opacity: 1; }
+
+  .candidate.interested {
+    border-color: var(--gold);
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.06), rgba(37, 99, 235, 0.01));
+  }
+
+  .interest-confirm {
+    grid-column: 1 / -1;
+    margin-top: 12px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-family: var(--serif);
+    font-style: italic;
+    color: var(--gold);
+    font-size: 15px;
+    display: none;
+  }
+
+  .candidate.interested .interest-confirm { display: block; }
+  .candidate.interested .candidate-actions { display: none; }
+  .candidate.passed { opacity: 0.35; }
+
+  .candidate-snapshot {
+    grid-column: 1 / -1;
+    margin-top: 12px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .snapshot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+  }
+
+  .snapshot-field { display: flex; flex-direction: column; gap: 2px; }
+
+  .snapshot-label {
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .snapshot-value { font-size: 13px; font-weight: 500; color: var(--text); }
+
+  .snapshot-loading .snapshot-value { color: var(--text-dim); font-weight: 400; font-style: italic; }
+
+  .btn-details {
+    font-family: var(--sans);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 10px 16px;
+    border-radius: 2px;
+    border: 1px solid var(--border-strong);
+    background: var(--bg);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn-details:hover { border-color: var(--gold); color: var(--gold); }
+
+  /* ============ ENRICHING INDICATOR ============ */
+  .enriching-indicator {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+  }
+
+  .enriching-indicator.active { display: flex; }
+
+  .enriching-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+
+  /* ============ ERROR STATE ============ */
+  .error-notice {
+    background: rgba(184, 122, 111, 0.08);
+    border: 1px solid rgba(184, 122, 111, 0.2);
+    border-radius: 3px;
+    padding: 14px 20px;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+    display: none;
+  }
+
+  /* ============ FALLBACK / EMPTY STATE ============ */
+  .fallback-state {
+    max-width: 600px;
+    margin: 80px auto;
+    text-align: center;
+    padding: 60px 40px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+  }
+
+  .fallback-state .crest {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 24px;
+    opacity: 0.6;
+  }
+
+  .fallback-state h3 {
+    font-family: var(--serif);
+    font-size: 28px;
+    font-weight: 500;
+    margin-bottom: 16px;
+  }
+
+  .fallback-state p {
+    color: var(--text-muted);
+    line-height: 1.7;
+    margin-bottom: 28px;
+  }
+
+  /* ============ ADMIN VIEW ============ */
+  #admin-view {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 60px 0 100px;
+  }
+
+  .admin-header {
+    margin-bottom: 48px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .admin-header h2 {
+    font-family: var(--serif);
+    font-size: 38px;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+
+  .admin-header h2 em {
+    font-style: italic;
+    color: var(--gold);
+  }
+
+  .admin-header p {
+    color: var(--text-muted);
+    font-size: 15px;
+    max-width: 600px;
+  }
+
+  .admin-notice {
+    background: rgba(138, 166, 131, 0.08);
+    border: 1px solid rgba(138, 166, 131, 0.2);
+    border-radius: 3px;
+    padding: 16px 20px;
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: 40px;
+    line-height: 1.6;
+  }
+
+  .admin-notice strong {
+    color: var(--sage);
+    font-weight: 600;
+  }
+
+  .admin-section {
+    margin-bottom: 56px;
+  }
+
+  .admin-section-title {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+
+  .admin-section-desc {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+
+  .active-scenario-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+  }
+
+  .active-scenario-row label {
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  select.scenario-select {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    padding: 12px 16px;
+    border-radius: 2px;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  select.scenario-select:focus, select.scenario-select:hover {
+    border-color: var(--gold);
+  }
+
+  .scenarios-list {
+    display: grid;
+    gap: 14px;
+  }
+
+  .scenario-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 24px 28px;
+  }
+
+  .scenario-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 16px;
+    gap: 20px;
+  }
+
+  .scenario-card-title {
+    font-family: var(--serif);
+    font-size: 20px;
+    font-weight: 500;
+  }
+
+  .scenario-card-meta {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  .keywords {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .keyword {
+    font-size: 11px;
+    padding: 4px 10px;
+    background: rgba(37, 99, 235, 0.06);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+  }
+
+  .scenario-card-actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  .btn-small {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: var(--sans);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 8px 14px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+
+  .btn-small:hover { border-color: var(--gold); color: var(--gold); }
+  .btn-small.danger:hover { border-color: var(--rose); color: var(--rose); }
+
+  .btn-add {
+    background: transparent;
+    border: 1px dashed var(--border-strong);
+    color: var(--accent, var(--gold));
+    font-family: var(--sans);
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 18px 24px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.25s;
+    width: 100%;
+    margin-top: 14px;
+  }
+
+  .btn-add:hover {
+    border-color: var(--gold);
+    background: rgba(37, 99, 235, 0.04);
+  }
+
+  /* ============ MODAL ============ */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(8px);
+    z-index: 100;
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 60px 20px;
+    overflow-y: auto;
+  }
+
+  .modal-backdrop.active { display: flex; }
+
+  .modal {
+    background: var(--bg-soft);
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    max-width: 760px;
+    width: 100%;
+    padding: 40px 44px;
+    box-shadow: var(--shadow);
+  }
+
+  .modal h3 {
+    font-family: var(--serif);
+    font-size: 28px;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+
+  .modal-desc {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-bottom: 32px;
+  }
+
+  .field {
+    margin-bottom: 20px;
+  }
+
+  .field label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  .field input, .field textarea {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    padding: 12px 14px;
+    border-radius: 2px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .field input:focus, .field textarea:focus { border-color: var(--gold); }
+
+  .field textarea { min-height: 70px; resize: vertical; font-family: var(--sans); font-size: 15px; }
+
+  .field-hint {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 6px;
+  }
+
+  .candidate-editor {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 20px;
+    margin-bottom: 14px;
+    position: relative;
+  }
+
+  .candidate-editor-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .candidate-editor-title {
+    font-family: var(--serif);
+    font-size: 15px;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+  }
+
+  .remove-candidate {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .remove-candidate:hover { color: var(--rose); }
+
+  .cand-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 120px;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: var(--sans);
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 12px 24px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+  .btn-ghost:hover { border-color: var(--text-muted); color: var(--text); }
+
+  /* ============ CV UPLOAD ============ */
+  .cv-upload-section {
+    display: none;
+    margin: 40px 0 0;
+    padding: 32px 36px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--surface);
+    animation: fadeUp 0.5s ease;
+  }
+  .cv-upload-section.visible { display: block; }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .cv-upload-eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 10px;
+  }
+  .cv-upload-heading {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 400;
+    margin-bottom: 6px;
+    line-height: 1.2;
+  }
+  .cv-upload-heading em { font-style: italic; color: var(--gold); }
+  .cv-upload-sub {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    line-height: 1.6;
+  }
+  .cv-drop-zone {
+    border: 1px dashed var(--border-strong);
+    border-radius: 10px;
+    padding: 32px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    position: relative;
+    background: rgba(37,99,235,0.02);
+  }
+  .cv-drop-zone:hover, .cv-drop-zone.dragover {
+    border-color: var(--gold);
+    background: rgba(37,99,235,0.04);
+  }
+  .cv-drop-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+  .cv-drop-icon {
+    width: 36px; height: 36px;
+    border: 1px solid var(--border-strong);
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 12px;
+  }
+  .cv-drop-icon svg { width: 16px; height: 16px; stroke: var(--gold); fill: none; stroke-width: 1.5; }
+  .cv-drop-label { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+  .cv-drop-label strong { color: var(--gold); font-weight: 500; }
+  .cv-drop-types { font-size: 11px; color: var(--text-dim); margin-top: 6px; letter-spacing: 0.06em; }
+  .cv-uploading { display: none; text-align: center; padding: 20px 0 8px; font-size: 13px; color: var(--text-muted); }
+  .cv-uploading.visible { display: block; }
+  .cv-uploading-dots::after {
+    content: '';
+    animation: cvdots 1.2s steps(4, end) infinite;
+  }
+  @keyframes cvdots {
+    0%, 20% { content: ''; }
+    40% { content: '.'; }
+    60% { content: '..'; }
+    80%, 100% { content: '...'; }
+  }
+  .cv-error { display: none; margin-top: 12px; font-size: 12px; color: var(--rose); text-align: center; }
+  .cv-error.visible { display: block; }
+  .candidate.cv-upload-card {
+    border-color: rgba(37,99,235,0.25);
+    background: linear-gradient(135deg, rgba(37,99,235,0.04), rgba(37,99,235,0.01));
+  }
+  .cv-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--gold);
+    border: 1px solid rgba(37,99,235,0.25);
+    border-radius: 999px;
+    padding: 2px 8px;
+    margin-bottom: 6px;
+  }
+
+  /* ============ RESPONSIVE ============ */
+  @media (max-width: 780px) {
+    nav { padding: 14px 20px; gap: 10px; }
+    nav img[alt="TalentKnight"] { display: none; }
+    .vesper-indicator { display: none !important; }
+    .scenario-indicator { display: none; }
+    .admin-toggle { padding: 8px 12px; font-size: 10px; }
+    main { padding: 0 20px; }
+    #screen-brief { padding: 48px 0 40px; }
+    textarea#briefInput { font-size: 17px; padding: 18px 20px; }
+    .brief-actions { flex-direction: column; align-items: flex-start; gap: 14px; }
+    .brief-hint { display: none; }
+    #screen-brief button.primary { width: 100%; padding: 18px 24px; text-align: center; }
+    .results-header { flex-direction: column; align-items: flex-start; gap: 16px; }
+    .results-title { font-size: 26px; }
+    .candidate { grid-template-columns: 1fr; gap: 16px; padding: 20px; }
+    .candidate-right { align-items: flex-start; min-width: 0; width: 100%; flex-direction: row; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    .fit-bar { width: 100px; }
+    .btn-interest, .btn-pass { padding: 12px 14px; flex: 1; text-align: center; }
+    .contact-fields { grid-template-columns: 1fr; }
+    .contact-submit { flex-direction: column; align-items: stretch; }
+    .contact-submit button.primary { width: 100%; }
+    .contact-confirm { flex-direction: column; gap: 16px; padding: 24px 20px; }
+    .modal-backdrop { padding: 20px 12px; }
+    .modal { padding: 24px 20px; }
+    .modal h3 { font-size: 22px; }
+    .cand-grid { grid-template-columns: 1fr; }
+    .modal-actions { flex-direction: column-reverse; gap: 10px; }
+    .modal-actions button { width: 100%; padding: 14px; }
+    #admin-view { padding: 40px 0 60px; }
+    .admin-header h2 { font-size: 28px; }
+    .active-scenario-row { flex-direction: column; align-items: stretch; gap: 12px; }
+    .scenario-card { padding: 18px 16px; }
+    .scenario-card-head { flex-direction: column; gap: 12px; }
+    .scenario-card-actions { justify-content: flex-start; }
+    .fallback-state { padding: 40px 20px; }
+    #screen-loading { padding: 100px 0; }
+  }
+
+  /* ============ CONTACT FORM ============ */
+  .contact-section {
+    margin-top: 64px;
+    padding-top: 60px;
+    border-top: 1px solid var(--border);
+    display: none;
+  }
+
+  .contact-section.visible { display: block; }
+
+  .contact-eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .contact-eyebrow::before {
+    content: '';
+    width: 24px;
+    height: 1px;
+    background: var(--gold);
+  }
+
+  .contact-heading {
+    font-family: var(--serif);
+    font-size: clamp(30px, 4vw, 44px);
+    font-weight: 500;
+    line-height: 1.1;
+    margin-bottom: 16px;
+  }
+
+  .contact-heading em { font-style: italic; color: var(--gold); font-weight: 400; }
+
+  .contact-sub {
+    font-size: 16px;
+    color: var(--text-muted);
+    max-width: 520px;
+    line-height: 1.7;
+    margin-bottom: 44px;
+  }
+
+  .contact-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 32px;
+    max-width: 680px;
+  }
+
+  .cf-field label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+  }
+
+  .cf-field .optional {
+    font-size: 10px;
+    opacity: 0.6;
+    text-transform: lowercase;
+    letter-spacing: 0;
+  }
+
+  .cf-field input {
+    width: 100%;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    outline: none;
+    transition: all 0.2s ease;
+  }
+
+  .cf-field input:focus {
+    border-color: var(--gold);
+    background: var(--bg);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+  }
+
+  .cf-field input::placeholder { color: var(--text-dim); }
+
+  .contact-submit {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .contact-confirm {
+    display: none;
+    align-items: center;
+    gap: 28px;
+    padding: 32px 36px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    max-width: 560px;
+    animation: fadeIn 0.5s ease;
+  }
+
+  .contact-confirm.visible { display: flex; }
+
+  .contact-confirm-text h4 {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--gold);
+    margin-bottom: 8px;
+  }
+
+  .contact-confirm-text p {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  .contact-confirm-text strong { color: var(--text); }
+
+  /* ============ LEAD CARDS (Admin) ============ */
+  .lead-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 20px 24px;
+    margin-bottom: 12px;
+    animation: fadeIn 0.4s ease;
+  }
+
+  .lead-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+    gap: 16px;
+  }
+
+  .lead-name {
+    font-family: var(--serif);
+    font-size: 19px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .lead-timestamp {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 3px;
+  }
+
+  .lead-contact {
+    display: flex;
+    gap: 20px;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+
+  .lead-email { color: var(--gold); }
+
+  .lead-brief {
+    font-size: 13px;
+    color: var(--text-dim);
+    font-style: italic;
+    font-family: var(--serif);
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+
+  .leads-empty {
+    color: var(--text-dim);
+    font-style: italic;
+    padding: 12px 0;
+    font-size: 14px;
+  }
+
+  @media (max-width: 780px) {
+    .contact-fields { grid-template-columns: 1fr; }
+    .contact-submit { flex-direction: column; align-items: flex-start; }
+  }
+
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 5px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--gold-dim); }
+
+  .brand img { display: none !important; }
+  .brand::before { content: 'Talent'; font-size: 20px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; font-family: var(--sans); }
+  .brand::after  { content: 'Knight'; font-size: 20px; font-weight: 700; color: #2563eb; letter-spacing: -0.02em; font-family: var(--sans); }
+.view-switcher{display:flex;gap:6px;}.view-btn{font-family:var(--sans);font-size:12px;font-weight:500;padding:6px 14px;border-radius:999px;border:1px solid var(--border);background:var(--bg);color:var(--text-muted);cursor:pointer;transition:all 0.2s ease;}.view-btn:hover{border-color:var(--border-strong);}.view-btn.active{border-color:var(--gold);color:var(--gold);background:rgba(37,99,235,0.06);}.view-note{font-size:12px;color:var(--text-muted);line-height:1.7;margin:16px 0 0;padding:12px 16px;background:var(--surface);border-left:2px solid var(--gold);border-radius:0 4px 4px 0;}.view-note strong{color:var(--text);}</style>
+</head>
+<body>
+
+<nav>
+  <div class="brand" onclick="showView('brief')">
