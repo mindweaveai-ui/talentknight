@@ -12,7 +12,9 @@
     { "src": "api/save-candidates.js", "use": "@vercel/node" },
     { "src": "api/parse-brief.js", "use": "@vercel/node" },
     { "src": "api/crm.js", "use": "@vercel/node" },
-    { "src": "*.html", "use": "@vercel/static" }
+    { "src": "*.html", "use": "@vercel/static" },
+    { "src": "robots.txt", "use": "@vercel/static" },
+    { "src": "sitemap.xml", "use": "@vercel/static" }
   ],
   "routes": [
     { "src": "/api/ai", "dest": "/api/ai.js" },
@@ -26,6 +28,8 @@
     { "src": "/api/save-candidates", "dest": "/api/save-candidates.js" },
     { "src": "/api/parse-brief", "dest": "/api/parse-brief.js" },
     { "src": "/api/crm", "dest": "/api/crm.js" },
+    { "src": "/robots.txt", "dest": "/robots.txt" },
+    { "src": "/sitemap.xml", "dest": "/sitemap.xml" },
     { "src": "/demo", "dest": "/demo.html" },
     { "src": "/demo.html", "dest": "/demo.html" },
     { "src": "/dashboard", "dest": "/dashboard.html" },

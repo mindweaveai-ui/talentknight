@@ -1,7 +1,8 @@
 User-agent: *
 Allow: /
 Disallow: /Admin.html
+Disallow: /admin.html
 Disallow: /client.html
 Disallow: /checkout.html
 
-Sitemap: https://talentknight.ai/sitemap.xml
+Sitemap: https://www.talentknight.ai/sitemap.xml
