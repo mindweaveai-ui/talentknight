@@ -64,6 +64,8 @@ const KF = {
   candidateSource: 'flda47WcrjAHQM3En', enrichmentStatus: 'fldHX3Q6XduR3q6JJ',
   // Earnings pipeline — staff-only, the actual agreed salary once a candidate is Placed.
   placementSalary: 'fldhomjZl7P3B6180',
+  // AI fit score (0-100) against whichever Role this candidate is currently matched to.
+  fitScore: 'fldkIxE2953yKOP1c',
 };
 const OSF = { name: 'fldIMiB64MXLRln82', clerkId: 'fld9qiWYAWe9mPx8i', organization: 'fldm9cJR6urVDzKLS', tier: 'fldMJlsUHuFX1yJOy', active: 'fldN7VcJ9fKx676dL' };
 const CAF = { consultant: 'fldK640gTY74TE88t', company: 'fld8jtLa5bBgLiecA' };
@@ -251,6 +253,11 @@ async function postToSlack(text) {
 // Ranks a candidate pool against a Role's brief, same idea as demo.html's rankWithClaude
 // but returns the actual candidate objects (keyed by list position) instead of names —
 // avoids any name-collision ambiguity when writing Assigned Role back to Airtable.
+//
+// Also asks Claude for a 0-100 fit score per candidate (same scale/spirit as the public
+// Vesper demo's "Fit score" UX on demo.html) so the CRM can show recruiters how strong a
+// match actually is, not just an unscored ranked order. Each returned candidate carries
+// a `.fitScore` alongside its existing fields.
 async function rankPoolAgainstRole(briefText, pool, limit = 8) {
   if (!pool.length) return [];
   const listText = pool.slice(0, 40).map((c, i) => {
@@ -264,13 +271,21 @@ async function rankPoolAgainstRole(briefText, pool, limit = 8) {
     return line;
   }).join('\n');
 
-  const system = `You are a recruitment matching assistant. Given a role brief and a numbered list of candidates, return ONLY a JSON array of the candidate numbers (integers) that are the strongest matches for the role, best match first, maximum ${limit} entries. No markdown, no preamble, no explanation. Example: [3, 1, 7]`;
-  const raw = await callClaude(system, `Role brief: ${briefText}\n\nCandidates:\n${listText}`, 300);
+  const system = `You are a recruitment matching assistant. Given a role brief and a numbered list of candidates, return ONLY a JSON array of objects for the strongest matches, best match first, maximum ${limit} entries. Each object must have "n" (the candidate's number from the list, integer) and "score" (an integer 0-100 estimating how well they fit the role — 90+ excellent fit, 70-89 strong, 50-69 partial, below 50 only if you must include them to reach the list). No markdown, no preamble, no explanation. Example: [{"n":3,"score":92},{"n":1,"score":78}]`;
+  const raw = await callClaude(system, `Role brief: ${briefText}\n\nCandidates:\n${listText}`, 400);
   if (!raw) return [];
   try {
-    const nums = JSON.parse(raw);
-    if (!Array.isArray(nums)) return [];
-    return nums.map(n => pool[n - 1]).filter(Boolean).slice(0, limit);
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map(item => {
+        const cand = pool[(item?.n ?? 0) - 1];
+        if (!cand) return null;
+        const score = Math.max(0, Math.min(100, Math.round(Number(item?.score) || 0)));
+        return { ...cand, fitScore: score };
+      })
+      .filter(Boolean)
+      .slice(0, limit);
   } catch {
     return [];
   }
@@ -293,7 +308,7 @@ async function rankPoolAgainstRole(briefText, pool, limit = 8) {
 // pipeline state that's already in progress.
 const STAGE_RESET_SAFE = new Set(['', undefined, 'Sourced', 'Rejected', 'Matched']);
 
-async function patchCandidatesStage(recordIds, roleId, h) {
+async function patchCandidatesStage(recordIds, roleId, h, scores = {}) {
   if (!recordIds.length) return { linked: [], notifyOnly: [] };
   const today = new Date().toISOString().split('T')[0];
 
@@ -326,6 +341,10 @@ async function patchCandidatesStage(recordIds, roleId, h) {
           links.add(roleId);
           const resetSafe = STAGE_RESET_SAFE.has(info.stage);
           const fields = { [KF.assignedRole]: [...links] };
+          // Fit score is written whenever we have one, regardless of the stage-reset
+          // branch below — it's informative even for a candidate who's already active
+          // elsewhere and whose Pipeline Stage we're deliberately not touching.
+          if (scores[id] != null) fields[KF.fitScore] = scores[id];
           if (resetSafe) {
             fields[KF.pipelineStage] = 'Matched';
             fields[KF.stageChangedAt] = today;
@@ -440,6 +459,7 @@ async function handleDashboard(req, res) {
         certifications: f[KF.certifications] || '',
         educationLevel: f[KF.educationLevel] || '',
         bio: f[KF.bio] || '',
+        fitScore: typeof f[KF.fitScore] === 'number' ? f[KF.fitScore] : null,
         // Earnings pipeline — commercial data, never sent to Company Contacts.
         placementSalary: isStaff && typeof f[KF.placementSalary] === 'number' ? f[KF.placementSalary] : null,
       };
@@ -693,7 +713,8 @@ async function runMatchSearch(roleId, title, location, brief, h) {
   }
 
   if (matched.length) {
-    const { linked, notifyOnly } = await patchCandidatesStage(matched.map(c => c.id), roleId, h);
+    const scores = Object.fromEntries(matched.map(c => [c.id, c.fitScore]));
+    const { linked, notifyOnly } = await patchCandidatesStage(matched.map(c => c.id), roleId, h, scores);
     if (linked.length) postToSlack(`:dart: *${linked.length} candidate(s) matched* to *${title || 'a role'}*: ${linked.map(c => c.name).join(', ')}`);
     if (notifyOnly.length) postToSlack(`:eyes: *${notifyOnly.map(c => c.name).join(', ')}* also fit *${title || 'a role'}* but ${notifyOnly.length === 1 ? 'is' : 'are'} already active elsewhere (stage untouched) — worth a look.`);
   }
@@ -719,7 +740,7 @@ async function runMatchSearch(roleId, title, location, brief, h) {
 
   return {
     matchedCount: matched.length,
-    matched: matched.map(c => ({ id: c.id, name: c.name })),
+    matched: matched.map(c => ({ id: c.id, name: c.name, fitScore: c.fitScore })),
     runId,
   };
 }
@@ -907,7 +928,8 @@ async function handleFindMatchesPoll(req, res) {
   const ranked = await rankPoolAgainstRole(briefText, resolved, 8);
   let linked = [], notifyOnly = [];
   if (ranked.length) {
-    ({ linked, notifyOnly } = await patchCandidatesStage(ranked.map(c => c.id), roleId, h));
+    const scores = Object.fromEntries(ranked.map(c => [c.id, c.fitScore]));
+    ({ linked, notifyOnly } = await patchCandidatesStage(ranked.map(c => c.id), roleId, h, scores));
     if (linked.length) postToSlack(`:dart: *${linked.length} new LinkedIn candidate(s) matched* to *${roleTitle || 'a role'}*: ${linked.map(c => c.name).join(', ')}`);
     if (notifyOnly.length) postToSlack(`:eyes: *${notifyOnly.map(c => c.name).join(', ')}* also fit *${roleTitle || 'a role'}* but already active elsewhere — worth a look.`);
   }
@@ -915,7 +937,7 @@ async function handleFindMatchesPoll(req, res) {
   return res.status(200).json({
     status: 'SUCCEEDED',
     matchedCount: ranked.length,
-    matched: ranked.map(c => ({ id: c.id, name: c.name })),
+    matched: ranked.map(c => ({ id: c.id, name: c.name, fitScore: c.fitScore })),
   });
 }
 
@@ -1002,7 +1024,8 @@ async function handleRematchPool(req, res) {
     const matched = await rankPoolAgainstRole(briefText, pool, 8);
     if (!matched.length) continue;
 
-    const { linked, notifyOnly } = await patchCandidatesStage(matched.map(c => c.id), role.id, h);
+    const scores = Object.fromEntries(matched.map(c => [c.id, c.fitScore]));
+    const { linked, notifyOnly } = await patchCandidatesStage(matched.map(c => c.id), role.id, h, scores);
     totalLinked += linked.length;
     totalNotify += notifyOnly.length;
     if (linked.length) summaryLines.push(`*${role.title}*: +${linked.length} new match(es) — ${linked.map(c => c.name).join(', ')}`);
