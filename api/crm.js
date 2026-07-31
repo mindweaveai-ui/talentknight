@@ -787,6 +787,19 @@ async function handleFindMatchesPoll(req, res) {
     const rawUrl = p.profilePicture || p.profilePic || p.photo || p.photoUrl || p.pictureUrl || p.profilePhoto || p.avatar || p.profileImageUrl || p.imgUrl || p.image || p.picture || '';
     return (typeof rawUrl === 'string' && rawUrl.startsWith('https://')) ? rawUrl.trim() : '';
   }
+  // HarvestAPI's "Full" profile mode returns skills as objects — { name, positions,
+  // endorsements } per its documented schema — not plain strings. The previous version of
+  // this mapping did `.join(', ')` straight over that array, which silently wrote literal
+  // "[object Object]" text into every affected candidate's Skills field (each object's
+  // default toString()). This extracts the actual name, with topSkills (a plain string
+  // array) as a fallback for profiles where the detailed skills list is empty.
+  function extractSkills(p) {
+    const fromSkills = Array.isArray(p.skills)
+      ? p.skills.map(s => (s && typeof s === 'object' ? s.name : s)).filter(Boolean)
+      : [];
+    const list = fromSkills.length ? fromSkills : (Array.isArray(p.topSkills) ? p.topSkills.filter(Boolean) : []);
+    return list.slice(0, 10).join(', ');
+  }
 
   const scraped = (Array.isArray(raw) ? raw : [])
     .map(p => ({
@@ -797,7 +810,7 @@ async function handleFindMatchesPoll(req, res) {
       company: str(p.companyName || p.currentCompany || (p.currentPosition?.[0]?.companyName) || ''),
       location: str(p.location || p.addressWithCountry || ''),
       bio: str(p.summary || p.about || '').slice(0, 400),
-      skills: Array.isArray(p.skills) ? p.skills.slice(0, 10).join(', ') : str(p.skills),
+      skills: extractSkills(p),
       sector: str(p.industry || ''),
       linkedinUrl: str(p.profileUrl || p.linkedinUrl || p.url || ''),
       photoUrl: extractPhoto(p),
