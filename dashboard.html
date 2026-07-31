@@ -455,6 +455,10 @@
         <label>Brief / key requirements</label>
         <textarea id="roleBrief" class="modal-textarea" placeholder="Qualifications, years of experience, specialisms, salary range…"></textarea>
       </div>
+      <div class="modal-field" id="clarifyQuestionsWrap" style="display:none;">
+        <label>A couple of quick questions to sharpen the match</label>
+        <div id="clarifyQuestionsList"></div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="modal-cancel" onclick="closeRoleModal()">Cancel</button>
@@ -1253,12 +1257,21 @@ async function savePlacementSalary(candidateId) {
 }
 
 // ── Role modal ───────────────────────────────────────────────────
+// Two-step submit: first pass asks the clarify-brief endpoint for up to 3 short
+// clarifying questions (skipped silently if the endpoint errors or has nothing to
+// ask); any answers are appended to the plain brief text before create-role is ever
+// called, so create-role/runMatchSearch below are completely unchanged.
+let clarifyState = { checked: false, questions: [] };
+
 function openRoleModal() {
   document.getElementById('roleTitle').value = '';
   document.getElementById('roleLocation').value = '';
   document.getElementById('roleBrief').value = '';
   document.getElementById('roleSubmitBtn').disabled = false;
-  document.getElementById('roleSubmitBtn').textContent = 'Submit role';
+  document.getElementById('roleSubmitBtn').textContent = 'Continue';
+  document.getElementById('clarifyQuestionsWrap').style.display = 'none';
+  document.getElementById('clarifyQuestionsList').innerHTML = '';
+  clarifyState = { checked: false, questions: [] };
   document.getElementById('roleModalOverlay').classList.add('open');
   setTimeout(() => document.getElementById('roleTitle').focus(), 50);
 }
@@ -1272,8 +1285,47 @@ async function submitNewRole() {
   const title = document.getElementById('roleTitle').value.trim();
   if (!title) { document.getElementById('roleTitle').focus(); return; }
   const location = document.getElementById('roleLocation').value.trim();
-  const brief = document.getElementById('roleBrief').value.trim();
+  let brief = document.getElementById('roleBrief').value.trim();
   const btn = document.getElementById('roleSubmitBtn');
+
+  if (!clarifyState.checked) {
+    btn.disabled = true; btn.textContent = 'Checking brief…';
+    try {
+      const h = await authHeader();
+      const r = await fetch('/api/crm?action=clarify-brief', {
+        method: 'POST', headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, location, brief }),
+      });
+      const data = r.ok ? await r.json() : { questions: [] };
+      clarifyState = { checked: true, questions: data.questions || [] };
+    } catch {
+      clarifyState = { checked: true, questions: [] };
+    }
+    btn.disabled = false;
+
+    if (clarifyState.questions.length) {
+      const wrap = document.getElementById('clarifyQuestionsWrap');
+      const list = document.getElementById('clarifyQuestionsList');
+      list.innerHTML = clarifyState.questions.map((q) => `
+        <div style="margin-bottom:10px;">
+          <label style="font-size:13px;color:var(--muted);display:block;margin-bottom:4px;">${esc(q)}</label>
+          <input type="text" class="modal-input clarify-answer" data-q="${esc(q)}" placeholder="Optional — leave blank to skip" />
+        </div>
+      `).join('');
+      wrap.style.display = 'block';
+      btn.textContent = 'Submit role';
+      return;
+    }
+    btn.textContent = 'Submit role';
+  }
+
+  const answers = Array.from(document.querySelectorAll('.clarify-answer'))
+    .map(inp => ({ q: inp.dataset.q, a: inp.value.trim() }))
+    .filter(x => x.a);
+  if (answers.length) {
+    brief += '\n\n' + answers.map(x => `${x.q} ${x.a}`).join('\n');
+  }
+
   btn.disabled = true; btn.textContent = 'Submitting…';
   try {
     const companyId = currentCompany().id;
