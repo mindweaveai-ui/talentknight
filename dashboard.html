@@ -261,6 +261,24 @@
     .consent-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); }
     .consent-dot.ok { background: var(--green); }
 
+    /* ── FIT SCORE ── */
+    .fit-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 26px; height: 20px; padding: 0 6px; border-radius: 10px;
+      font-size: 11px; font-weight: 700; flex-shrink: 0;
+    }
+    .fit-badge.good { background: #dcfce7; color: #166534; }
+    .fit-badge.ok   { background: #e0f2fe; color: #075985; }
+    .fit-badge.low  { background: #fef3c7; color: #92400e; }
+    .fit-score-row { display: flex; align-items: center; gap: 10px; }
+    .fit-score-num { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+    .fit-score-num .fit-score-max { font-size: 12px; font-weight: 500; color: var(--dim); }
+    .fit-score-bar { flex: 1; height: 6px; border-radius: 3px; background: var(--bg); overflow: hidden; }
+    .fit-score-bar-fill { height: 100%; border-radius: 3px; }
+    .fit-score-bar-fill.good { background: var(--green); }
+    .fit-score-bar-fill.ok   { background: #0ea5e9; }
+    .fit-score-bar-fill.low  { background: var(--amber); }
+
     /* ── DRAWER ── */
     .drawer-backdrop {
       position: fixed; inset: 0; background: rgba(15,23,42,0.25); z-index: 300;
@@ -957,6 +975,7 @@ function makeCard(c) {
         <div class="cand-name" title="${esc(c.name)}">${hl(c.name)}</div>
         ${sub ? `<div class="cand-sub" title="${esc(sub)}">${hl(sub)}</div>` : ''}
       </div>
+      ${c.fitScore != null ? `<span class="fit-badge ${fitScoreClass(c.fitScore)}" title="AI fit score">${c.fitScore}</span>` : ''}
     </div>
     <div class="card-footer">
       <span class="card-loc">${loc ? `📍 ${hl(loc)}` : ''}</span>
@@ -1131,6 +1150,15 @@ function openDrawer(c) {
         ? `<div class="drawer-detail-row"><span class="drawer-detail-icon">📱</span><span style="color:var(--green);font-weight:500;">${esc(c.phone)}</span></div>`
         : ''}
     </div>
+
+    ${c.fitScore != null ? `
+    <div class="drawer-section">
+      <div class="drawer-section-label">Fit score</div>
+      <div class="fit-score-row">
+        <div class="fit-score-num">${c.fitScore}<span class="fit-score-max">/100</span></div>
+        <div class="fit-score-bar"><div class="fit-score-bar-fill ${fitScoreClass(c.fitScore)}" style="width:${c.fitScore}%"></div></div>
+      </div>
+    </div>` : ''}
 
     ${(profileRows.length || compRows.length) ? `
     <div class="drawer-section">
@@ -1390,6 +1418,9 @@ function avatarColor(name) {
 }
 function initials(name) {
   return String(name || '').split(' ').slice(0, 2).map(w => w[0] || '').join('').toUpperCase() || '?';
+}
+function fitScoreClass(score) {
+  return score >= 85 ? 'good' : score >= 70 ? 'ok' : 'low';
 }
 function shortLoc(loc) {
   if (!loc) return '';
