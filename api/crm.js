@@ -21,6 +21,7 @@ export default async function handler(req, res) {
   if (action === 'update-role-terms')  return handleUpdateRoleTerms(req, res);
   if (action === 'save-placement-salary') return handleSavePlacementSalary(req, res);
   if (action === 'rematch-pool')       return handleRematchPool(req, res);
+  if (action === 'clarify-brief')      return handleClarifyBrief(req, res);
   if (action === 'generate-token') return res.status(410).json({ error: 'Magic-link tokens are retired. Sign in via Clerk instead.' });
   return res.status(400).json({ error: 'Unknown action' });
 }
@@ -1000,6 +1001,49 @@ async function handleRematchPool(req, res) {
   }
 
   return res.status(200).json({ ok: true, rolesChecked: roles.length, totalLinked, totalNotify });
+}
+
+// ── CLARIFY BRIEF (conversational intake, employer side) ──────────
+// Staff-only. Given a role's title/location/brief as typed into the "Request a new
+// role" modal, asks Claude for up to 3 short clarifying questions covering whatever's
+// genuinely missing — must-have vs nice-to-have skills, seniority band, remote/hybrid/
+// onsite, salary range, sector specifics — before the brief ever reaches runMatchSearch.
+// Returns an empty array if the brief is already detailed enough.
+//
+// Deliberately additive: the dashboard appends any answers to the plain brief text
+// itself before calling create-role, so create-role and runMatchSearch need zero
+// changes — they still just receive a single (now richer) brief string, same as today.
+async function handleClarifyBrief(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const clerkUserId = await getClerkUserId(req);
+  if (!clerkUserId) return res.status(401).json({ error: 'Invalid or missing session' });
+
+  const AT_TOKEN = process.env.AT_TOKEN;
+  if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
+  const h = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
+  const access = await resolveAccess(clerkUserId, h);
+  if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet." });
+  if (access.viewerType !== 'staff') return res.status(403).json({ error: 'Only recruiters can do this.' });
+
+  const { title, location, brief } = req.body || {};
+  if (!title?.trim()) return res.status(400).json({ error: 'title is required' });
+
+  const briefText = [title, location, brief].filter(Boolean).join(' — ');
+  const system = 'You are helping a recruiter sharpen a hiring brief before it is matched against a candidate pool. Given the brief below, return ONLY a JSON array of up to 3 short clarifying questions covering things that would meaningfully change who counts as a good match — must-have vs nice-to-have skills, seniority level, remote/hybrid/onsite, salary range, sector specifics — but ONLY ask about things not already stated in the brief. If the brief is already detailed enough, return an empty array. No markdown, no preamble, no explanation. Example: ["Is this remote, hybrid, or fully on-site?", "What is the target salary range?"]';
+  const raw = await callClaude(system, briefText, 200);
+
+  let questions = [];
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) questions = parsed.filter(q => typeof q === 'string' && q.trim()).slice(0, 3);
+    } catch {
+      // Malformed JSON from the model — treat as "no questions" rather than error out.
+    }
+  }
+
+  return res.status(200).json({ questions });
 }
 
 // ── UPDATE ROLE TERMS ─────────────────────────────────────────────
