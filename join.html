@@ -9,6 +9,7 @@
 <link rel="canonical" href="https://www.talentknight.ai/join.html" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -70,9 +71,14 @@
   .btn-download:hover { background: #059669; }
   .btn-linkedin { background: #0a66c2; color: #fff; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
   .btn-linkedin:hover { background: #004182; }
+  .btn-upload-cv { background: var(--surface); border: 1px solid var(--border-strong,#cbd5e1); color: var(--text); display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+  .btn-upload-cv:hover { border-color: var(--accent); color: var(--accent); }
   .linkedin-row { margin-top: 0; margin-bottom: 4px; }
   .divider-or { text-align: center; font-size: 12px; color: var(--text-faint); margin: 20px 0; display: flex; align-items: center; gap: 12px; }
   .divider-or::before, .divider-or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .prefill-status { font-size: 13px; margin-top: 4px; margin-bottom: 4px; padding: 10px 14px; border-radius: 8px; background: var(--accent-dim); color: #3730a3; display: none; line-height: 1.5; }
+  .prefill-status.visible { display: block; }
+  .prefill-status.error { background: var(--red-dim); color: var(--red); }
   .cv-preview { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 48px; margin-bottom: 24px; box-shadow: 0 2px 16px rgba(0,0,0,0.06); }
   .cv-header { border-bottom: 2px solid var(--accent); padding-bottom: 22px; margin-bottom: 24px; }
   .cv-name { font-size: 30px; font-weight: 700; letter-spacing: -0.6px; color: var(--text); }
@@ -99,7 +105,7 @@
   .linkedin-notice.visible { display: block; }
   @media print {
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    nav, .hero-banner, .progress-wrap, .card-title, .card-sub, .btn-row, .download-notice, .error-msg, .linkedin-notice, .divider-or, #step-success { display: none !important; }
+    nav, .hero-banner, .progress-wrap, .card-title, .card-sub, .btn-row, .download-notice, .error-msg, .linkedin-notice, .prefill-status, .divider-or, #step-success { display: none !important; }
     .step-card { display: none !important; }
     #step-7 { display: block !important; }
     body { background: #fff !important; }
@@ -152,7 +158,13 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
         Sign up with LinkedIn
       </a>
+      <label class="btn btn-upload-cv" for="cv-upload-input">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Upload your CV
+      </label>
+      <input type="file" id="cv-upload-input" accept=".pdf,.doc,.docx,.txt" style="display:none" onchange="handleCVUpload(this.files[0])">
     </div>
+    <div class="prefill-status" id="cv-status"></div>
     <div class="divider-or">or fill in manually</div>
     <div class="field-grid">
       <div class="field"><label>Full name *</label><input type="text" id="f-name" placeholder="Jane Smith"></div>
@@ -377,7 +389,7 @@
   if (liParam) {
     try { liData = JSON.parse(atob(decodeURIComponent(liParam))); } catch(e) {}
   }
-  const marketingSource = liData ? 'LinkedIn' : (srcMap[rawSrc.toLowerCase()] || (rawSrc ? rawSrc : 'Direct'));
+  let marketingSource = liData ? 'LinkedIn' : (srcMap[rawSrc.toLowerCase()] || (rawSrc ? rawSrc : 'Direct'));
 
   const stepLabels = ['Personal details','Your experience','What you\'re looking for','Qualifications','Skills & expertise','About you','Review & download'];
   function showStep(n) {
@@ -528,6 +540,133 @@
       show('err-7');
       btn.disabled=false;
       btn.textContent='Submit & Join TalentKnight ✓';
+    }
+  }
+
+  // ===== CV Upload & Auto-Parse =====
+  const CV_PARSE_SYSTEM = "You are a CV/resume parser for TalentKnight, a recruitment platform. Extract candidate details from the CV text/document provided and return ONLY a valid JSON object \u2014 no markdown, no preamble, matching this exact shape:\n\n{\"name\":\"\",\"email\":\"\",\"phone\":\"\",\"location\":\"\",\"linkedin\":\"\",\"role\":\"\",\"company\":\"\",\"yearsExp\":\"\",\"seniority\":\"\",\"targetRoles\":\"\",\"sector\":\"\",\"degreeSubject\":\"\",\"educationLevel\":\"\",\"certifications\":[],\"skills\":[],\"bio\":\"\"}\n\nRules:\n- location: city/town only (e.g. \"London\", \"Manchester\")\n- role/company: their MOST RECENT or CURRENT job title and employer\n- targetRoles: 2-4 comma-separated job titles this person is qualified for, based on their experience\n- yearsExp: must be EXACTLY one of: \"Less than 1 year\", \"1\u20133 years\", \"3\u20135 years\", \"5\u201310 years\", \"10\u201315 years\", \"15+ years\" (pick the closest match based on total career experience, or \"\" if unclear)\n- seniority: must be EXACTLY one of: \"Entry level\", \"Junior\", \"Mid-level\", \"Senior\", \"Lead\", \"Manager\", \"Senior Manager\", \"Director\", \"VP / Head of\", \"C-Suite / Executive\" (or \"\" if unclear)\n- sector: must be EXACTLY one of: \"Accounting & Finance\", \"Construction & Property\", \"Creative & Design\", \"Education\", \"Engineering\", \"Facilities & Cleaning\", \"Healthcare & Medical\", \"Hospitality & Leisure\", \"HR & Recruitment\", \"IT & Technology\", \"Legal\", \"Logistics & Supply Chain\", \"Manufacturing\", \"Marketing & PR\", \"Operations & Admin\", \"Retail & Consumer\", \"Sales & Business Dev\", \"Transport & Driving\", \"Other\" (or \"\" if unclear)\n- educationLevel: must be EXACTLY one of: \"Below GCSE\", \"GCSE / O-Level\", \"A-Level / IB\", \"HND / HNC\", \"Foundation Degree\", \"Bachelor's Degree\", \"Postgraduate Certificate\", \"Master's Degree\", \"MBA\", \"PhD / Doctorate\", \"Professional Qualification\", \"Other\" (highest level only, or \"\" if unclear)\n- certifications: array of professional certifications/licences only (e.g. ACA, ACCA, CIMA, PMP) \u2014 not degrees\n- skills: array of 6-12 key skills/technologies, most relevant first\n- bio: a 3-4 sentence professional summary written in first person (\"I am...\") based on their experience \u2014 punchy, not generic\n- Leave any field \"\" or [] if genuinely not determinable. Never invent information.";
+
+  function showCVStatus(msg, isError) {
+    const el = document.getElementById('cv-status');
+    if (!el) return;
+    el.textContent = msg;
+    el.className = 'prefill-status visible' + (isError ? ' error' : '');
+  }
+  function clearCVStatus() {
+    const el = document.getElementById('cv-status');
+    if (el) { el.textContent=''; el.className='prefill-status'; }
+  }
+  function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result.split(',')[1]);
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+  }
+  function readFileAsText(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = reject;
+      r.readAsText(file);
+    });
+  }
+  function readFileAsArrayBuffer(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = reject;
+      r.readAsArrayBuffer(file);
+    });
+  }
+  function setIfMatch(selectId, value) {
+    if (!value) return;
+    const el = document.getElementById(selectId);
+    if (!el) return;
+    const match = Array.from(el.options).find(o => o.value.toLowerCase() === String(value).trim().toLowerCase());
+    if (match) el.value = match.value;
+  }
+  function applyCVData(p) {
+    if (!p) return;
+    const setVal = (id, val) => { if (val) { const el = document.getElementById(id); if (el) el.value = val; } };
+    setVal('f-name', p.name);
+    setVal('f-email', p.email);
+    setVal('f-phone', p.phone);
+    setVal('f-location', p.location);
+    setVal('f-linkedin', p.linkedin);
+    setVal('f-role', p.role);
+    setVal('f-company', p.company);
+    setVal('f-targetroles', p.targetRoles);
+    setVal('f-degreesubject', p.degreeSubject);
+    setIfMatch('f-yearsexp', p.yearsExp);
+    setIfMatch('f-seniority', p.seniority);
+    setIfMatch('f-sector', p.sector);
+    setIfMatch('f-education', p.educationLevel);
+    if (Array.isArray(p.certifications)) p.certifications.forEach(c => addTag('certs', String(c).trim()));
+    if (Array.isArray(p.skills)) p.skills.forEach(s => addTag('skills', String(s).trim()));
+    if (p.bio) {
+      const bioEl = document.getElementById('f-bio');
+      if (bioEl) {
+        bioEl.value = p.bio;
+        const count = document.getElementById('bio-count');
+        if (count) count.textContent = p.bio.length + ' / 500 characters recommended';
+      }
+    }
+  }
+  async function handleCVUpload(file) {
+    if (!file) return;
+    clearCVStatus();
+    if (file.size > 3 * 1024 * 1024) { showCVStatus('That file is too large \u2014 please upload a CV under 3MB.', true); return; }
+
+    showCVStatus('Reading your CV\u2026', false);
+
+    try {
+      const name = file.name.toLowerCase();
+      const isPDF  = file.type === 'application/pdf' || name.endsWith('.pdf');
+      const isDocx = name.endsWith('.docx');
+      const isDoc  = name.endsWith('.doc') && !isDocx;
+
+      let content;
+      if (isPDF) {
+        const b64 = await readFileAsBase64(file);
+        content = [
+          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } },
+          { type: 'text', text: 'Extract this candidate\'s details as instructed.' },
+        ];
+      } else if (isDocx) {
+        if (typeof mammoth === 'undefined') throw new Error('DOCX reader failed to load \u2014 please try a PDF instead');
+        const buf = await readFileAsArrayBuffer(file);
+        const result = await mammoth.extractRawText({ arrayBuffer: buf });
+        content = 'CV text:\n' + result.value.slice(0, 8000) + '\n\nExtract this candidate\'s details as instructed.';
+      } else if (isDoc) {
+        throw new Error('old .doc format isn\'t supported \u2014 please save as PDF and try again');
+      } else {
+        const txt = await readFileAsText(file);
+        content = 'CV text:\n' + txt.slice(0, 8000) + '\n\nExtract this candidate\'s details as instructed.';
+      }
+
+      const resp = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-5',
+          max_tokens: 1000,
+          system: CV_PARSE_SYSTEM,
+          messages: [{ role: 'user', content }],
+        }),
+      });
+      if (!resp.ok) throw new Error('server error (' + resp.status + ')');
+      const data = await resp.json();
+      const text = (data.content || []).map(b => b.text || '').join('');
+      const clean = text.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(clean);
+
+      applyCVData(parsed);
+      marketingSource = 'CV Upload';
+      showCVStatus('\u2713 We read your CV \u2014 check the details below and continue.', false);
+    } catch (e) {
+      showCVStatus('Couldn\'t read that file (' + e.message + '). Please fill in the form manually.', true);
     }
   }
 </script>
