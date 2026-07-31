@@ -40,5 +40,8 @@
     { "src": "/admin", "dest": "/admin.html" },
     { "src": "/admin.html", "dest": "/admin.html" },
     { "src": "/", "dest": "/index.html" }
+  ],
+  "crons": [
+    { "path": "/api/crm?action=rematch-pool", "schedule": "0 3 * * *" }
   ]
 }
