@@ -2,7 +2,7 @@
 export default async function handler(req, res) {
   const { code, error } = req.query;
   if (error || !code) {
-    res.writeHead(302, { Location: '/client?error=auth_cancelled' });
+    res.writeHead(302, { Location: '/join.html?error=auth_cancelled' });
     return res.end();
   }
 
@@ -24,7 +24,7 @@ export default async function handler(req, res) {
   });
   const tokenData = await tokenRes.json();
   if (!tokenData.access_token) {
-    res.writeHead(302, { Location: '/client?error=token_failed' });
+    res.writeHead(302, { Location: '/join.html?error=token_failed' });
     return res.end();
   }
 
@@ -59,6 +59,6 @@ export default async function handler(req, res) {
   }
 
   const userData = Buffer.from(JSON.stringify({ name, email, picture })).toString('base64');
-  res.writeHead(302, { Location: '/client?li=' + encodeURIComponent(userData) });
+  res.writeHead(302, { Location: '/join.html?li=' + encodeURIComponent(userData) });
   res.end();
-                    }
+}
