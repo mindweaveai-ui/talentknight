@@ -13,7 +13,6 @@
     { "src": "api/parse-brief.js", "use": "@vercel/node" },
     { "src": "api/crm.js", "use": "@vercel/node" },
     { "src": "api/auth/linkedin.js", "use": "@vercel/node" },
-    { "src": "api/auth/callback.js", "use": "@vercel/node" },
     { "src": "*.html", "use": "@vercel/static" },
     { "src": "robots.txt", "use": "@vercel/static" },
     { "src": "sitemap.xml", "use": "@vercel/static" }
@@ -31,7 +30,7 @@
     { "src": "/api/parse-brief", "dest": "/api/parse-brief.js" },
     { "src": "/api/crm", "dest": "/api/crm.js" },
     { "src": "/api/auth/linkedin", "dest": "/api/auth/linkedin.js" },
-    { "src": "/api/auth/callback", "dest": "/api/auth/callback.js" },
+    { "src": "/api/auth/callback", "dest": "/api/auth/linkedin.js" },
     { "src": "/robots.txt", "dest": "/robots.txt" },
     { "src": "/sitemap.xml", "dest": "/sitemap.xml" },
     { "src": "/demo", "dest": "/demo.html" },
