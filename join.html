@@ -90,9 +90,11 @@
   .success-sub { font-size: 15px; color: var(--text-dim); line-height: 1.6; max-width: 480px; margin: 0 auto 28px; }
   .error-msg { background: var(--red-dim); color: var(--red); font-size: 13px; padding: 11px 14px; border-radius: 8px; margin-top: 14px; display: none; }
   .error-msg.visible { display: block; }
+  .linkedin-notice { background: var(--accent-dim); border: 1px solid #c7d2fe; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #3730a3; margin-bottom: 20px; line-height: 1.5; display: none; }
+  .linkedin-notice.visible { display: block; }
   @media print {
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    nav, .hero-banner, .progress-wrap, .card-title, .card-sub, .btn-row, .download-notice, .error-msg, #step-success { display: none !important; }
+    nav, .hero-banner, .progress-wrap, .card-title, .card-sub, .btn-row, .download-notice, .error-msg, .linkedin-notice, #step-success { display: none !important; }
     .step-card { display: none !important; }
     #step-7 { display: block !important; }
     body { background: #fff !important; }
@@ -124,6 +126,7 @@
   </div>
 </div>
 <div class="page">
+  <div class="linkedin-notice" id="linkedin-notice">✓ Signed in with LinkedIn — we've filled in your name and email below.</div>
   <div class="progress-wrap" id="progress-wrap">
     <div class="progress-steps">
       <div class="progress-step active" id="prog-1"></div>
@@ -355,7 +358,15 @@
   const TOTAL_STEPS = 7;
   const srcMap = { linkedin:'LinkedIn', instagram:'Instagram', tiktok:'TikTok', facebook:'Facebook', twitter:'Twitter / X', x:'Twitter / X', bio:'Direct / Bio link' };
   const rawSrc = new URLSearchParams(window.location.search).get('src') || '';
-  const marketingSource = srcMap[rawSrc.toLowerCase()] || (rawSrc ? rawSrc : 'Direct');
+
+  // LinkedIn quick sign-in — pre-fill name/email if we arrived via the OAuth callback
+  const liParam = new URLSearchParams(window.location.search).get('li');
+  let liData = null;
+  if (liParam) {
+    try { liData = JSON.parse(atob(decodeURIComponent(liParam))); } catch(e) {}
+  }
+  const marketingSource = liData ? 'LinkedIn' : (srcMap[rawSrc.toLowerCase()] || (rawSrc ? rawSrc : 'Direct'));
+
   const stepLabels = ['Personal details','Your experience','What you\'re looking for','Qualifications','Skills & expertise','About you','Review & download'];
   function showStep(n) {
     document.querySelectorAll('.step-card').forEach(c => c.classList.remove('active'));
@@ -380,6 +391,15 @@
   function show(id) { document.getElementById(id)?.classList.add('visible'); }
   function hide(id) { document.getElementById(id)?.classList.remove('visible'); }
   function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // Apply LinkedIn prefill now that the form fields exist
+  if (liData) {
+    if (liData.name) document.getElementById('f-name').value = liData.name;
+    if (liData.email) document.getElementById('f-email').value = liData.email;
+    const notice = document.getElementById('linkedin-notice');
+    if (notice) notice.classList.add('visible');
+  }
+
   document.getElementById('skill-input').addEventListener('keydown', e => {
     if (e.key==='Enter'||e.key===',') { e.preventDefault(); addTag('skills', e.target.value.replace(',','').trim()); e.target.value=''; }
     if (e.key==='Backspace'&&!e.target.value&&skills.length) removeTag('skills',skills[skills.length-1]);
