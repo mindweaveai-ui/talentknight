@@ -35,6 +35,13 @@ const ORGANIZATIONS = 'tblKDRFNdB2UhLQxo';
 const ORG_STAFF = 'tblPM0Btn9BzBvnhG';
 const CONSULTANT_ASSIGNMENTS = 'tbl5hhfM2SWa6i5Lw';
 const COMPANY_CONTACTS = 'tblw8aIC6fGAVKRi8';
+// Junction table: one row per (Candidate, Role) pair, holding that pair's Fit Score +
+// Pipeline Stage. Added 2026-08-02 to fix a real bug — Fit Score/Pipeline Stage used to be
+// flat fields on the Candidate record, so a candidate matched to 2+ concurrent Roles showed
+// the same score/stage on every Role's board, and moving their stage on one Role silently
+// moved it on all of them. The old flat fields (KF.fitScore/pipelineStage/stageChangedAt)
+// are left in place as a frozen historical snapshot as of the migration — no longer written.
+const ROLE_MATCHES = 'tblVD5U84GIci7Jkq';
 
 // Same Apify actor the public Vesper search on demo.html uses for live LinkedIn top-up.
 const APIFY_ACTOR = 'harvestapi~linkedin-profile-search';
@@ -71,6 +78,10 @@ const OSF = { name: 'fldIMiB64MXLRln82', email: 'fldyS0isZa5LuVScg', clerkId: 'f
 const CAF = { consultant: 'fldK640gTY74TE88t', company: 'fld8jtLa5bBgLiecA' };
 const CCF = { name: 'fldS7Oj0wFblqAMW9', email: 'fldZr1W6KC4alo6O3', clerkId: 'fldxow90zxJZebzPo', company: 'fldRIczrSKBL7blS0', active: 'flddZUcmemx9fU3rf' };
 const ORGF = { name: 'fldqGP76mkwa9AtYZ', companies: 'fldCmI1mZ1qsPDDAv' };
+const RMF = {
+  label: 'fldqJpmu8lbG8fcJJ', candidate: 'fldV7FC0dg8vCsb6Y', role: 'fldPX949XGdsRZD7H',
+  fitScore: 'fldXxiaWdcG4FClat', pipelineStage: 'fld6PAXY7lGgmPOb9', stageChangedAt: 'fldGp33EmrMVDh31g',
+};
 
 // Stages that only Org Staff (Admin/Consultant) may see or set. "Matched" is where Vesper's
 // AI matches land before a human reviews and promotes them into Sourced — kept invisible to
@@ -359,68 +370,124 @@ async function rankPoolAgainstRole(briefText, pool, limit = 8) {
   }
 }
 
-// Writes Assigned Role + Pipeline Stage onto a batch of candidate record IDs — the one
-// write path that actually lands a search result in the CRM's Matched column.
-//
-// Assigned Role is a multi-link field (confirmed via the Airtable schema —
-// prefersSingleRecordLink: false), so this APPENDS the new role to whatever's already
-// linked rather than overwriting it. The previous version of this function replaced
-// the link outright, which silently dropped a candidate's connection to any role they
-// were previously matched against the moment they matched a second one.
-//
-// Pipeline Stage is still a single global field per candidate, not one per role. If a
-// candidate is already meaningfully engaged elsewhere (Contacted/Shortlisted for a
-// different role), we still link the new role but leave their stage alone rather than
-// bouncing it back to 'Matched' — and report them back as "notifyOnly" so the caller
-// can flag it for a recruiter to review by hand instead of silently overwriting real
-// pipeline state that's already in progress.
+// Stages that count as "not meaningfully progressed yet" — safe to bounce/reset to
+// 'Matched' when a fresh search re-surfaces this candidate for a Role. Anything past this
+// (Contacted/Shortlisted/Interviewing/Offered/Placed) means a recruiter is already actively
+// working the candidate for that specific Role, so a re-match should never silently stomp it.
 const STAGE_RESET_SAFE = new Set(['', undefined, 'Sourced', 'Rejected', 'Matched']);
 
-async function patchCandidatesStage(recordIds, roleId, h, scores = {}) {
-  if (!recordIds.length) return { linked: [], notifyOnly: [] };
+// Fetches every Role Matches row, paginated, normalized to {id, candidateId, roleId,
+// fitScore, stage, stageChangedAt}. Linked-record fields can't be reliably filtered
+// server-side via filterByFormula (same limitation noted in resolveAccess for Org Staff/
+// Consultant Assignments), so callers fetch broadly and match client-side by candidateId/
+// roleId membership. Fine at current table size; revisit with a real filter/index if the
+// table grows into the thousands of rows.
+async function fetchAllRoleMatches(h) {
+  let all = [];
+  let offset;
+  do {
+    const url = `https://api.airtable.com/v0/${BASE}/${ROLE_MATCHES}?returnFieldsByFieldId=true&pageSize=100${offset ? `&offset=${offset}` : ''}`;
+    const res = await fetch(url, { headers: h }).then(r => r.json()).catch(() => ({ records: [] }));
+    all = all.concat((res.records || []).map(rec => ({
+      id: rec.id,
+      candidateId: (rec.fields[RMF.candidate] || [])[0] || null,
+      roleId: (rec.fields[RMF.role] || [])[0] || null,
+      fitScore: typeof rec.fields[RMF.fitScore] === 'number' ? rec.fields[RMF.fitScore] : null,
+      stage: rec.fields[RMF.pipelineStage] || '',
+      stageChangedAt: rec.fields[RMF.stageChangedAt] || '',
+    })));
+    offset = res.offset;
+  } while (offset);
+  return all;
+}
+
+// Writes/updates each candidate's Role Matches row for this specific Role — the one write
+// path that actually lands a search result in the CRM's Matched column, now scoped
+// per-Role instead of overwriting a flat per-Candidate field (see ROLE_MATCHES comment
+// above for why that was a bug). Also appends to the Candidate's Assigned Role link (a
+// simple "which Roles has this candidate ever touched" index, used by handleDashboard/
+// candidateAllowed — unaffected by the per-Role score/stage fix since it was already a
+// correctly-behaving multi-link field).
+//
+// Per-row reset-safety: a candidate with NO existing Role Matches row for this Role is
+// always safe to create fresh as 'Matched' (brand new relationship for this Role, doesn't
+// matter what their stage is on some other Role — that's handled separately by the
+// cross-role PROTECTED_STAGES pool exclusion in runMatchSearch/handleRematchPool). A
+// candidate who already has a row for THIS Role only gets reset to 'Matched' if that row's
+// current stage is still reset-safe (STAGE_RESET_SAFE); otherwise we update the Fit Score
+// but leave their stage alone and report them as notifyOnly so a recruiter can review.
+//
+// `candidates` is an array of {id, name, fitScore} (the shape rankPoolAgainstRole already
+// returns), `allMatches` is a fetchAllRoleMatches(h) snapshot the caller fetched once.
+async function upsertRoleMatches(candidates, roleId, roleTitle, allMatches, h) {
+  if (!candidates.length) return { linked: [], notifyOnly: [] };
   const today = new Date().toISOString().split('T')[0];
 
-  const existing = await fetch(
-    `https://api.airtable.com/v0/${BASE}/${CANDIDATES}?filterByFormula=${encodeURIComponent(`OR(${recordIds.map(id => `RECORD_ID()='${id}'`).join(',')})`)}&returnFieldsByFieldId=true&pageSize=100`,
-    { headers: h }
-  ).then(r => r.json()).catch(() => ({ records: [] }));
-  const current = {};
-  (existing.records || []).forEach(rec => {
-    current[rec.id] = {
-      links: rec.fields[KF.assignedRole] || [],
-      stage: rec.fields[KF.pipelineStage] || '',
-      name: rec.fields[KF.name] || '',
-    };
+  const existingByCandidate = {};
+  allMatches.forEach(m => {
+    if (m.roleId === roleId && m.candidateId) existingByCandidate[m.candidateId] = m;
   });
 
   const linked = [];
   const notifyOnly = [];
+  const toCreate = [];
+  const toUpdate = [];
+
+  candidates.forEach(c => {
+    const existing = existingByCandidate[c.id];
+    const fields = {};
+    if (c.fitScore != null) fields[RMF.fitScore] = c.fitScore;
+
+    if (!existing) {
+      fields[RMF.label] = `${c.name} → ${roleTitle}`;
+      fields[RMF.candidate] = [c.id];
+      fields[RMF.role] = [roleId];
+      fields[RMF.pipelineStage] = 'Matched';
+      fields[RMF.stageChangedAt] = today;
+      toCreate.push({ fields });
+      linked.push({ id: c.id, name: c.name });
+    } else if (STAGE_RESET_SAFE.has(existing.stage)) {
+      fields[RMF.pipelineStage] = 'Matched';
+      fields[RMF.stageChangedAt] = today;
+      toUpdate.push({ id: existing.id, fields });
+      linked.push({ id: c.id, name: c.name });
+    } else if (Object.keys(fields).length) {
+      toUpdate.push({ id: existing.id, fields });
+      notifyOnly.push({ id: c.id, name: c.name, currentStage: existing.stage });
+    }
+  });
+
+  for (let i = 0; i < toCreate.length; i += 50) {
+    await fetch(`https://api.airtable.com/v0/${BASE}/${ROLE_MATCHES}`, {
+      method: 'POST', headers: h,
+      body: JSON.stringify({ records: toCreate.slice(i, i + 50) }),
+    }).catch(() => null);
+  }
+  for (let i = 0; i < toUpdate.length; i += 10) {
+    await fetch(`https://api.airtable.com/v0/${BASE}/${ROLE_MATCHES}`, {
+      method: 'PATCH', headers: h,
+      body: JSON.stringify({ records: toUpdate.slice(i, i + 10) }),
+    }).catch(() => null);
+  }
+
+  // Append this Role to the Candidate's Assigned Role index (multi-link, additive).
+  const recordIds = candidates.map(c => c.id);
+  const existingCands = await fetch(
+    `https://api.airtable.com/v0/${BASE}/${CANDIDATES}?filterByFormula=${encodeURIComponent(`OR(${recordIds.map(id => `RECORD_ID()='${id}'`).join(',')})`)}&returnFieldsByFieldId=true&pageSize=100`,
+    { headers: h }
+  ).then(r => r.json()).catch(() => ({ records: [] }));
+  const currentLinks = {};
+  (existingCands.records || []).forEach(rec => { currentLinks[rec.id] = rec.fields[KF.assignedRole] || []; });
 
   for (let i = 0; i < recordIds.length; i += 10) {
     const batch = recordIds.slice(i, i + 10);
     await fetch(`https://api.airtable.com/v0/${BASE}/${CANDIDATES}`, {
-      method: 'PATCH',
-      headers: h,
+      method: 'PATCH', headers: h,
       body: JSON.stringify({
         records: batch.map(id => {
-          const info = current[id] || { links: [], stage: '', name: '' };
-          const links = new Set(info.links);
-          const alreadyLinked = links.has(roleId);
+          const links = new Set(currentLinks[id] || []);
           links.add(roleId);
-          const resetSafe = STAGE_RESET_SAFE.has(info.stage);
-          const fields = { [KF.assignedRole]: [...links] };
-          // Fit score is written whenever we have one, regardless of the stage-reset
-          // branch below — it's informative even for a candidate who's already active
-          // elsewhere and whose Pipeline Stage we're deliberately not touching.
-          if (scores[id] != null) fields[KF.fitScore] = scores[id];
-          if (resetSafe) {
-            fields[KF.pipelineStage] = 'Matched';
-            fields[KF.stageChangedAt] = today;
-            linked.push({ id, name: info.name });
-          } else if (!alreadyLinked) {
-            notifyOnly.push({ id, name: info.name, currentStage: info.stage });
-          }
-          return { id, fields };
+          return { id, fields: { [KF.assignedRole]: [...links] } };
         }),
       }),
     }).catch(() => null);
@@ -494,12 +561,12 @@ async function handleDashboard(req, res) {
       const consented = f[KF.outreachStatus] === 'Interested';
       const rawCompany = f[KF.company] || '';
       const company = /^\d+$/.test(rawCompany.trim()) ? '' : rawCompany;
-      const stage = f[KF.pipelineStage] || 'Sourced';
 
-      // Company Contacts never see staff-only stages (e.g. "Matched" — AI matches
-      // awaiting recruiter review) even if a candidate is linked to their role.
-      if (!isStaff && STAFF_ONLY_STAGES.includes(stage)) return;
-
+      // Note: pipelineStage/fitScore/stageChangedAt are intentionally NOT read from the
+      // Candidate record here — those flat fields are frozen historical snapshots as of
+      // the 2026-08-02 Role Matches migration. Per-Role values are merged in below from
+      // Role Matches, once per Role, so a candidate matched to 2+ Roles gets the correct
+      // score/stage on each Role's board instead of one shared value.
       candidateMap[rec.id] = {
         id: rec.id,
         name: f[KF.name] || 'Unknown',
@@ -510,9 +577,7 @@ async function handleDashboard(req, res) {
         email: consented ? (f[KF.personalEmail] || '') : '',
         phone: consented ? (f[KF.mobile] || '') : '',
         outreachStatus: f[KF.outreachStatus] || '',
-        pipelineStage: stage,
         notes: f[KF.notes] || '',
-        stageChangedAt: f[KF.stageChangedAt] || '',
         photoUrl: f[KF.photoUrl] || '',
         sector: f[KF.sector] || '',
         yearsExperience: f[KF.yearsExperience] || '',
@@ -527,10 +592,18 @@ async function handleDashboard(req, res) {
         certifications: f[KF.certifications] || '',
         educationLevel: f[KF.educationLevel] || '',
         bio: f[KF.bio] || '',
-        fitScore: typeof f[KF.fitScore] === 'number' ? f[KF.fitScore] : null,
         // Earnings pipeline — commercial data, never sent to Company Contacts.
         placementSalary: isStaff && typeof f[KF.placementSalary] === 'number' ? f[KF.placementSalary] : null,
       };
+    });
+  }
+
+  // Per-Role Fit Score/Pipeline Stage/Stage Changed At, keyed by "roleId|candidateId" —
+  // see ROLE_MATCHES comment near the top of this file for why this replaced flat fields.
+  const matchByKey = {};
+  if (allRoleIds.length) {
+    (await fetchAllRoleMatches(h)).forEach(m => {
+      if (m.roleId && m.candidateId) matchByKey[`${m.roleId}|${m.candidateId}`] = m;
     });
   }
 
@@ -548,7 +621,18 @@ async function handleDashboard(req, res) {
           id: c.id,
           name: c.name,
           roles: c.roleIds.map(id => roleMap[id]).filter(Boolean).map(role => {
-            const roleCandidates = role.candidateIds.map(id => candidateMap[id]).filter(Boolean);
+            const roleCandidates = role.candidateIds
+              .map(id => {
+                const cand = candidateMap[id];
+                if (!cand) return null;
+                const m = matchByKey[`${role.id}|${id}`];
+                const stage = m?.stage || 'Sourced';
+                // Company Contacts never see staff-only stages (e.g. "Matched" — AI
+                // matches awaiting recruiter review) even if linked to their role.
+                if (!isStaff && STAFF_ONLY_STAGES.includes(stage)) return null;
+                return { ...cand, fitScore: m?.fitScore ?? null, pipelineStage: stage, stageChangedAt: m?.stageChangedAt || '' };
+              })
+              .filter(Boolean);
             const base = { ...role, candidateIds: undefined, candidates: roleCandidates };
 
             if (!isStaff) {
@@ -592,8 +676,13 @@ async function handleUpdateStage(req, res) {
   const AT_TOKEN = process.env.AT_TOKEN;
   if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
 
-  const { candidateId, stage } = req.body || {};
-  if (!candidateId || !stage) return res.status(400).json({ error: 'Missing fields' });
+  // roleId is now required — Pipeline Stage lives on the Role Matches row for this
+  // specific (candidate, role) pair, not on the Candidate record. Old clients sending
+  // just {candidateId, stage} will get a 400 here; dashboard.html was updated alongside
+  // this to always send roleId (it already has it in scope — the kanban board is
+  // rendered per-Role).
+  const { candidateId, roleId, stage } = req.body || {};
+  if (!candidateId || !roleId || !stage) return res.status(400).json({ error: 'Missing fields' });
 
   const VALID = ['Matched','Sourced','Contacted','Shortlisted','Interviewing','Offered','Placed','Rejected'];
   if (!VALID.includes(stage)) return res.status(400).json({ error: 'Invalid stage' });
@@ -609,15 +698,39 @@ async function handleUpdateStage(req, res) {
     return res.status(403).json({ error: 'Only recruiters can set this stage.' });
   }
 
+  // Checks access via the specific Role being updated, not candidateAllowed()'s
+  // roleIds[0] shortcut (that only ever checked the FIRST role a candidate happened to
+  // be linked to — could wrongly allow or deny access once a candidate is linked to
+  // multiple Roles across different Companies). Mirrors the check handleFindMatches uses.
   const allCompanyIds = access.organizations.flatMap(o => o.companyIds);
-  const check = await candidateAllowed(candidateId, allCompanyIds, h);
-  if (!check.ok) return res.status(check.status).json({ error: check.error });
+  const roleRec = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLES}/${roleId}?returnFieldsByFieldId=true`, { headers: h }).then(r => r.json()).catch(() => null);
+  if (!roleRec?.id) return res.status(404).json({ error: 'Role not found' });
+  const roleCompanyIds = roleRec.fields[RF.company] || [];
+  if (!roleCompanyIds.some(id => allCompanyIds.includes(id))) return res.status(403).json({ error: 'Role not in your access scope' });
 
   const today = new Date().toISOString().split('T')[0];
-  const upd = await fetch(`https://api.airtable.com/v0/${BASE}/${CANDIDATES}/${candidateId}`, {
-    method: 'PATCH', headers: h,
-    body: JSON.stringify({ fields: { [KF.pipelineStage]: stage, [KF.stageChangedAt]: today } }),
-  }).then(r => r.json());
+  const allMatches = await fetchAllRoleMatches(h);
+  const existing = allMatches.find(m => m.roleId === roleId && m.candidateId === candidateId);
+
+  let upd;
+  if (existing) {
+    upd = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLE_MATCHES}/${existing.id}`, {
+      method: 'PATCH', headers: h,
+      body: JSON.stringify({ fields: { [RMF.pipelineStage]: stage, [RMF.stageChangedAt]: today } }),
+    }).then(r => r.json());
+  } else {
+    const candRec = await fetch(`https://api.airtable.com/v0/${BASE}/${CANDIDATES}/${candidateId}?returnFieldsByFieldId=true`, { headers: h }).then(r => r.json()).catch(() => null);
+    const candName = candRec?.fields?.[KF.name] || '';
+    const roleTitle = roleRec.fields[RF.title] || '';
+    upd = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLE_MATCHES}`, {
+      method: 'POST', headers: h,
+      body: JSON.stringify({ fields: {
+        [RMF.label]: `${candName} → ${roleTitle}`,
+        [RMF.candidate]: [candidateId], [RMF.role]: [roleId],
+        [RMF.pipelineStage]: stage, [RMF.stageChangedAt]: today,
+      } }),
+    }).then(r => r.json());
+  }
 
   return upd.id
     ? res.status(200).json({ ok: true, stage, stageChangedAt: today })
@@ -758,14 +871,22 @@ async function runMatchSearch(roleId, title, location, brief, h) {
       )`;
     });
     const typeFilter = `OR(${ALLOWED_TYPES.map(t => `{${KF.type}} = '${t}'`).join(',')})`;
-    const stageProtectFilter = `NOT(OR(${PROTECTED_STAGES.map(s => `{${KF.pipelineStage}} = '${s}'`).join(',')}))`;
     const keywordFilter = `OR(${fieldChecks.join(',')})`;
-    const formula = `AND(${typeFilter}, ${stageProtectFilter}, ${keywordFilter})`;
+    // Cross-role PROTECTED_STAGES exclusion used to be a filterByFormula check against the
+    // (now-frozen) flat KF.pipelineStage field — moved to a client-side check against
+    // Role Matches below, since stage is per-Role now and there's no single flat field
+    // left to filter on server-side.
+    const formula = `AND(${typeFilter}, ${keywordFilter})`;
 
     const poolRes = await fetch(
       `https://api.airtable.com/v0/${BASE}/${CANDIDATES}?filterByFormula=${encodeURIComponent(formula)}&pageSize=60&returnFieldsByFieldId=true`,
       { headers: h }
     ).then(r => r.json()).catch(() => ({ records: [] }));
+
+    const allMatches = await fetchAllRoleMatches(h);
+    const protectedIds = new Set(
+      allMatches.filter(m => PROTECTED_STAGES.includes(m.stage)).map(m => m.candidateId)
+    );
 
     const pool = (poolRes.records || []).map(rec => ({
       id: rec.id,
@@ -775,16 +896,15 @@ async function runMatchSearch(roleId, title, location, brief, h) {
       location: rec.fields[KF.location] || '',
       sector: rec.fields[KF.sector] || '',
       bio: rec.fields[KF.bio] || '',
-    })).filter(c => c.name);
+    })).filter(c => c.name && !protectedIds.has(c.id));
 
     matched = await rankPoolAgainstRole(briefText, pool, 8);
-  }
 
-  if (matched.length) {
-    const scores = Object.fromEntries(matched.map(c => [c.id, c.fitScore]));
-    const { linked, notifyOnly } = await patchCandidatesStage(matched.map(c => c.id), roleId, h, scores);
-    if (linked.length) postToSlack(`:dart: *${linked.length} candidate(s) matched* to *${title || 'a role'}*: ${linked.map(c => c.name).join(', ')}`);
-    if (notifyOnly.length) postToSlack(`:eyes: *${notifyOnly.map(c => c.name).join(', ')}* also fit *${title || 'a role'}* but ${notifyOnly.length === 1 ? 'is' : 'are'} already active elsewhere (stage untouched) — worth a look.`);
+    if (matched.length) {
+      const { linked, notifyOnly } = await upsertRoleMatches(matched, roleId, title, allMatches, h);
+      if (linked.length) postToSlack(`:dart: *${linked.length} candidate(s) matched* to *${title || 'a role'}*: ${linked.map(c => c.name).join(', ')}`);
+      if (notifyOnly.length) postToSlack(`:eyes: *${notifyOnly.map(c => c.name).join(', ')}* also fit *${title || 'a role'}* but ${notifyOnly.length === 1 ? 'is' : 'are'} already active elsewhere on this role (stage untouched) — worth a look.`);
+    }
   }
 
   // Kick off a live LinkedIn top-up in the background — frontend polls find-matches-poll
@@ -996,10 +1116,10 @@ async function handleFindMatchesPoll(req, res) {
   const ranked = await rankPoolAgainstRole(briefText, resolved, 8);
   let linked = [], notifyOnly = [];
   if (ranked.length) {
-    const scores = Object.fromEntries(ranked.map(c => [c.id, c.fitScore]));
-    ({ linked, notifyOnly } = await patchCandidatesStage(ranked.map(c => c.id), roleId, h, scores));
+    const allMatches = await fetchAllRoleMatches(h);
+    ({ linked, notifyOnly } = await upsertRoleMatches(ranked, roleId, roleTitle, allMatches, h));
     if (linked.length) postToSlack(`:dart: *${linked.length} new LinkedIn candidate(s) matched* to *${roleTitle || 'a role'}*: ${linked.map(c => c.name).join(', ')}`);
-    if (notifyOnly.length) postToSlack(`:eyes: *${notifyOnly.map(c => c.name).join(', ')}* also fit *${roleTitle || 'a role'}* but already active elsewhere — worth a look.`);
+    if (notifyOnly.length) postToSlack(`:eyes: *${notifyOnly.map(c => c.name).join(', ')}* also fit *${roleTitle || 'a role'}* but already active elsewhere on this role — worth a look.`);
   }
 
   return res.status(200).json({
@@ -1066,14 +1186,24 @@ async function handleRematchPool(req, res) {
       )`;
     });
     const typeFilter = `OR(${ALLOWED_TYPES.map(t => `{${KF.type}} = '${t}'`).join(',')})`;
-    const stageProtectFilter = `NOT(OR(${PROTECTED_STAGES.map(s => `{${KF.pipelineStage}} = '${s}'`).join(',')}))`;
     const keywordFilter = `OR(${fieldChecks.join(',')})`;
-    const formula = `AND(${typeFilter}, ${stageProtectFilter}, ${keywordFilter})`;
+    // Cross-role PROTECTED_STAGES exclusion moved client-side (see runMatchSearch comment) —
+    // fetched fresh each loop iteration so a stage change written for an earlier Role in
+    // this same run is reflected before the next Role's pool is filtered.
+    const formula = `AND(${typeFilter}, ${keywordFilter})`;
 
     const poolRes = await fetch(
       `https://api.airtable.com/v0/${BASE}/${CANDIDATES}?filterByFormula=${encodeURIComponent(formula)}&pageSize=60&returnFieldsByFieldId=true`,
       { headers: h }
     ).then(r => r.json()).catch(() => ({ records: [] }));
+
+    const allMatches = await fetchAllRoleMatches(h);
+    const protectedIds = new Set(
+      allMatches.filter(m => PROTECTED_STAGES.includes(m.stage)).map(m => m.candidateId)
+    );
+    const alreadyOnThisRole = new Set(
+      allMatches.filter(m => m.roleId === role.id).map(m => m.candidateId)
+    );
 
     const pool = (poolRes.records || []).map(rec => ({
       id: rec.id,
@@ -1083,21 +1213,20 @@ async function handleRematchPool(req, res) {
       location: rec.fields[KF.location] || '',
       sector: rec.fields[KF.sector] || '',
       bio: rec.fields[KF.bio] || '',
-      assignedRole: rec.fields[KF.assignedRole] || [],
-    // Skip candidates already linked to this exact Role — nothing new to surface.
-    })).filter(c => c.name && !c.assignedRole.includes(role.id));
+    // Skip candidates already linked to this exact Role (nothing new to surface) and
+    // anyone currently Interviewing/Offered/Placed on a DIFFERENT Role (protected).
+    })).filter(c => c.name && !alreadyOnThisRole.has(c.id) && !protectedIds.has(c.id));
 
     if (!pool.length) continue;
 
     const matched = await rankPoolAgainstRole(briefText, pool, 8);
     if (!matched.length) continue;
 
-    const scores = Object.fromEntries(matched.map(c => [c.id, c.fitScore]));
-    const { linked, notifyOnly } = await patchCandidatesStage(matched.map(c => c.id), role.id, h, scores);
+    const { linked, notifyOnly } = await upsertRoleMatches(matched, role.id, role.title, allMatches, h);
     totalLinked += linked.length;
     totalNotify += notifyOnly.length;
     if (linked.length) summaryLines.push(`*${role.title}*: +${linked.length} new match(es) — ${linked.map(c => c.name).join(', ')}`);
-    if (notifyOnly.length) summaryLines.push(`*${role.title}*: ${notifyOnly.map(c => c.name).join(', ')} also fit but already active elsewhere — review manually`);
+    if (notifyOnly.length) summaryLines.push(`*${role.title}*: ${notifyOnly.map(c => c.name).join(', ')} also fit but already active elsewhere on this role — review manually`);
   }
 
   if (summaryLines.length) {
