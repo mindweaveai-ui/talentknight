@@ -219,13 +219,24 @@
     }
     .consent-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); }
     .consent-dot.ok { background: var(--green); }
+
+    /* ── FIT SCORE ── */
     .fit-badge {
-      font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px;
-      flex-shrink: 0; margin-left: auto; white-space: nowrap;
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 26px; height: 20px; padding: 0 6px; border-radius: 10px;
+      font-size: 11px; font-weight: 700; flex-shrink: 0;
     }
-    .fit-hi  { background: #dcfce7; color: #166534; }
-    .fit-mid { background: #fef9c3; color: #854d0e; }
-    .fit-lo  { background: #fee2e2; color: #991b1b; }
+    .fit-badge.good { background: #dcfce7; color: #166534; }
+    .fit-badge.ok   { background: #e0f2fe; color: #075985; }
+    .fit-badge.low  { background: #fef3c7; color: #92400e; }
+    .fit-score-row { display: flex; align-items: center; gap: 10px; }
+    .fit-score-num { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+    .fit-score-num .fit-score-max { font-size: 12px; font-weight: 500; color: var(--dim); }
+    .fit-score-bar { flex: 1; height: 6px; border-radius: 3px; background: var(--bg); overflow: hidden; }
+    .fit-score-bar-fill { height: 100%; border-radius: 3px; }
+    .fit-score-bar-fill.good { background: var(--green); }
+    .fit-score-bar-fill.ok   { background: #0ea5e9; }
+    .fit-score-bar-fill.low  { background: var(--amber); }
 
     /* ── DRAWER ── */
     .drawer-backdrop {
@@ -797,7 +808,7 @@ function makeCard(c) {
         <div class="cand-name" title="${esc(c.name)}">${hl(c.name)}</div>
         ${sub ? `<div class="cand-sub" title="${esc(sub)}">${hl(sub)}</div>` : ''}
       </div>
-      ${c.fitScore != null ? `<span class="fit-badge ${fitClass(c.fitScore)}" title="AI fit score: ${c.fitScore}/100">${c.fitScore}%</span>` : ''}
+      ${c.fitScore != null ? `<span class="fit-badge ${fitScoreClass(c.fitScore)}" title="AI fit score">${c.fitScore}</span>` : ''}
     </div>
     <div class="card-footer">
       <span class="card-loc">${loc ? `📍 ${hl(loc)}` : ''}</span>
@@ -846,7 +857,7 @@ async function applyStage(candidateId, newStage, oldStage) {
   }
 }
 
-// ── Find matches (Vesper, scoped to a Role) ──────────────────────────
+// ── Find matches (Vesper, scoped to a Role) ─────────────────────────
 // Same instant-pool + Claude-ranking + live-Apify-top-up pattern the public Vesper search
 // on demo.html uses, pointed at this Role's brief. Results land straight in the Matched
 // column via api/crm.js's find-matches / find-matches-poll actions.
@@ -962,17 +973,6 @@ function openDrawer(c) {
   ].filter(Boolean);
 
   document.getElementById('drawerBody').innerHTML = `
-    ${c.fitScore != null ? `
-    <div class="drawer-section">
-      <div class="drawer-section-label">AI Fit Score</div>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="flex:1;height:8px;background:var(--bg);border-radius:4px;overflow:hidden;">
-          <div style="height:100%;width:${c.fitScore}%;background:${fitColor(c.fitScore)};border-radius:4px;"></div>
-        </div>
-        <span class="fit-badge ${fitClass(c.fitScore)}" style="margin-left:0;">${c.fitScore}%</span>
-      </div>
-    </div>` : ''}
-
     <div class="drawer-section">
       <div class="drawer-section-label">Details</div>
       ${loc ? `<div class="drawer-detail-row"><span class="drawer-detail-icon">📍</span><span>${esc(loc)}</span></div>` : ''}
@@ -986,6 +986,15 @@ function openDrawer(c) {
         ? `<div class="drawer-detail-row"><span class="drawer-detail-icon">📱</span><span style="color:var(--green);font-weight:500;">${esc(c.phone)}</span></div>`
         : ''}
     </div>
+
+    ${c.fitScore != null ? `
+    <div class="drawer-section">
+      <div class="drawer-section-label">Fit score</div>
+      <div class="fit-score-row">
+        <div class="fit-score-num">${c.fitScore}<span class="fit-score-max">/100</span></div>
+        <div class="fit-score-bar"><div class="fit-score-bar-fill ${fitScoreClass(c.fitScore)}" style="width:${c.fitScore}%"></div></div>
+      </div>
+    </div>` : ''}
 
     ${(profileRows.length || compRows.length) ? `
     <div class="drawer-section">
@@ -1128,16 +1137,6 @@ function todayISO() {
   return new Date().toISOString().split('T')[0];
 }
 
-function fitClass(score) {
-  if (score >= 80) return 'fit-hi';
-  if (score >= 60) return 'fit-mid';
-  return 'fit-lo';
-}
-function fitColor(score) {
-  if (score >= 80) return '#16a34a';
-  if (score >= 60) return '#d97706';
-  return '#dc2626';
-}
 function avatarColor(name) {
   const p = ['#2563eb','#7c3aed','#db2777','#dc2626','#d97706','#059669','#0891b2','#4f46e5'];
   let h = 0;
@@ -1146,6 +1145,9 @@ function avatarColor(name) {
 }
 function initials(name) {
   return String(name || '').split(' ').slice(0, 2).map(w => w[0] || '').join('').toUpperCase() || '?';
+}
+function fitScoreClass(score) {
+  return score >= 85 ? 'good' : score >= 70 ? 'ok' : 'low';
 }
 function shortLoc(loc) {
   if (!loc) return '';
