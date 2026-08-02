@@ -219,6 +219,13 @@
     }
     .consent-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); }
     .consent-dot.ok { background: var(--green); }
+    .fit-badge {
+      font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px;
+      flex-shrink: 0; margin-left: auto; white-space: nowrap;
+    }
+    .fit-hi  { background: #dcfce7; color: #166534; }
+    .fit-mid { background: #fef9c3; color: #854d0e; }
+    .fit-lo  { background: #fee2e2; color: #991b1b; }
 
     /* ── DRAWER ── */
     .drawer-backdrop {
@@ -790,6 +797,7 @@ function makeCard(c) {
         <div class="cand-name" title="${esc(c.name)}">${hl(c.name)}</div>
         ${sub ? `<div class="cand-sub" title="${esc(sub)}">${hl(sub)}</div>` : ''}
       </div>
+      ${c.fitScore != null ? `<span class="fit-badge ${fitClass(c.fitScore)}" title="AI fit score: ${c.fitScore}/100">${c.fitScore}%</span>` : ''}
     </div>
     <div class="card-footer">
       <span class="card-loc">${loc ? `📍 ${hl(loc)}` : ''}</span>
@@ -838,7 +846,7 @@ async function applyStage(candidateId, newStage, oldStage) {
   }
 }
 
-// ── Find matches (Vesper, scoped to a Role) ─────────────────────────
+// ── Find matches (Vesper, scoped to a Role) ──────────────────────────
 // Same instant-pool + Claude-ranking + live-Apify-top-up pattern the public Vesper search
 // on demo.html uses, pointed at this Role's brief. Results land straight in the Matched
 // column via api/crm.js's find-matches / find-matches-poll actions.
@@ -954,6 +962,17 @@ function openDrawer(c) {
   ].filter(Boolean);
 
   document.getElementById('drawerBody').innerHTML = `
+    ${c.fitScore != null ? `
+    <div class="drawer-section">
+      <div class="drawer-section-label">AI Fit Score</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="flex:1;height:8px;background:var(--bg);border-radius:4px;overflow:hidden;">
+          <div style="height:100%;width:${c.fitScore}%;background:${fitColor(c.fitScore)};border-radius:4px;"></div>
+        </div>
+        <span class="fit-badge ${fitClass(c.fitScore)}" style="margin-left:0;">${c.fitScore}%</span>
+      </div>
+    </div>` : ''}
+
     <div class="drawer-section">
       <div class="drawer-section-label">Details</div>
       ${loc ? `<div class="drawer-detail-row"><span class="drawer-detail-icon">📍</span><span>${esc(loc)}</span></div>` : ''}
@@ -1109,6 +1128,16 @@ function todayISO() {
   return new Date().toISOString().split('T')[0];
 }
 
+function fitClass(score) {
+  if (score >= 80) return 'fit-hi';
+  if (score >= 60) return 'fit-mid';
+  return 'fit-lo';
+}
+function fitColor(score) {
+  if (score >= 80) return '#16a34a';
+  if (score >= 60) return '#d97706';
+  return '#dc2626';
+}
 function avatarColor(name) {
   const p = ['#2563eb','#7c3aed','#db2777','#dc2626','#d97706','#059669','#0891b2','#4f46e5'];
   let h = 0;
