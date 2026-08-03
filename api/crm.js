@@ -1375,7 +1375,7 @@ async function handleSavePlacementSalary(req, res) {
 
   const upd = await fetch(`https://api.airtable.com/v0/${BASE}/${CANDIDATES}/${candidateId}`, {
     method: 'PATCH', headers: h,
-    body: JSON.stringify({ fields: { [KF.notes]: String(notes ?? '') } }),
+    body: JSON.stringify({ fields: { [KF.placementSalary]: placementSalary } }),
   }).then(r => r.json());
 
   return upd.id ? res.status(200).json({ ok: true }) : res.status(500).json({ error: 'Save failed' });
