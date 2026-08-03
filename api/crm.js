@@ -346,12 +346,15 @@ async function callClaude(system, userText, maxTokens = 300) {
   }
 }
 
-// ── Slack notifications (optional) ────────────────────────────────
-// No-op until SLACK_WEBHOOK_URL is set as an env var — create an Incoming Webhook in
-// Slack (any channel) and paste its URL in as SLACK_WEBHOOK_URL. Nothing else in this
-// file needs to change once that's set; every call site below already calls this.
-async function postToSlack(text) {
-  const url = process.env.SLACK_WEBHOOK_URL;
+// ── Notifications (optional, via Make.com) ────────────────────────
+// No-op until MAKE_WEBHOOK_URL is set as an env var. Points at a Make.com scenario
+// (Custom Webhook trigger → Send an email) that emails match alerts to the team.
+// Originally Slack-shaped (SLACK_WEBHOOK_URL) — swapped 2026-08-04 since there's no
+// TalentKnight Slack workspace, and Make was already in use for other TalentKnight
+// automations (Airtable/Instantly integration, candidate enrichment). Text is plain
+// (no Slack mrkdwn) since it's read as an email now, not a Slack message.
+async function postNotification(text) {
+  const url = process.env.MAKE_WEBHOOK_URL;
   if (!url) return;
   try {
     await fetch(url, {
@@ -360,7 +363,7 @@ async function postToSlack(text) {
       body: JSON.stringify({ text }),
     });
   } catch {
-    // Best-effort — a Slack outage should never block the caller.
+    // Best-effort — a notification failure should never block the caller.
   }
 }
 
@@ -937,8 +940,8 @@ async function runMatchSearch(roleId, title, location, brief, h) {
 
     if (matched.length) {
       const { linked, notifyOnly } = await upsertRoleMatches(matched, roleId, title, allMatches, h);
-      if (linked.length) postToSlack(`:dart: *${linked.length} candidate(s) matched* to *${title || 'a role'}*: ${linked.map(c => c.name).join(', ')}`);
-      if (notifyOnly.length) postToSlack(`:eyes: *${notifyOnly.map(c => c.name).join(', ')}* also fit *${title || 'a role'}* but ${notifyOnly.length === 1 ? 'is' : 'are'} already active elsewhere on this role (stage untouched) — worth a look.`);
+      if (linked.length) postNotification(`${linked.length} candidate(s) matched to ${title || 'a role'}: ${linked.map(c => c.name).join(', ')}`);
+      if (notifyOnly.length) postNotification(`${notifyOnly.map(c => c.name).join(', ')} also fit ${title || 'a role'} but ${notifyOnly.length === 1 ? 'is' : 'are'} already active elsewhere on this role (stage untouched) — worth a look.`);
     }
   }
 
@@ -1153,8 +1156,8 @@ async function handleFindMatchesPoll(req, res) {
   if (ranked.length) {
     const allMatches = await fetchAllRoleMatches(h);
     ({ linked, notifyOnly } = await upsertRoleMatches(ranked, roleId, roleTitle, allMatches, h));
-    if (linked.length) postToSlack(`:dart: *${linked.length} new LinkedIn candidate(s) matched* to *${roleTitle || 'a role'}*: ${linked.map(c => c.name).join(', ')}`);
-    if (notifyOnly.length) postToSlack(`:eyes: *${notifyOnly.map(c => c.name).join(', ')}* also fit *${roleTitle || 'a role'}* but already active elsewhere on this role — worth a look.`);
+    if (linked.length) postNotification(`${linked.length} new LinkedIn candidate(s) matched to ${roleTitle || 'a role'}: ${linked.map(c => c.name).join(', ')}`);
+    if (notifyOnly.length) postNotification(`${notifyOnly.map(c => c.name).join(', ')} also fit ${roleTitle || 'a role'} but already active elsewhere on this role — worth a look.`);
   }
 
   return res.status(200).json({
@@ -1171,8 +1174,8 @@ async function handleFindMatchesPoll(req, res) {
 // Role was created still get surfaced against it, and candidates rejected from one role
 // get a chance at others. Reuses the exact same keyword-filter + Claude-ranking path as
 // the live "Find matches" button; the only difference is what triggers it and that it
-// loops every Active Role instead of just one. Posts a Slack summary if
-// SLACK_WEBHOOK_URL is configured — otherwise a silent no-op until that's set up.
+// loops every Active Role instead of just one. Posts an email summary if
+// MAKE_WEBHOOK_URL is configured — otherwise a silent no-op until that's set up.
 async function handleRematchPool(req, res) {
   const AT_TOKEN = process.env.AT_TOKEN;
   if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
@@ -1265,7 +1268,7 @@ async function handleRematchPool(req, res) {
   }
 
   if (summaryLines.length) {
-    await postToSlack(`:recycle: *Daily rematch* — ${totalLinked} new match(es), ${totalNotify} cross-role flag(s) across ${roles.length} active role(s):\n${summaryLines.join('\n')}`);
+    await postNotification(`Daily rematch — ${totalLinked} new match(es), ${totalNotify} cross-role flag(s) across ${roles.length} active role(s):\n${summaryLines.join('\n')}`);
   }
 
   return res.status(200).json({ ok: true, rolesChecked: roles.length, totalLinked, totalNotify });
