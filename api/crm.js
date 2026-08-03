@@ -271,9 +271,19 @@ async function candidateAllowed(candidateId, companyIds, h) {
   if (!candRes?.id) return { ok: false, status: 404, error: 'Candidate not found' };
   const roleIds = candRes.fields[KF.assignedRole] || [];
   if (!roleIds.length) return { ok: false, status: 403, error: 'Candidate not in your pipeline' };
-  const roleRec = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLES}/${roleIds[0]}?returnFieldsByFieldId=true`, { headers: h }).then(r => r.json()).catch(() => null);
-  const roleCompanyIds = roleRec?.fields?.[RF.company] || [];
-  if (!roleCompanyIds.some(id => companyIds.includes(id))) return { ok: false, status: 403, error: 'Candidate not in your pipeline' };
+  // Checks EVERY Role this candidate is linked to, not just roleIds[0] — a candidate can be
+  // linked to multiple Roles across different Companies (see ROLE_MATCHES comment near the
+  // top of this file), so only checking the first one could wrongly deny access to a
+  // recruiter whose Company owns a different one of the candidate's linked Roles. Notes and
+  // placement salary are candidate-level (not per-Role) fields, so "allowed" here correctly
+  // means "this candidate touches at least one Role in your scope", not "their first Role
+  // happens to be yours". Mirrors the per-Role check handleUpdateStage already does.
+  const roleRecs = await fetch(
+    `https://api.airtable.com/v0/${BASE}/${ROLES}?filterByFormula=${encodeURIComponent(`OR(${roleIds.map(id => `RECORD_ID()='${id}'`).join(',')})`)}&returnFieldsByFieldId=true&pageSize=100`,
+    { headers: h }
+  ).then(r => r.json()).catch(() => ({ records: [] }));
+  const allowed = (roleRecs.records || []).some(rec => (rec.fields[RF.company] || []).some(id => companyIds.includes(id)));
+  if (!allowed) return { ok: false, status: 403, error: 'Candidate not in your pipeline' };
   return { ok: true };
 }
 
