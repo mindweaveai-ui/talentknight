@@ -92,6 +92,16 @@ const STAFF_ONLY_STAGES = ['Matched'];
 // protects a live pipeline from being silently bumped onto a different Role's Matched queue.
 const PROTECTED_STAGES = ['Interviewing', 'Offered', 'Placed'];
 
+// Candidates ranked below this score are dropped entirely (not written to Role Matches, not
+// linked to the Role) rather than counted as a match — part of the keyword-noise fix
+// (2026-08-03): rankPoolAgainstRole always returns up to `limit` candidates regardless of
+// absolute score, so without this gate even a 30-45 (weak/filler) fit got written as
+// "Matched" whenever the pool didn't have 8 strong options. Complements the tightened
+// keyword filter (buildKeywordFilter) rather than replacing it. 60 sits at the bottom of
+// rankPoolAgainstRole's own "50-69 = partial fit" band, so anything scored as filler-only
+// (<50) or borderline-partial (50-59) never reaches a recruiter's Matched column.
+const MIN_MATCH_SCORE = 60;
+
 // ── Earnings pipeline ──────────────────────────────────────────────
 // Rough probability-of-closing weight per pipeline stage, used to turn a Role's
 // Fee % × Target Salary into a forecasted (weighted) value rather than treating every
@@ -284,6 +294,21 @@ function extractKeywords(text) {
     .split(/\s+/)
     .filter(w => w.length >= 3 && !stopwords.has(w))
     .slice(0, 10);
+}
+
+// Builds the pool-filter keyword clause from a list of per-keyword field-check formulas
+// (each an OR across role/bio/skills/sector/location/company for one keyword). Previously
+// this was a flat OR across all keyword checks, so a single incidental hit — e.g. a shared
+// location word like "london" matching in the location field — was enough to pull a totally
+// unrelated candidate into the pool. Requiring at least 2 independent keyword hits (falling
+// back to 1 when a brief only yields a single keyword) is a cheap, no-tuning-required way to
+// cut that noise: it doesn't stop a single strong keyword match (e.g. an exact skill) from
+// still counting toward the total, it just stops one weak/generic word from qualifying a
+// candidate on its own. Shared by runMatchSearch and handleRematchPool so the two pool
+// searches can't drift out of sync with each other.
+function buildKeywordFilter(fieldChecks) {
+  const threshold = Math.min(2, fieldChecks.length);
+  return `SUM(${fieldChecks.map(fc => `IF(${fc},1,0)`).join(',')}) >= ${threshold}`;
 }
 
 // Thin wrapper around the same Claude call parse-brief.js and demo.html's rankWithClaude
@@ -871,7 +896,7 @@ async function runMatchSearch(roleId, title, location, brief, h) {
       )`;
     });
     const typeFilter = `OR(${ALLOWED_TYPES.map(t => `{${KF.type}} = '${t}'`).join(',')})`;
-    const keywordFilter = `OR(${fieldChecks.join(',')})`;
+    const keywordFilter = buildKeywordFilter(fieldChecks);
     // Cross-role PROTECTED_STAGES exclusion used to be a filterByFormula check against the
     // (now-frozen) flat KF.pipelineStage field — moved to a client-side check against
     // Role Matches below, since stage is per-Role now and there's no single flat field
@@ -898,7 +923,7 @@ async function runMatchSearch(roleId, title, location, brief, h) {
       bio: rec.fields[KF.bio] || '',
     })).filter(c => c.name && !protectedIds.has(c.id));
 
-    matched = await rankPoolAgainstRole(briefText, pool, 8);
+    matched = (await rankPoolAgainstRole(briefText, pool, 8)).filter(c => c.fitScore >= MIN_MATCH_SCORE);
 
     if (matched.length) {
       const { linked, notifyOnly } = await upsertRoleMatches(matched, roleId, title, allMatches, h);
@@ -1113,7 +1138,7 @@ async function handleFindMatchesPoll(req, res) {
   const roleBrief = roleRec.fields[RF.brief] || '';
   const briefText = [roleTitle, roleLoc, roleBrief].filter(Boolean).join(' — ');
 
-  const ranked = await rankPoolAgainstRole(briefText, resolved, 8);
+  const ranked = (await rankPoolAgainstRole(briefText, resolved, 8)).filter(c => c.fitScore >= MIN_MATCH_SCORE);
   let linked = [], notifyOnly = [];
   if (ranked.length) {
     const allMatches = await fetchAllRoleMatches(h);
@@ -1186,7 +1211,7 @@ async function handleRematchPool(req, res) {
       )`;
     });
     const typeFilter = `OR(${ALLOWED_TYPES.map(t => `{${KF.type}} = '${t}'`).join(',')})`;
-    const keywordFilter = `OR(${fieldChecks.join(',')})`;
+    const keywordFilter = buildKeywordFilter(fieldChecks);
     // Cross-role PROTECTED_STAGES exclusion moved client-side (see runMatchSearch comment) —
     // fetched fresh each loop iteration so a stage change written for an earlier Role in
     // this same run is reflected before the next Role's pool is filtered.
@@ -1219,7 +1244,7 @@ async function handleRematchPool(req, res) {
 
     if (!pool.length) continue;
 
-    const matched = await rankPoolAgainstRole(briefText, pool, 8);
+    const matched = (await rankPoolAgainstRole(briefText, pool, 8)).filter(c => c.fitScore >= MIN_MATCH_SCORE);
     if (!matched.length) continue;
 
     const { linked, notifyOnly } = await upsertRoleMatches(matched, role.id, role.title, allMatches, h);
@@ -1350,7 +1375,7 @@ async function handleSavePlacementSalary(req, res) {
 
   const upd = await fetch(`https://api.airtable.com/v0/${BASE}/${CANDIDATES}/${candidateId}`, {
     method: 'PATCH', headers: h,
-    body: JSON.stringify({ fields: { [KF.placementSalary]: placementSalary } }),
+    body: JSON.stringify({ fields: { [KF.notes]: String(notes ?? '') } }),
   }).then(r => r.json());
 
   return upd.id ? res.status(200).json({ ok: true }) : res.status(500).json({ error: 'Save failed' });
