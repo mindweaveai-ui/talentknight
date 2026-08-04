@@ -16,6 +16,8 @@ export default async function handler(req, res) {
   if (action === 'update-stage')       return handleUpdateStage(req, res);
   if (action === 'save-notes')         return handleSaveNotes(req, res);
   if (action === 'create-role')        return handleCreateRole(req, res);
+  if (action === 'update-role')        return handleUpdateRole(req, res);
+  if (action === 'delete-role')        return handleDeleteRole(req, res);
   if (action === 'find-matches')       return handleFindMatches(req, res);
   if (action === 'find-matches-poll')  return handleFindMatchesPoll(req, res);
   if (action === 'update-role-terms')  return handleUpdateRoleTerms(req, res);
@@ -1374,6 +1376,96 @@ async function handleUpdateRoleTerms(req, res) {
   }).then(r => r.json());
 
   return upd.id ? res.status(200).json({ ok: true }) : res.status(500).json({ error: 'Update failed' });
+}
+
+// ── UPDATE ROLE ───────────────────────────────────────────────────
+// Staff-only. Edits a Role's title/location/brief/status in place. Added 2026-08-04 —
+// until now the only role-related writes were create-role and update-role-terms (Fee%/
+// Target Salary), so there was no way to fix a typo or close a role once created without
+// editing Airtable directly. Flagged after Mike found a near-duplicate "Bookeeping" role
+// created by mistake (see project memory) with no in-app way to fix it.
+async function handleUpdateRole(req, res) {
+  if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed' });
+  const AT_TOKEN = process.env.AT_TOKEN;
+  if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
+
+  const { roleId, title, location, brief, status } = req.body || {};
+  if (!roleId) return res.status(400).json({ error: 'roleId is required' });
+  if (title !== undefined && !title.trim()) return res.status(400).json({ error: 'title cannot be empty' });
+  const VALID_STATUSES = ['Active', 'Paused', 'Filled', 'Closed'];
+  if (status !== undefined && !VALID_STATUSES.includes(status)) return res.status(400).json({ error: 'Invalid status' });
+
+  const clerkUserId = await getClerkUserId(req);
+  if (!clerkUserId) return res.status(401).json({ error: 'Invalid or missing session' });
+
+  const h = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
+  const access = await resolveAccess(clerkUserId, h);
+  if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet." });
+  if (access.viewerType !== 'staff') return res.status(403).json({ error: 'Only recruiters can edit roles.' });
+
+  const allCompanyIds = access.organizations.flatMap(o => o.companyIds);
+  const roleRec = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLES}/${roleId}?returnFieldsByFieldId=true`, { headers: h }).then(r => r.json()).catch(() => null);
+  if (!roleRec?.id) return res.status(404).json({ error: 'Role not found' });
+  const roleCompanyIds = roleRec.fields[RF.company] || [];
+  if (!roleCompanyIds.some(id => allCompanyIds.includes(id))) return res.status(403).json({ error: 'Role not in your access scope' });
+
+  const fields = {};
+  if (title !== undefined) fields[RF.title] = title.trim();
+  if (location !== undefined) fields[RF.location] = location.trim();
+  if (brief !== undefined) fields[RF.brief] = brief.trim();
+  if (status !== undefined) fields[RF.status] = status;
+
+  const upd = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLES}/${roleId}`, {
+    method: 'PATCH', headers: h,
+    body: JSON.stringify({ fields }),
+  }).then(r => r.json());
+
+  return upd.id ? res.status(200).json({ ok: true }) : res.status(500).json({ error: 'Update failed' });
+}
+
+// ── DELETE ROLE ───────────────────────────────────────────────────
+// Staff-only. Hard-deletes a Role. Also deletes any Role Matches rows that reference it
+// first, so the delete doesn't leave orphaned junction rows pointing at a now-gone Role.
+// Does NOT touch the candidates themselves — only this Role's link to them. Frontend gates
+// this behind a confirm() dialog; "Closed" status (via update-role) is the safer, reversible
+// alternative for just hiding a role from the default sidebar view without losing data.
+async function handleDeleteRole(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const AT_TOKEN = process.env.AT_TOKEN;
+  if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
+
+  const { roleId } = req.body || {};
+  if (!roleId) return res.status(400).json({ error: 'roleId is required' });
+
+  const clerkUserId = await getClerkUserId(req);
+  if (!clerkUserId) return res.status(401).json({ error: 'Invalid or missing session' });
+
+  const h = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
+  const access = await resolveAccess(clerkUserId, h);
+  if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet." });
+  if (access.viewerType !== 'staff') return res.status(403).json({ error: 'Only recruiters can delete roles.' });
+
+  const allCompanyIds = access.organizations.flatMap(o => o.companyIds);
+  const roleRec = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLES}/${roleId}?returnFieldsByFieldId=true`, { headers: h }).then(r => r.json()).catch(() => null);
+  if (!roleRec?.id) return res.status(404).json({ error: 'Role not found' });
+  const roleCompanyIds = roleRec.fields[RF.company] || [];
+  if (!roleCompanyIds.some(id => allCompanyIds.includes(id))) return res.status(403).json({ error: 'Role not in your access scope' });
+
+  const allMatches = await fetchAllRoleMatches(h);
+  const matchIdsToDelete = allMatches.filter(m => m.roleId === roleId).map(m => m.id);
+  for (let i = 0; i < matchIdsToDelete.length; i += 10) {
+    const batch = matchIdsToDelete.slice(i, i + 10);
+    const qs = batch.map(id => `records[]=${id}`).join('&');
+    await fetch(`https://api.airtable.com/v0/${BASE}/${ROLE_MATCHES}?${qs}`, {
+      method: 'DELETE', headers: h,
+    }).catch(() => null);
+  }
+
+  const del = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLES}/${roleId}`, {
+    method: 'DELETE', headers: h,
+  }).then(r => r.json()).catch(() => null);
+
+  return del?.deleted ? res.status(200).json({ ok: true }) : res.status(500).json({ error: 'Delete failed' });
 }
 
 // ── SAVE PLACEMENT SALARY ─────────────────────────────────────────
