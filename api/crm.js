@@ -680,14 +680,17 @@ async function handleDashboard(req, res) {
               return base;
             }
 
-            // Forecast = Fee % × Target Salary × probability-of-closing, where probability
-            // is taken from this Role's most-advanced candidate stage (STAGE_WEIGHTS).
+            // Forecast = Fee % × Target Salary — the full potential fee if this Role closes,
+            // not weighted by pipeline stage (Mike wanted the raw upside, not a probability-
+            // discounted number). `probability` is still computed and kept on the Role purely
+            // to drive the "X% likely" stage label in the Forecast table — it no longer
+            // factors into forecastValue itself.
             // A Role with no candidates yet, or missing fee/salary terms, forecasts as null
             // rather than 0 — lets the UI distinguish "no data" from "genuinely worthless."
             const probability = roleCandidates.reduce((max, c) => Math.max(max, STAGE_WEIGHTS[c.pipelineStage] ?? 0), 0);
             base.probability = probability;
             base.forecastValue = (role.feePercent && role.targetSalary)
-              ? Math.round(role.feePercent * role.targetSalary * probability)
+              ? Math.round(role.feePercent * role.targetSalary)
               : null;
 
             // Actual (billed) earnings only apply to Placed candidates — computed here
