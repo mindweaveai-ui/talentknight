@@ -507,7 +507,7 @@ let searchQuery = '';
 let roleSearchQuery = '';
 let viewMode = 'pipeline'; // 'pipeline' | 'earnings' — earnings is staff-only
 
-// ── Auth + load ───────────────────────────────────────────────────
+// ── Auth + load ─────────────────────────────────────────
 async function authHeader() {
   const token = await Clerk.session.getToken();
   return { Authorization: `Bearer ${token}` };
@@ -550,7 +550,7 @@ async function load() {
   render();
 }
 
-// ── Render ─────────────────────────────────────────────────────────
+// ── Render ────────────────────────────────────────────────
 function currentCompany() {
   return state.organizations[orgIdx]?.companies[companyIdx];
 }
@@ -677,7 +677,7 @@ function buildPipelineView(role) {
 function dealTermsHtml(role) {
   const feeDisplay = role.feePercent != null ? (role.feePercent * 100).toFixed(1) : '';
   const salaryDisplay = role.targetSalary != null ? role.targetSalary : '';
-  const forecast = role.forecastValue != null ? `<span class="forecast-pill" title="Fee % × Target Salary × stage probability">Forecast: £${role.forecastValue.toLocaleString()}</span>` : '';
+  const forecast = role.forecastValue != null ? `<span class="forecast-pill" title="Fee % × Target Salary — full potential if this role closes">Forecast: £${role.forecastValue.toLocaleString()}</span>` : '';
   return `
     <span class="deal-terms">
       Fee <input class="deal-input" id="dealFee" type="number" min="0" max="100" step="0.5" placeholder="—" value="${feeDisplay}"
@@ -754,7 +754,7 @@ function buildEarningsView(company) {
       <div class="earnings-card">
         <div class="earnings-card-label">Pipeline forecast</div>
         <div class="earnings-card-value">£${forecastTotal.toLocaleString()}</div>
-        <div class="earnings-card-sub">Weighted by stage, across ${roles.length} role${roles.length !== 1 ? 's' : ''}</div>
+        <div class="earnings-card-sub">Full potential, across ${roles.length} role${roles.length !== 1 ? 's' : ''}</div>
       </div>
       <div class="earnings-card">
         <div class="earnings-card-label">Actual (billed)</div>
@@ -861,7 +861,7 @@ function buildRoleList() {
   });
 }
 
-// ── Search ────────────────────────────────────────────────────────
+// ── Search ──────────────────────────────────────────────
 function onSearch(val) {
   searchQuery = val;
   updateSearchClear();
@@ -902,7 +902,7 @@ function filterCandidates(candidates) {
   );
 }
 
-// ── Kanban ────────────────────────────────────────────────────────
+// ── Kanban ──────────────────────────────────────────────
 function buildKanban(role) {
   const board = document.getElementById('board');
   board.innerHTML = '';
@@ -997,7 +997,7 @@ function makeCard(c) {
   return card;
 }
 
-// ── Stage update ──────────────────────────────────────────────────
+// ── Stage update ────────────────────────────────────────────────────
 async function applyStage(candidateId, newStage, oldStage) {
   const role = currentCompany().roles[roleIdx];
   const cand = role.candidates.find(c => c.id === candidateId);
@@ -1020,7 +1020,7 @@ async function applyStage(candidateId, newStage, oldStage) {
   }
 }
 
-// ── Find matches (Vesper, scoped to a Role) ─────────────────────────
+// ── Find matches (Vesper, scoped to a Role) ────────────────────────────
 // Same instant-pool + Claude-ranking + live-Apify-top-up pattern the public Vesper search
 // on demo.html uses, pointed at this Role's brief. Results land straight in the Matched
 // column via api/crm.js's find-matches / find-matches-poll actions.
@@ -1092,7 +1092,7 @@ async function refreshDashboard() {
   } catch { /* keep showing existing state if refresh fails */ }
 }
 
-// ── Candidate drawer ──────────────────────────────────────────────
+// ── Candidate drawer ────────────────────────────────────────────
 function openDrawer(c) {
   openCand = c;
   const bg = avatarColor(c.name);
@@ -1283,7 +1283,7 @@ async function savePlacementSalary(candidateId) {
   }
 }
 
-// ── Role modal ───────────────────────────────────────────────────
+// ── Role modal ─────────────────────────────────────────────────────
 function openRoleModal() {
   document.getElementById('roleTitle').value = '';
   document.getElementById('roleLocation').value = '';
@@ -1328,7 +1328,7 @@ async function submitNewRole() {
   }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────
 function stageDays(dateStr) {
   if (!dateStr) return null;
   const then = new Date(dateStr + 'T00:00:00');
