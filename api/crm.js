@@ -348,6 +348,35 @@ async function callClaude(system, userText, maxTokens = 300) {
   }
 }
 
+// Expands a single Role Location (e.g. "Brentwood, United Kingdom") into itself plus a
+// handful of realistically-commutable nearby towns, for the Apify actor's `locations`
+// filter. Added 2026-08-04 after confirming (via the actor's own input schema — there is
+// no radius/distance parameter at all, `locations` is a strict array of exact LinkedIn
+// geo matches, max 70 items) that searching one small town returns almost nothing: 4
+// candidates for "Service desk analyst, 2nd line support" in Brentwood, all four sharing
+// the identical normalized location string. A whole county is the opposite problem — too
+// wide, pulls in candidates an hour+ away. This sits in between: same idea a recruiter
+// would apply by hand ("also check Shenfield, Billericay, Chelmsford...").
+// Falls back to just the normalized single location on any parse/API failure — never
+// blocks a search, just degrades to the pre-2026-08-04 behavior.
+async function expandLocationForSearch(location) {
+  const normalize = (loc) => loc.replace(/\bUK\b/gi, 'United Kingdom').trim();
+  const fallback = [normalize(location)];
+  if (!location?.trim()) return [];
+
+  const system = 'You help configure a LinkedIn candidate search for a UK recruiter. Given a role Location, return ONLY a JSON array of up to 6 location strings suitable for LinkedIn\'s own location search/autocomplete: the given location itself (normalized, spelling "United Kingdom" in full, never "UK") plus a few realistically commutable nearby towns/areas (roughly a 10-15 mile / 20-30 minute drive radius, not a whole county or region). Format each as "Town, England/Scotland/Wales/Northern Ireland, United Kingdom" (or the correct country for non-UK locations). If the input is already broad (a city, county, or country), just return that single location unchanged — do not narrow it. No markdown, no preamble. Example input: "Brentwood, United Kingdom" — example output: ["Brentwood, England, United Kingdom","Shenfield, England, United Kingdom","Billericay, England, United Kingdom","Ingatestone, England, United Kingdom","Chelmsford, England, United Kingdom"]';
+  const raw = await callClaude(system, location, 250);
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || !parsed.length) return fallback;
+    const list = parsed.filter(l => typeof l === 'string' && l.trim()).map(normalize).slice(0, 6);
+    return list.length ? list : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 // ── Notifications (optional, via Make.com) ────────────────────────
 // No-op until MAKE_WEBHOOK_URL is set as an env var. Points at a Make.com scenario
 // (Custom Webhook trigger → Send an email) that emails match alerts to the team.
@@ -967,12 +996,19 @@ async function runMatchSearch(roleId, title, location, brief, h) {
   //      a compound like "Service desk analyst, 2nd line support" matches almost nobody's
   //      literal LinkedIn title. Dropped in favor of `searchQuery` alone, which the actor
   //      documents as fuzzy and already carries the same title text.
+  // A third, related finding the same day: even once "Shenfield" resolves correctly, a single
+  // small town returns almost nothing (confirmed: 4 candidates for Service Desk Analyst in
+  // Brentwood, all sharing the identical normalized location string) — the actor's `locations`
+  // filter has no radius/distance parameter at all (checked the full input schema), it's a
+  // strict exact match against one LinkedIn geo entity. `expandLocationForSearch()` above
+  // widens a single town into itself + a few realistically commutable nearby towns rather than
+  // jumping straight to a whole county (too broad — pulls in candidates an hour+ away).
   let runId = null;
   const APIFY_TOKEN = process.env.APIFY_TOKEN;
   if (APIFY_TOKEN && title) {
     try {
       const actorInput = { profileScraperMode: 'Full', maxItems: 25, searchQuery: title };
-      if (location) actorInput.locations = [location.replace(/\bUK\b/gi, 'United Kingdom')];
+      if (location) actorInput.locations = await expandLocationForSearch(location);
       const startUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/runs?token=${APIFY_TOKEN}&memory=256`;
       const r = await fetch(startUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(actorInput) });
       if (r.ok) {
