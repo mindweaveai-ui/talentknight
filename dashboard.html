@@ -220,6 +220,47 @@
     .consent-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); }
     .consent-dot.ok { background: var(--green); }
 
+    /* ── DEAL TERMS (earnings) ── */
+    .deal-terms { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+    .deal-input {
+      font-family: inherit; font-size: 12px; width: 54px; text-align: right;
+      padding: 3px 6px; border: 1px solid var(--border); border-radius: 6px;
+      background: var(--surface); color: var(--text); transition: border-color 0.12s;
+    }
+    .deal-input:focus { outline: none; border-color: var(--blue); }
+    .deal-input.salary { width: 78px; }
+    .deal-save-status { font-size: 11px; color: var(--green); opacity: 0; transition: opacity 0.3s; }
+    .forecast-pill {
+      font-size: 11px; font-weight: 600; color: #6d28d9; background: #f5f3ff;
+      border: 1px solid #ddd6fe; border-radius: 20px; padding: 2px 9px;
+    }
+
+    /* ── EARNINGS VIEW ── */
+    .earnings-toggle-btn {
+      font-family: inherit; font-size: 12px; font-weight: 600; color: var(--blue);
+      background: none; border: none; border-top: 1px solid var(--border);
+      padding: 9px 11px; cursor: pointer; transition: background 0.12s; flex-shrink: 0;
+      text-align: left;
+    }
+    .earnings-toggle-btn:hover { background: var(--bg); }
+    .earnings-summary { display: flex; gap: 12px; margin: 4px 0 20px; flex-wrap: wrap; }
+    .earnings-card {
+      flex: 1; min-width: 180px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 14px 16px;
+    }
+    .earnings-card-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--dim); }
+    .earnings-card-value { font-size: 24px; font-weight: 700; margin-top: 4px; letter-spacing: -0.4px; }
+    .earnings-card-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .earnings-table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .earnings-table th {
+      text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--dim); padding: 9px 12px; background: var(--bg); border-bottom: 1px solid var(--border);
+    }
+    .earnings-table td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .earnings-table tr:last-child td { border-bottom: none; }
+    .earnings-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .earnings-empty-note { font-size: 12px; color: var(--dim); padding: 20px; text-align: center; }
+
     /* ── FIT SCORE ── */
     .fit-badge {
       display: inline-flex; align-items: center; justify-content: center;
@@ -464,6 +505,7 @@ let dragFrom = null;
 let openCand = null;
 let searchQuery = '';
 let roleSearchQuery = '';
+let viewMode = 'pipeline'; // 'pipeline' | 'earnings' — earnings is staff-only
 
 // ── Auth + load ───────────────────────────────────────────────────
 async function authHeader() {
@@ -560,6 +602,7 @@ function render() {
           <div class="sidebar-top">${orgSelectHtml(organizations)}${companySelectHtml(companies)}</div>
           <div class="role-list"><div class="role-list-empty">No roles yet</div></div>
           <button class="new-role-btn-sidebar" onclick="openRoleModal()">＋ New role</button>
+          ${user.isStaff ? `<button class="earnings-toggle-btn" onclick="toggleEarningsView()">💰 Earnings</button>` : ''}
         </aside>
         <div class="content-area">
           <div class="centered" style="min-height:50vh;">
@@ -587,35 +630,153 @@ function render() {
         </div>
         <div class="role-list" id="roleList"></div>
         <button class="new-role-btn-sidebar" onclick="openRoleModal()">＋ New role</button>
+        ${user.isStaff ? `<button class="earnings-toggle-btn" onclick="toggleEarningsView()">${viewMode === 'earnings' ? '← Back to pipeline' : '💰 Earnings'}</button>` : ''}
       </aside>
-      <div class="content-area">
-        <div class="content-header">
-          <div class="page-title">${esc(role.title)}</div>
-          <div class="role-info">
-            <span class="status-badge status-${role.status.toLowerCase()}">${esc(role.status)}</span>
-            ${role.location ? `<span>📍 ${esc(role.location)}</span>` : ''}
-            ${role.brief ? `<span class="role-brief" title="${esc(role.brief)}">${esc(role.brief)}</span>` : ''}
-            ${user.isStaff ? `<button class="find-matches-btn" id="findMatchesBtn" onclick="findMatches('${role.id}')">🔍 Find matches</button><span class="find-matches-status" id="findMatchesStatus"></span>` : ''}
-          </div>
-        </div>
-        <div class="search-row">
-          <div class="search-wrap">
-            <span class="search-icon">🔍</span>
-            <input id="searchInput" class="search-input" type="search" placeholder="Search candidates…"
-              oninput="onSearch(this.value)" value="${esc(searchQuery)}" autocomplete="off" />
-            <button class="search-clear" id="searchClear" onclick="clearSearch()" title="Clear">✕</button>
-          </div>
-          <span class="search-count" id="searchCount"></span>
-        </div>
-        <div class="kanban-board" id="board"></div>
-      </div>
+      <div class="content-area" id="contentArea"></div>
     </div>`;
 
   attachCompanySelectListener();
   attachOrgSelectListener();
   buildRoleList();
+
+  if (viewMode === 'earnings' && user.isStaff) {
+    buildEarningsView(company);
+  } else {
+    buildPipelineView(role);
+  }
+}
+
+function buildPipelineView(role) {
+  const contentArea = document.getElementById('contentArea');
+  contentArea.innerHTML = `
+    <div class="content-header">
+      <div class="page-title">${esc(role.title)}</div>
+      <div class="role-info">
+        <span class="status-badge status-${role.status.toLowerCase()}">${esc(role.status)}</span>
+        ${role.location ? `<span>📍 ${esc(role.location)}</span>` : ''}
+        ${role.brief ? `<span class="role-brief" title="${esc(role.brief)}">${esc(role.brief)}</span>` : ''}
+        ${state.user.isStaff ? `<button class="find-matches-btn" id="findMatchesBtn" onclick="findMatches('${role.id}')">🔍 Find matches</button><span class="find-matches-status" id="findMatchesStatus"></span>` : ''}
+        ${state.user.isStaff ? dealTermsHtml(role) : ''}
+      </div>
+    </div>
+    <div class="search-row">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input id="searchInput" class="search-input" type="search" placeholder="Search candidates…"
+          oninput="onSearch(this.value)" value="${esc(searchQuery)}" autocomplete="off" />
+        <button class="search-clear" id="searchClear" onclick="clearSearch()" title="Clear">✕</button>
+      </div>
+      <span class="search-count" id="searchCount"></span>
+    </div>
+    <div class="kanban-board" id="board"></div>`;
+
   updateSearchClear();
   buildKanban(role);
+}
+
+function dealTermsHtml(role) {
+  const feeDisplay = role.feePercent != null ? (role.feePercent * 100).toFixed(1) : '';
+  const salaryDisplay = role.targetSalary != null ? role.targetSalary : '';
+  const forecast = role.forecastValue != null ? `<span class="forecast-pill" title="Fee % × Target Salary × stage probability">Forecast: £${role.forecastValue.toLocaleString()}</span>` : '';
+  return `
+    <span class="deal-terms">
+      Fee <input class="deal-input" id="dealFee" type="number" min="0" max="100" step="0.5" placeholder="—" value="${feeDisplay}"
+        onchange="saveDealTerms('${role.id}')" />%
+      · Target <input class="deal-input salary" id="dealSalary" type="number" min="0" step="1000" placeholder="—" value="${salaryDisplay}"
+        onchange="saveDealTerms('${role.id}')" /> £/yr
+      <span class="deal-save-status" id="dealSaveStatus">✓ Saved</span>
+    </span>
+    ${forecast}`;
+}
+
+async function saveDealTerms(roleId) {
+  const feeInput = document.getElementById('dealFee');
+  const salaryInput = document.getElementById('dealSalary');
+  const status = document.getElementById('dealSaveStatus');
+  const feePercent = feeInput.value === '' ? null : Number(feeInput.value) / 100;
+  const targetSalary = salaryInput.value === '' ? null : Number(salaryInput.value);
+  try {
+    const h = await authHeader();
+    const r = await fetch('/api/crm?action=update-role-terms', {
+      method: 'PATCH', headers: { ...h, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roleId, feePercent, targetSalary }),
+    });
+    if (!r.ok) throw new Error();
+    if (status) { status.style.opacity = '1'; setTimeout(() => { status.style.opacity = '0'; }, 2000); }
+    await refreshDashboard();
+  } catch {
+    alert('Failed to save deal terms — please try again.');
+  }
+}
+
+function toggleEarningsView() {
+  viewMode = viewMode === 'earnings' ? 'pipeline' : 'earnings';
+  render();
+}
+
+function buildEarningsView(company) {
+  const contentArea = document.getElementById('contentArea');
+  const roles = company.roles;
+
+  const forecastTotal = roles.reduce((sum, r) => sum + (r.forecastValue || 0), 0);
+  const placedCandidates = roles.flatMap(r => (r.candidates || [])
+    .filter(c => c.pipelineStage === 'Placed')
+    .map(c => ({ ...c, roleTitle: r.title })));
+  const actualTotal = placedCandidates.reduce((sum, c) => sum + (c.actualEarnings || 0), 0);
+  const rolesWithTerms = roles.filter(r => r.feePercent != null || r.targetSalary != null).length;
+
+  const roleRows = roles.map(r => {
+    const stageLabel = (r.probability || 0) >= 1 ? 'Placed'
+      : (r.candidates || []).length ? `${Math.round((r.probability || 0) * 100)}% likely` : 'No candidates yet';
+    return `
+      <tr>
+        <td>${esc(r.title)}</td>
+        <td class="num">${r.feePercent != null ? (r.feePercent * 100).toFixed(1) + '%' : '—'}</td>
+        <td class="num">${r.targetSalary != null ? '£' + r.targetSalary.toLocaleString() : '—'}</td>
+        <td>${esc(stageLabel)}</td>
+        <td class="num">${r.forecastValue != null ? '£' + r.forecastValue.toLocaleString() : '—'}</td>
+      </tr>`;
+  }).join('');
+
+  const placedRows = placedCandidates.map(c => `
+    <tr>
+      <td>${esc(c.name)}</td>
+      <td>${esc(c.roleTitle)}</td>
+      <td class="num">${c.placementSalary != null ? '£' + c.placementSalary.toLocaleString() : '—'}</td>
+      <td class="num">${c.actualEarnings != null ? '£' + c.actualEarnings.toLocaleString() : '—'}</td>
+    </tr>`).join('');
+
+  contentArea.innerHTML = `
+    <div class="content-header">
+      <div class="page-title">Earnings — ${esc(company.name)}</div>
+    </div>
+    <div class="earnings-summary">
+      <div class="earnings-card">
+        <div class="earnings-card-label">Pipeline forecast</div>
+        <div class="earnings-card-value">£${forecastTotal.toLocaleString()}</div>
+        <div class="earnings-card-sub">Weighted by stage, across ${roles.length} role${roles.length !== 1 ? 's' : ''}</div>
+      </div>
+      <div class="earnings-card">
+        <div class="earnings-card-label">Actual (billed)</div>
+        <div class="earnings-card-value">£${actualTotal.toLocaleString()}</div>
+        <div class="earnings-card-sub">${placedCandidates.length} placement${placedCandidates.length !== 1 ? 's' : ''}</div>
+      </div>
+      <div class="earnings-card">
+        <div class="earnings-card-label">Deal terms set</div>
+        <div class="earnings-card-value">${rolesWithTerms} / ${roles.length}</div>
+        <div class="earnings-card-sub">Roles with Fee % or Target Salary</div>
+      </div>
+    </div>
+    ${roles.length ? `
+    <table class="earnings-table" style="margin-bottom:20px;">
+      <thead><tr><th>Role</th><th>Fee %</th><th>Target salary</th><th>Stage</th><th>Forecast</th></tr></thead>
+      <tbody>${roleRows}</tbody>
+    </table>` : ''}
+    ${placedCandidates.length ? `
+    <table class="earnings-table">
+      <thead><tr><th>Placed candidate</th><th>Role</th><th>Placement salary</th><th>Actual earnings</th></tr></thead>
+      <tbody>${placedRows}</tbody>
+    </table>` : `<div class="earnings-empty-note">No placements yet.</div>`}`;
 }
 
 function orgSelectHtml(organizations) {
@@ -636,6 +797,7 @@ function onOrgChange(val) {
   roleIdx = 0;
   searchQuery = '';
   roleSearchQuery = '';
+  viewMode = 'pipeline';
   closeDrawer();
   render();
 }
@@ -659,6 +821,7 @@ function onCompanyChange(val) {
   roleIdx = 0;
   searchQuery = '';
   roleSearchQuery = '';
+  viewMode = 'pipeline';
   closeDrawer();
   render();
 }
@@ -693,7 +856,7 @@ function buildRoleList() {
         <span class="role-item-title">${esc(r.title)}</span>
       </div>
       <div class="role-item-meta">${r.candidates.length} candidate${r.candidates.length !== 1 ? 's' : ''}${r.location ? ` · ${esc(shortLoc(r.location))}` : ''}</div>`;
-    item.onclick = () => { roleIdx = i; searchQuery = ''; closeDrawer(); render(); };
+    item.onclick = () => { roleIdx = i; searchQuery = ''; viewMode = 'pipeline'; closeDrawer(); render(); };
     wrap.appendChild(item);
   });
 }
@@ -1023,6 +1186,18 @@ function openDrawer(c) {
       ${stageSinceHtml}
     </div>
 
+    ${state.user.isStaff ? `
+    <div class="drawer-section">
+      <div class="drawer-section-label">Placement salary</div>
+      <div class="deal-terms">
+        £ <input class="deal-input salary" id="drawerPlacementSalary" type="number" min="0" step="1000"
+          placeholder="—" value="${c.placementSalary != null ? c.placementSalary : ''}"
+          onchange="savePlacementSalary('${c.id}')" /> /yr
+        <span class="deal-save-status" id="placementSaveStatus">✓ Saved</span>
+      </div>
+      <div id="placementEarningsNote" style="font-size:12px;color:var(--muted);margin-top:6px;">${c.actualEarnings != null ? `Actual earnings at this rate: <strong>£${c.actualEarnings.toLocaleString()}</strong>` : ''}</div>
+    </div>` : ''}
+
     <div class="drawer-section" style="flex:1;">
       <div class="drawer-section-label">Notes</div>
       <textarea class="drawer-notes" id="drawerNotes" placeholder="Add notes about this candidate…">${esc(c.notes || '')}</textarea>
@@ -1071,6 +1246,41 @@ async function saveNotes() {
     setTimeout(() => { status.style.opacity = '0'; }, 2500);
   } catch { alert('Failed to save notes — please try again.'); }
   finally { btn.disabled = false; btn.textContent = 'Save notes'; }
+}
+
+async function savePlacementSalary(candidateId) {
+  const input = document.getElementById('drawerPlacementSalary');
+  const status = document.getElementById('placementSaveStatus');
+  const placementSalary = input.value === '' ? null : Number(input.value);
+  try {
+    const h = await authHeader();
+    const r = await fetch('/api/crm?action=save-placement-salary', {
+      method: 'PATCH', headers: { ...h, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidateId, placementSalary }),
+    });
+    if (!r.ok) throw new Error();
+
+    // Update local state in place (mirrors applyStage's approach) rather than a full
+    // server refetch — recomputes actualEarnings using the same formula the backend
+    // uses (Fee % × placement salary, falling back to Target Salary), so the kanban
+    // board and Earnings view reflect the change immediately without a round trip.
+    const role = currentCompany().roles.find(r => r.candidates.some(c => c.id === candidateId));
+    const cand = role?.candidates.find(c => c.id === candidateId);
+    if (cand) {
+      cand.placementSalary = placementSalary;
+      const salaryForCalc = placementSalary ?? role.targetSalary ?? null;
+      cand.actualEarnings = (role.feePercent && salaryForCalc) ? Math.round(role.feePercent * salaryForCalc) : null;
+      if (openCand && openCand.id === candidateId) openCand.actualEarnings = cand.actualEarnings;
+    }
+
+    if (status) { status.style.opacity = '1'; setTimeout(() => { status.style.opacity = '0'; }, 2000); }
+    const earningsNote = document.getElementById('placementEarningsNote');
+    if (earningsNote) {
+      earningsNote.innerHTML = cand?.actualEarnings != null ? `Actual earnings at this rate: <strong>£${cand.actualEarnings.toLocaleString()}</strong>` : '';
+    }
+  } catch {
+    alert('Failed to save placement salary — please try again.');
+  }
 }
 
 // ── Role modal ───────────────────────────────────────────────────
