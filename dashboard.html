@@ -602,7 +602,7 @@ function render() {
           <div class="sidebar-top">${orgSelectHtml(organizations)}${companySelectHtml(companies)}</div>
           <div class="role-list"><div class="role-list-empty">No roles yet</div></div>
           <button class="new-role-btn-sidebar" onclick="openRoleModal()">＋ New role</button>
-          ${user.isStaff ? `<button class="earnings-toggle-btn" onclick="toggleEarningsView()">💰 Earnings</button>` : ''}
+          ${user.isStaff ? `<button class="earnings-toggle-btn" onclick="toggleEarningsView()">Forecast</button>` : ''}
         </aside>
         <div class="content-area">
           <div class="centered" style="min-height:50vh;">
@@ -630,7 +630,7 @@ function render() {
         </div>
         <div class="role-list" id="roleList"></div>
         <button class="new-role-btn-sidebar" onclick="openRoleModal()">＋ New role</button>
-        ${user.isStaff ? `<button class="earnings-toggle-btn" onclick="toggleEarningsView()">${viewMode === 'earnings' ? '← Back to pipeline' : '💰 Earnings'}</button>` : ''}
+        ${user.isStaff ? `<button class="earnings-toggle-btn" onclick="toggleEarningsView()">${viewMode === 'earnings' ? '← Back to pipeline' : 'Forecast'}</button>` : ''}
       </aside>
       <div class="content-area" id="contentArea"></div>
     </div>`;
@@ -748,7 +748,7 @@ function buildEarningsView(company) {
 
   contentArea.innerHTML = `
     <div class="content-header">
-      <div class="page-title">Earnings — ${esc(company.name)}</div>
+      <div class="page-title">Forecast — ${esc(company.name)}</div>
     </div>
     <div class="earnings-summary">
       <div class="earnings-card">
