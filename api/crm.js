@@ -1001,7 +1001,7 @@ async function handleFindMatchesPoll(req, res) {
   if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
   if (!APIFY_TOKEN) return res.status(500).json({ error: 'APIFY_TOKEN not configured' });
 
-  const { runId, roleId } = req.query;
+  const { runId, roleId, retry } = req.query;
   if (!runId || !roleId) return res.status(400).json({ error: 'runId and roleId are required' });
 
   const clerkUserId = await getClerkUserId(req);
@@ -1040,6 +1040,33 @@ async function handleFindMatchesPoll(req, res) {
     raw = await r.json();
   } catch {
     return res.status(200).json({ status: 'FAILED' });
+  }
+
+  // Location-not-recognized fallback, added 2026-08-04 — found investigating the
+  // "Service desk analyst, 2nd line support" role (Location: "Shenfield") returning zero
+  // live matches. The actor's own log showed a 404 "Input location \"Shenfield\" is not
+  // recognized by LinkedIn" — but the actor run itself still reports SUCCEEDED with an
+  // empty dataset, so nothing ever surfaced as an error anywhere in the app. Bare small-town
+  // names (no county/country) are the trigger; big cities/countries (e.g. "United States")
+  // resolve fine, so there's no reliable way to pre-validate every location string a
+  // recruiter might type. Instead: if the first run comes back SUCCEEDED with 0 items and
+  // this isn't already a retry, kick a second run for the same Role title with no location
+  // filter at all (nationwide UK/wherever), and hand the frontend that new runId to keep
+  // polling — degrades to a broader search instead of silently reporting nothing.
+  if (raw.length === 0 && retry !== '1' && APIFY_TOKEN) {
+    const title = roleRec.fields[RF.title];
+    if (title) {
+      try {
+        const retryInput = { profileScraperMode: 'Full', maxItems: 25, searchQuery: title };
+        const retryStartUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/runs?token=${APIFY_TOKEN}&memory=256`;
+        const rr = await fetch(retryStartUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(retryInput) });
+        if (rr.ok) {
+          const rd = await rr.json();
+          const newRunId = rd?.data?.id;
+          if (newRunId) return res.status(200).json({ status: 'RUNNING', runId: newRunId, retry: '1' });
+        }
+      } catch { /* fall through to normal 0-result handling below */ }
+    }
   }
 
   function str(v) {
