@@ -1009,11 +1009,21 @@ async function runMatchSearch(roleId, title, location, brief, h) {
     try {
       const actorInput = { profileScraperMode: 'Full', maxItems: 25, searchQuery: title };
       if (location) actorInput.locations = await expandLocationForSearch(location);
+      // Temporary diagnostic log, added 2026-08-04 — the 20:39 Brentwood search's first-pass
+      // run (expanded locations) came back with 0 results and triggered the nationwide
+      // fallback in handleFindMatchesPoll, same silent-failure shape as the original
+      // Shenfield bug. Logging the exact locations array Claude generated so the next
+      // occurrence can be diagnosed from Vercel's function logs instead of guessing —
+      // remove once expandLocationForSearch's output has been confirmed reliable.
+      console.log('[find-matches] actorInput for role', JSON.stringify({ title, roleLocation: location, locations: actorInput.locations }));
       const startUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/runs?token=${APIFY_TOKEN}&memory=256`;
       const r = await fetch(startUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(actorInput) });
       if (r.ok) {
         const d = await r.json();
         runId = d?.data?.id || null;
+        console.log('[find-matches] apify run started', runId);
+      } else {
+        console.log('[find-matches] apify run start failed', r.status, await r.text().catch(() => ''));
       }
     } catch { /* live top-up is best-effort — pool results above still stand */ }
   }
@@ -1091,6 +1101,12 @@ async function handleFindMatchesPoll(req, res) {
   // polling — degrades to a broader search instead of silently reporting nothing.
   if (raw.length === 0 && retry !== '1' && APIFY_TOKEN) {
     const title = roleRec.fields[RF.title];
+    // Temporary diagnostic log, added 2026-08-04 alongside the matching one in
+    // runMatchSearch — confirms when the nationwide fallback actually fires (vs. the
+    // AI-expanded locations genuinely finding 0 people) so a 0-result first pass can be
+    // traced back to what locations were sent, not just guessed at. Remove once
+    // expandLocationForSearch's output has been confirmed reliable.
+    console.log('[find-matches-poll] first pass returned 0, triggering nationwide fallback', JSON.stringify({ runId, roleId, title }));
     if (title) {
       try {
         const retryInput = { profileScraperMode: 'Full', maxItems: 25, searchQuery: title };
@@ -1099,6 +1115,7 @@ async function handleFindMatchesPoll(req, res) {
         if (rr.ok) {
           const rd = await rr.json();
           const newRunId = rd?.data?.id;
+          console.log('[find-matches-poll] nationwide retry run started', newRunId);
           if (newRunId) return res.status(200).json({ status: 'RUNNING', runId: newRunId, retry: '1' });
         }
       } catch { /* fall through to normal 0-result handling below */ }
