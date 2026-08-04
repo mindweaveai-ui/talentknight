@@ -952,12 +952,25 @@ async function runMatchSearch(roleId, title, location, brief, h) {
   // separately, this call only needs to start the run and hand back its ID. "Full" mode
   // captures skills/industry/summary per profile (not just name+headline like "Short"),
   // so every candidate this saves is genuinely searchable later, not more sparse-pool rubbish.
+  //
+  // Two silent-failure modes found 2026-08-04 investigating zero-match Armstrong Knight test
+  // roles (Service Desk Analyst; Bookeeping/Client Bookkeeper) — every run showed "Succeeded"
+  // in Apify with 0 results, nothing surfaced anywhere in the app:
+  //   1. The actor's own field docs warn a bare "UK" in a location string gets misread as
+  //      "Ukraine" (must be "United Kingdom") — "Shenfield, Essex, UK" 404'd as an unrecognized
+  //      location, while "benfleet" alone (no "UK" token) resolved fine.
+  //   2. `currentJobTitles` is a strict filter on a LinkedIn profile's exact current title.
+  //      Fine for the short canonical titles apify-search.js/apify-start.js extract via regex
+  //      (Manager, Engineer, etc.), but a literal full Role Title like "Client Bookkeeper" or
+  //      a compound like "Service desk analyst, 2nd line support" matches almost nobody's
+  //      literal LinkedIn title. Dropped in favor of `searchQuery` alone, which the actor
+  //      documents as fuzzy and already carries the same title text.
   let runId = null;
   const APIFY_TOKEN = process.env.APIFY_TOKEN;
   if (APIFY_TOKEN && title) {
     try {
-      const actorInput = { profileScraperMode: 'Full', maxItems: 25, searchQuery: title, currentJobTitles: [title] };
-      if (location) actorInput.locations = [location];
+      const actorInput = { profileScraperMode: 'Full', maxItems: 25, searchQuery: title };
+      if (location) actorInput.locations = [location.replace(/\bUK\b/gi, 'United Kingdom')];
       const startUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/runs?token=${APIFY_TOKEN}&memory=256`;
       const r = await fetch(startUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(actorInput) });
       if (r.ok) {

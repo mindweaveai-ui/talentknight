@@ -16,7 +16,11 @@ export default async function handler(req, res) {
   const locationMatch = brief.match(
     /\b(?:based in|located in|in|near|around)\s+([A-Z][a-zA-Z\s\-]+?)(?:\s*,|\s+and\b|\s+with\b|\s*\.|\s*$)/i
   );
-  const location = locationMatch ? locationMatch[1].trim() : '';
+  let location = locationMatch ? locationMatch[1].trim() : '';
+
+  // Apify/LinkedIn misreads a bare "UK" token as "Ukraine" (documented gotcha on the actor's
+  // own locations field) — normalize before it ever reaches the actor.
+  if (location) location = location.replace(/\bUK\b/gi, 'United Kingdom');
 
   // Extract job title from brief
   const titleMatch = brief.match(

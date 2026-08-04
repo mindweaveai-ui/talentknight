@@ -47,6 +47,11 @@ export default async function handler(req, res) {
     location = `${location}, United Kingdom`;
   }
 
+  // Apify/LinkedIn misreads a bare "UK" token as "Ukraine" (documented gotcha on the actor's
+  // own locations field) — normalize it regardless of which branch produced `location`, so a
+  // brief or Role field that already spells out "..., UK" doesn't silently 404.
+  if (location) location = location.replace(/\bUK\b/gi, 'United Kingdom');
+
   const actorId = 'harvestapi~linkedin-profile-search';
 
   const actorInput = {
