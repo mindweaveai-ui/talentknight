@@ -1113,7 +1113,7 @@ async function findMatches(roleId) {
   }
 }
 
-function pollFindMatches(runId, roleId, attempt) {
+function pollFindMatches(runId, roleId, attempt, retry) {
   if (attempt >= 20) {
     const btn = document.getElementById('findMatchesBtn');
     const status = document.getElementById('findMatchesStatus');
@@ -1126,9 +1126,15 @@ function pollFindMatches(runId, roleId, attempt) {
     const status = document.getElementById('findMatchesStatus');
     try {
       const h = await authHeader();
-      const r = await fetch(`/api/crm?action=find-matches-poll&runId=${encodeURIComponent(runId)}&roleId=${encodeURIComponent(roleId)}`, { headers: h });
+      // retry flag/runId round-trip: the backend can swap in a fresh runId mid-poll (see
+      // find-matches-poll's location-not-recognized fallback, added 2026-08-04) — a broader,
+      // no-location re-search kicked off automatically when the first pass 404s on an
+      // unrecognized small-town Location. We just need to keep following whatever runId/retry
+      // the server hands back rather than assuming the original runId stays valid throughout.
+      const retryQs = retry ? `&retry=${encodeURIComponent(retry)}` : '';
+      const r = await fetch(`/api/crm?action=find-matches-poll&runId=${encodeURIComponent(runId)}&roleId=${encodeURIComponent(roleId)}${retryQs}`, { headers: h });
       const data = await r.json();
-      if (data.status === 'RUNNING') return pollFindMatches(runId, roleId, attempt + 1);
+      if (data.status === 'RUNNING') return pollFindMatches(data.runId || runId, roleId, attempt + 1, data.retry || retry);
       if (btn) { btn.disabled = false; btn.textContent = '🔍 Find matches'; }
       if (data.status === 'SUCCEEDED') {
         if (status) status.textContent = data.matchedCount ? `+${data.matchedCount} more from live search` : 'No new live matches';
