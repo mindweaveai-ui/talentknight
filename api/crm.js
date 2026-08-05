@@ -83,6 +83,9 @@ const ORGF = { name: 'fldqGP76mkwa9AtYZ', companies: 'fldCmI1mZ1qsPDDAv' };
 const RMF = {
   label: 'fldqJpmu8lbG8fcJJ', candidate: 'fldV7FC0dg8vCsb6Y', role: 'fldPX949XGdsRZD7H',
   fitScore: 'fldXxiaWdcG4FClat', pipelineStage: 'fld6PAXY7lGgmPOb9', stageChangedAt: 'fldGp33EmrMVDh31g',
+  // Real geocoded distance in miles between the Role's Location and this candidate's
+  // Location — see filterByDistance()/geocodeLocation() below. Added 2026-08-05.
+  distanceMiles: 'fldTPNQbBIMUb2nNH',
 };
 
 // Stages that only Org Staff (Admin/Consultant) may see or set. "Matched" is where Vesper's
@@ -103,6 +106,17 @@ const PROTECTED_STAGES = ['Interviewing', 'Offered', 'Placed'];
 // rankPoolAgainstRole's own "50-69 = partial fit" band, so anything scored as filler-only
 // (<50) or borderline-partial (50-59) never reaches a recruiter's Matched column.
 const MIN_MATCH_SCORE = 60;
+
+// Maximum real-world distance (geocoded, straight-line miles — see filterByDistance()) a
+// candidate can be from a Role's Location and still count as a match. Added 2026-08-05,
+// replacing the 2026-08-04 AI-generated multi-town LinkedIn search filter (Fix #5) after
+// confirming via Vercel logs that a well-formed multi-town `locations` array still returns
+// 0 results from the Apify actor — there's no way to get Apify/LinkedIn to search a genuine
+// mile radius at the source (their `locations` field is exact-match only, no radius param
+// exists). Instead we search broadly and filter the results ourselves using real geocoded
+// distance. 15 was Mike's own number when he asked "is there a way of looking 15 miles
+// around the town" — matches a realistic one-way commute.
+const MAX_COMMUTE_MILES = 15;
 
 // ── Earnings pipeline ──────────────────────────────────────────────
 // Rough probability-of-closing weight per pipeline stage, used to turn a Role's
@@ -348,33 +362,89 @@ async function callClaude(system, userText, maxTokens = 300) {
   }
 }
 
-// Expands a single Role Location (e.g. "Brentwood, United Kingdom") into itself plus a
-// handful of realistically-commutable nearby towns, for the Apify actor's `locations`
-// filter. Added 2026-08-04 after confirming (via the actor's own input schema — there is
-// no radius/distance parameter at all, `locations` is a strict array of exact LinkedIn
-// geo matches, max 70 items) that searching one small town returns almost nothing: 4
-// candidates for "Service desk analyst, 2nd line support" in Brentwood, all four sharing
-// the identical normalized location string. A whole county is the opposite problem — too
-// wide, pulls in candidates an hour+ away. This sits in between: same idea a recruiter
-// would apply by hand ("also check Shenfield, Billericay, Chelmsford...").
-// Falls back to just the normalized single location on any parse/API failure — never
-// blocks a search, just degrades to the pre-2026-08-04 behavior.
-async function expandLocationForSearch(location) {
-  const normalize = (loc) => loc.replace(/\bUK\b/gi, 'United Kingdom').trim();
-  const fallback = [normalize(location)];
-  if (!location?.trim()) return [];
+// Normalizes a single Role Location for the Apify actor's `locations` filter (still just
+// one value — see the 2026-08-05 comment on MAX_COMMUTE_MILES for why the 2026-08-04
+// multi-town AI-expansion attempt (Fix #5) was reverted). "UK" gets expanded to "United
+// Kingdom" because the actor's docs warn a bare "UK" token gets misread as "Ukraine".
+function normalizeLocation(location) {
+  return (location || '').replace(/\bUK\b/gi, 'United Kingdom').trim();
+}
 
-  const system = 'You help configure a LinkedIn candidate search for a UK recruiter. Given a role Location, return ONLY a JSON array of up to 6 location strings suitable for LinkedIn\'s own location search/autocomplete: the given location itself (normalized, spelling "United Kingdom" in full, never "UK") plus a few realistically commutable nearby towns/areas (roughly a 10-15 mile / 20-30 minute drive radius, not a whole county or region). Format each as "Town, England/Scotland/Wales/Northern Ireland, United Kingdom" (or the correct country for non-UK locations). If the input is already broad (a city, county, or country), just return that single location unchanged — do not narrow it. No markdown, no preamble. Example input: "Brentwood, United Kingdom" — example output: ["Brentwood, England, United Kingdom","Shenfield, England, United Kingdom","Billericay, England, United Kingdom","Ingatestone, England, United Kingdom","Chelmsford, England, United Kingdom"]';
-  const raw = await callClaude(system, location, 250);
-  if (!raw) return fallback;
+// ── Distance filtering (geocoding + haversine) ─────────────────────
+// Added 2026-08-05. There is no way to get Apify/LinkedIn to search a genuine mile radius
+// at the source — the actor's `locations` field is a strict array of exact geo matches,
+// and a 2026-08-04 attempt to work around that by having Claude generate a list of nearby
+// towns (Fix #5) turned out to fail silently: even a well-formed list like ["Brentwood,
+// England, United Kingdom", "Shenfield, England, United Kingdom", ...] came back with 0
+// results from the actor (confirmed via Vercel logs), most likely because one or more of
+// the smaller towns still doesn't resolve as a LinkedIn geo entity and the whole run fails
+// rather than searching the towns that do resolve. So instead: search broadly (single
+// location, falling back to nationwide per the existing 2026-08-04 fallback below), then
+// geocode the Role's Location and each shortlisted candidate's Location ourselves and
+// filter/tag by real calculated distance — this is what actually answers "search within
+// 15 miles," not anything LinkedIn's own filter can do.
+//
+// Uses OpenStreetMap's Nominatim (free, no API key) — fine for this app's low volume
+// (a handful of geocode calls per search, only ever run against an already-ranked
+// shortlist of up to 8 candidates, not a whole pool). Nominatim's usage policy caps free
+// use at ~1 request/second and requires a descriptive User-Agent, both respected below.
+// If usage ever grows enough to hit that limit, swap in a paid geocoding provider.
+let lastGeocodeAt = 0;
+const geocodeCache = new Map();
+async function geocodeLocation(text) {
+  const key = (text || '').trim().toLowerCase();
+  if (!key) return null;
+  if (geocodeCache.has(key)) return geocodeCache.get(key);
+  const wait = 1100 - (Date.now() - lastGeocodeAt);
+  if (wait > 0) await new Promise(r => setTimeout(r, wait));
+  lastGeocodeAt = Date.now();
   try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || !parsed.length) return fallback;
-    const list = parsed.filter(l => typeof l === 'string' && l.trim()).map(normalize).slice(0, 6);
-    return list.length ? list : fallback;
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(text)}`;
+    const r = await fetch(url, { headers: { 'User-Agent': 'TalentKnight-CRM/1.0 (mindweaveai@gmail.com)' } });
+    const data = r.ok ? await r.json() : [];
+    const hit = data[0];
+    const result = hit ? { lat: parseFloat(hit.lat), lon: parseFloat(hit.lon) } : null;
+    geocodeCache.set(key, result);
+    return result;
   } catch {
-    return fallback;
+    geocodeCache.set(key, null);
+    return null;
   }
+}
+
+function haversineMiles(a, b) {
+  const R = 3958.8; // Earth radius in miles
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLon = toRad(b.lon - a.lon);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.asin(Math.sqrt(h));
+}
+
+// Geocodes the Role's Location once and each candidate's Location, attaches
+// `.distanceMiles` to every candidate that resolved within MAX_COMMUTE_MILES, and drops
+// anyone beyond it. Only ever called on an already-Claude-ranked shortlist (max 8), so
+// worst case is ~9 sequential geocode calls (~10s added, well within Vercel's 5-minute
+// function timeout).
+//
+// If the Role's Location itself doesn't geocode to a specific point — blank, "Remote", a
+// bare country, or just a lookup failure — distance can't mean anything, so every
+// candidate is returned unfiltered rather than silently dropping everyone. Same for a
+// candidate whose own Location fails to geocode: kept, just undecorated, rather than
+// punished for missing/messy data.
+async function filterByDistance(roleLocation, candidates) {
+  if (!roleLocation?.trim() || !candidates.length) return candidates;
+  const roleGeo = await geocodeLocation(roleLocation);
+  if (!roleGeo) return candidates;
+
+  const out = [];
+  for (const c of candidates) {
+    const geo = c.location ? await geocodeLocation(c.location) : null;
+    if (!geo) { out.push(c); continue; }
+    const miles = haversineMiles(roleGeo, geo);
+    if (miles <= MAX_COMMUTE_MILES) out.push({ ...c, distanceMiles: Math.round(miles * 10) / 10 });
+  }
+  return out;
 }
 
 // ── Notifications (optional, via Make.com) ────────────────────────
@@ -506,6 +576,7 @@ async function upsertRoleMatches(candidates, roleId, roleTitle, allMatches, h) {
     const existing = existingByCandidate[c.id];
     const fields = {};
     if (c.fitScore != null) fields[RMF.fitScore] = c.fitScore;
+    if (c.distanceMiles != null) fields[RMF.distanceMiles] = c.distanceMiles;
 
     if (!existing) {
       fields[RMF.label] = `${c.name} → ${roleTitle}`;
@@ -971,6 +1042,7 @@ async function runMatchSearch(roleId, title, location, brief, h) {
     })).filter(c => c.name && !protectedIds.has(c.id));
 
     matched = (await rankPoolAgainstRole(briefText, pool, 8)).filter(c => c.fitScore >= MIN_MATCH_SCORE);
+    matched = await filterByDistance(location, matched);
 
     if (matched.length) {
       const { linked, notifyOnly } = await upsertRoleMatches(matched, roleId, title, allMatches, h);
@@ -1000,21 +1072,18 @@ async function runMatchSearch(roleId, title, location, brief, h) {
   // small town returns almost nothing (confirmed: 4 candidates for Service Desk Analyst in
   // Brentwood, all sharing the identical normalized location string) — the actor's `locations`
   // filter has no radius/distance parameter at all (checked the full input schema), it's a
-  // strict exact match against one LinkedIn geo entity. `expandLocationForSearch()` above
-  // widens a single town into itself + a few realistically commutable nearby towns rather than
-  // jumping straight to a whole county (too broad — pulls in candidates an hour+ away).
+  // strict exact match against one LinkedIn geo entity. A same-day attempt to fix this by having
+  // Claude expand one town into several nearby commutable towns (`expandLocationForSearch()`,
+  // Fix #5) was reverted 2026-08-05 after confirming via Vercel logs that even a well-formed
+  // multi-town array still returns 0 results from the actor. Real "search within X miles"
+  // behavior is now handled entirely after the fact by `filterByDistance()` above (see its
+  // comment) — this first-pass search just uses the single normalized Role Location.
   let runId = null;
   const APIFY_TOKEN = process.env.APIFY_TOKEN;
   if (APIFY_TOKEN && title) {
     try {
       const actorInput = { profileScraperMode: 'Full', maxItems: 25, searchQuery: title };
-      if (location) actorInput.locations = await expandLocationForSearch(location);
-      // Temporary diagnostic log, added 2026-08-04 — the 20:39 Brentwood search's first-pass
-      // run (expanded locations) came back with 0 results and triggered the nationwide
-      // fallback in handleFindMatchesPoll, same silent-failure shape as the original
-      // Shenfield bug. Logging the exact locations array Claude generated so the next
-      // occurrence can be diagnosed from Vercel's function logs instead of guessing —
-      // remove once expandLocationForSearch's output has been confirmed reliable.
+      if (location) actorInput.locations = [normalizeLocation(location)];
       console.log('[find-matches] actorInput for role', JSON.stringify({ title, roleLocation: location, locations: actorInput.locations }));
       const startUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/runs?token=${APIFY_TOKEN}&memory=256`;
       const r = await fetch(startUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(actorInput) });
@@ -1030,7 +1099,7 @@ async function runMatchSearch(roleId, title, location, brief, h) {
 
   return {
     matchedCount: matched.length,
-    matched: matched.map(c => ({ id: c.id, name: c.name, fitScore: c.fitScore })),
+    matched: matched.map(c => ({ id: c.id, name: c.name, fitScore: c.fitScore, distanceMiles: c.distanceMiles ?? null })),
     runId,
   };
 }
@@ -1101,11 +1170,12 @@ async function handleFindMatchesPoll(req, res) {
   // polling — degrades to a broader search instead of silently reporting nothing.
   if (raw.length === 0 && retry !== '1' && APIFY_TOKEN) {
     const title = roleRec.fields[RF.title];
-    // Temporary diagnostic log, added 2026-08-04 alongside the matching one in
-    // runMatchSearch — confirms when the nationwide fallback actually fires (vs. the
-    // AI-expanded locations genuinely finding 0 people) so a 0-result first pass can be
-    // traced back to what locations were sent, not just guessed at. Remove once
-    // expandLocationForSearch's output has been confirmed reliable.
+    // Diagnostic log, added 2026-08-04 — confirms when this nationwide fallback actually
+    // fires. As of 2026-08-05 the first-pass search uses a single normalized Role Location
+    // (see normalizeLocation() — the multi-town AI-expansion this comment used to reference
+    // was reverted), and whatever this fallback surfaces gets run back through
+    // filterByDistance() below just like the first pass would have, so a Manchester result
+    // for a Brentwood role still can't slip through even on the nationwide path.
     console.log('[find-matches-poll] first pass returned 0, triggering nationwide fallback', JSON.stringify({ runId, roleId, title }));
     if (title) {
       try {
@@ -1249,7 +1319,13 @@ async function handleFindMatchesPoll(req, res) {
   const roleBrief = roleRec.fields[RF.brief] || '';
   const briefText = [roleTitle, roleLoc, roleBrief].filter(Boolean).join(' — ');
 
-  const ranked = (await rankPoolAgainstRole(briefText, resolved, 8)).filter(c => c.fitScore >= MIN_MATCH_SCORE);
+  // Distance filtering matters most here: this is the path that also handles the
+  // nationwide-fallback dataset (see the "Location-not-recognized fallback" comment
+  // above) — without it, a role in Brentwood with no local LinkedIn hits could silently
+  // link candidates from Manchester or Doncaster. Applied after Claude's fit-score
+  // ranking, so it only ever runs against an already-short (max 8) list.
+  let ranked = (await rankPoolAgainstRole(briefText, resolved, 8)).filter(c => c.fitScore >= MIN_MATCH_SCORE);
+  ranked = await filterByDistance(roleLoc, ranked);
   let linked = [], notifyOnly = [];
   if (ranked.length) {
     const allMatches = await fetchAllRoleMatches(h);
@@ -1261,7 +1337,7 @@ async function handleFindMatchesPoll(req, res) {
   return res.status(200).json({
     status: 'SUCCEEDED',
     matchedCount: ranked.length,
-    matched: ranked.map(c => ({ id: c.id, name: c.name, fitScore: c.fitScore })),
+    matched: ranked.map(c => ({ id: c.id, name: c.name, fitScore: c.fitScore, distanceMiles: c.distanceMiles ?? null })),
   });
 }
 
@@ -1355,7 +1431,12 @@ async function handleRematchPool(req, res) {
 
     if (!pool.length) continue;
 
-    const matched = (await rankPoolAgainstRole(briefText, pool, 8)).filter(c => c.fitScore >= MIN_MATCH_SCORE);
+    let matched = (await rankPoolAgainstRole(briefText, pool, 8)).filter(c => c.fitScore >= MIN_MATCH_SCORE);
+    // geocodeLocation()'s cache is module-level and persists across this loop's iterations
+    // (not just within one role), so candidates who show up in more than one role's
+    // shortlist only ever get geocoded once per cron run — keeps the added latency from
+    // compounding too badly across a base with many Active Roles.
+    matched = await filterByDistance(role.location, matched);
     if (!matched.length) continue;
 
     const { linked, notifyOnly } = await upsertRoleMatches(matched, role.id, role.title, allMatches, h);
