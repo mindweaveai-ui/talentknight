@@ -308,6 +308,36 @@
     .fit-score-bar-fill.good      { background: var(--amber); }
     .fit-score-bar-fill.partial   { background: var(--rose); }
 
+    /* ── CRM INTELLIGENCE (Contact History) ── added 2026-08-05 */
+    .history-add-row { display: flex; gap: 6px; margin-bottom: 10px; }
+    .history-type-select {
+      font-family: inherit; font-size: 12px; padding: 7px 8px; border: 1px solid var(--border);
+      border-radius: 7px; background: var(--bg); color: var(--text); flex-shrink: 0;
+    }
+    .history-summary-input {
+      font-family: inherit; font-size: 12px; flex: 1; min-width: 0;
+      padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px;
+      background: var(--bg); color: var(--text);
+    }
+    .history-summary-input:focus, .history-type-select:focus { outline: none; border-color: var(--blue); background: var(--surface); }
+    .history-log-btn {
+      font-family: inherit; font-size: 12px; font-weight: 600; color: white;
+      background: var(--blue); border: none; border-radius: 7px; padding: 0 12px;
+      cursor: pointer; flex-shrink: 0; transition: background 0.12s;
+    }
+    .history-log-btn:hover { background: #1d4ed8; }
+    .history-log-btn:disabled { background: var(--dim); cursor: not-allowed; }
+    .history-list { display: flex; flex-direction: column; }
+    .history-entry { font-size: 12.5px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .history-entry:last-child { border-bottom: none; padding-bottom: 0; }
+    .history-type-badge {
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;
+      color: var(--blue); background: var(--blue-light); border-radius: 4px; padding: 1px 6px;
+      margin-right: 6px;
+    }
+    .history-meta { color: var(--dim); font-size: 11px; margin-top: 2px; }
+    .history-empty, .history-loading { color: var(--dim); font-size: 12px; padding: 4px 0; }
+
     /* ── DRAWER ── */
     .drawer-backdrop {
       position: fixed; inset: 0; background: rgba(15,23,42,0.25); z-index: 300;
@@ -571,6 +601,7 @@ let roleIdx = 0;
 let dragId = null;
 let dragFrom = null;
 let openCand = null;
+let openCandRoleId = null; // CRM Intelligence — the Role in scope when the drawer was opened
 let searchQuery = '';
 let roleSearchQuery = '';
 let showClosed = false; // hide Closed-status roles from the sidebar list by default
@@ -1181,6 +1212,11 @@ async function refreshDashboard() {
 // ── Candidate drawer ────────────────────────────────────────────
 function openDrawer(c) {
   openCand = c;
+  // CRM Intelligence needs the current Role's id (candidate objects don't carry it
+  // themselves — the kanban board is always rendered per-Role, so this is always in scope
+  // whenever a card is clicked). Stored on the module-level state so addHistoryEntry() can
+  // read it without needing it threaded through every call site.
+  openCandRoleId = currentCompany().roles[roleIdx]?.id || null;
   const bg = avatarColor(c.name);
   const sub = [c.role, c.company].filter(Boolean).join(' · ');
   const loc = shortLoc(c.location);
@@ -1286,6 +1322,21 @@ function openDrawer(c) {
       <div id="placementEarningsNote" style="font-size:12px;color:var(--muted);margin-top:6px;">${c.actualEarnings != null ? `Actual earnings at this rate: <strong>£${c.actualEarnings.toLocaleString()}</strong>` : ''}</div>
     </div>` : ''}
 
+    ${state.user.isStaff ? `
+    <div class="drawer-section">
+      <div class="drawer-section-label">Activity</div>
+      <div class="history-add-row">
+        <select class="history-type-select" id="historyType">
+          <option>Note</option><option>Call</option><option>Email</option><option>Interview</option>
+          <option>Submission</option><option>Offer</option><option>Placement</option>
+        </select>
+        <input class="history-summary-input" id="historySummary" type="text" placeholder="Log a call, email, note…"
+          onkeydown="if(event.key==='Enter') addHistoryEntry('${c.id}')" />
+        <button class="history-log-btn" id="historyLogBtn" onclick="addHistoryEntry('${c.id}')">Log</button>
+      </div>
+      <div class="history-list" id="historyList"><div class="history-loading">Loading activity…</div></div>
+    </div>` : ''}
+
     <div class="drawer-section" style="flex:1;">
       <div class="drawer-section-label">Notes</div>
       <textarea class="drawer-notes" id="drawerNotes" placeholder="Add notes about this candidate…">${esc(c.notes || '')}</textarea>
@@ -1294,6 +1345,67 @@ function openDrawer(c) {
   document.getElementById('drawerBackdrop').classList.add('open');
   document.getElementById('drawer').classList.add('open');
   document.getElementById('saveStatus').style.opacity = '0';
+
+  if (state.user.isStaff) loadCandidateHistory(c.id);
+}
+
+// ── CRM Intelligence (Contact History) ─────────────────────────────
+function renderHistoryEntries(entries) {
+  const list = document.getElementById('historyList');
+  if (!list) return; // drawer may have been closed/reopened before the fetch resolved
+  if (!entries.length) {
+    list.innerHTML = `<div class="history-empty">No activity logged yet.</div>`;
+    return;
+  }
+  list.innerHTML = entries.map(e => {
+    const when = new Date(e.loggedAt);
+    const dateStr = isNaN(when) ? '' : when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) +
+      ' at ' + when.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    return `
+      <div class="history-entry">
+        <span class="history-type-badge">${esc(e.type)}</span>${esc(e.summary)}
+        <div class="history-meta">${esc(dateStr)}${e.loggedBy ? ` · ${esc(e.loggedBy)}` : ''}</div>
+      </div>`;
+  }).join('');
+}
+
+async function loadCandidateHistory(candidateId) {
+  try {
+    const h = await authHeader();
+    const r = await fetch(`/api/crm?action=candidate-history&candidateId=${encodeURIComponent(candidateId)}`, { headers: h });
+    if (!r.ok) throw new Error();
+    const data = await r.json();
+    // Guard against a stale response landing after the drawer moved on to a different
+    // candidate (fast clicking between cards) or closed entirely.
+    if (openCand?.id !== candidateId) return;
+    renderHistoryEntries(data.entries || []);
+  } catch {
+    const list = document.getElementById('historyList');
+    if (list && openCand?.id === candidateId) list.innerHTML = `<div class="history-empty">Couldn't load activity.</div>`;
+  }
+}
+
+async function addHistoryEntry(candidateId) {
+  const type = document.getElementById('historyType').value;
+  const input = document.getElementById('historySummary');
+  const summary = input.value.trim();
+  if (!summary) { input.focus(); return; }
+  const btn = document.getElementById('historyLogBtn');
+  btn.disabled = true; btn.textContent = 'Logging…';
+  try {
+    const h = await authHeader();
+    const r = await fetch('/api/crm?action=add-history', {
+      method: 'POST', headers: { ...h, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidateId, roleId: openCandRoleId, type, summary }),
+    });
+    if (!r.ok) throw new Error();
+    input.value = '';
+    await loadCandidateHistory(candidateId);
+  } catch {
+    alert('Failed to log entry — please try again.');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Log';
+  }
 }
 
 function closeDrawer() {
@@ -1507,115 +1619,3 @@ async function submitEditRole() {
   const btn = document.getElementById('editRoleSubmitBtn');
   btn.disabled = true; btn.textContent = 'Saving…';
   try {
-    const h = await authHeader();
-    const r = await fetch('/api/crm?action=update-role', {
-      method: 'PATCH', headers: { ...h, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roleId: editingRoleId, title, location, brief, status }),
-    });
-    if (!r.ok) throw new Error();
-    const company = currentCompany();
-    const role = company.roles.find(r => r.id === editingRoleId);
-    if (role) Object.assign(role, { title, location, brief, status });
-    document.getElementById('editRoleModalOverlay').classList.remove('open');
-    editingRoleId = null;
-    render();
-  } catch {
-    alert('Failed to save role — please try again.');
-    btn.disabled = false; btn.textContent = 'Save changes';
-  }
-}
-
-async function confirmDeleteRole() {
-  if (!editingRoleId) return;
-  const company = currentCompany();
-  const role = company.roles.find(r => r.id === editingRoleId);
-  if (!role) return;
-  const candCount = role.candidates.length;
-  const warning = candCount
-    ? `Delete "${role.title}"? This also permanently removes ${candCount} candidate match${candCount !== 1 ? 'es' : ''} linked to this role (the candidates themselves are untouched). This can't be undone.`
-    : `Delete "${role.title}"? This can't be undone.`;
-  if (!confirm(warning)) return;
-
-  const btn = document.getElementById('editRoleDeleteBtn');
-  btn.disabled = true; btn.textContent = 'Deleting…';
-  try {
-    const h = await authHeader();
-    const r = await fetch('/api/crm?action=delete-role', {
-      method: 'POST', headers: { ...h, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roleId: editingRoleId }),
-    });
-    if (!r.ok) throw new Error();
-    company.roles = company.roles.filter(r => r.id !== editingRoleId);
-    roleIdx = Math.min(roleIdx, Math.max(0, company.roles.length - 1));
-    document.getElementById('editRoleModalOverlay').classList.remove('open');
-    editingRoleId = null;
-    searchQuery = '';
-    render();
-  } catch {
-    alert('Failed to delete role — please try again.');
-    btn.disabled = false; btn.textContent = '🗑️ Delete role';
-  }
-}
-
-// ── Helpers ───────────────────────────────────────────────
-function stageDays(dateStr) {
-  if (!dateStr) return null;
-  const then = new Date(dateStr + 'T00:00:00');
-  const now = new Date();
-  const diff = Math.floor((now - then) / 86400000);
-  return diff < 0 ? 0 : diff;
-}
-
-function ageClass(days) {
-  if (days >= 14) return 'stage-age-alert';
-  if (days >= 7)  return 'stage-age-warn';
-  return 'stage-age-ok';
-}
-
-function todayISO() {
-  return new Date().toISOString().split('T')[0];
-}
-
-function avatarColor(name) {
-  const p = ['#2563eb','#7c3aed','#db2777','#dc2626','#d97706','#059669','#0891b2','#4f46e5'];
-  let h = 0;
-  for (const ch of String(name)) h = (h * 31 + ch.charCodeAt(0)) & 0x7fffffff;
-  return p[h % p.length];
-}
-function initials(name) {
-  return String(name || '').split(' ').slice(0, 2).map(w => w[0] || '').join('').toUpperCase() || '?';
-}
-// Four-tier bands (2026-08-05) — 90+ Excellent, 80-89 Strong, 70-79 Good, below 70
-// Partial. Class name doubles as the human label (see fitScoreLabel below), replacing
-// the previous two-cutoff good/ok/low scheme (85/70) that didn't match this spec.
-function fitScoreClass(score) {
-  return score >= 90 ? 'excellent' : score >= 80 ? 'strong' : score >= 70 ? 'good' : 'partial';
-}
-function fitScoreLabel(score) {
-  const c = fitScoreClass(score);
-  return c.charAt(0).toUpperCase() + c.slice(1);
-}
-function shortLoc(loc) {
-  if (!loc) return '';
-  const parts = loc.split(',').map(p => p.trim());
-  if (parts.length === 1) return loc;
-  const cm = { 'United Kingdom':'UK','England':'UK','Scotland':'UK','Wales':'UK','Northern Ireland':'UK','United States':'US','United States of America':'US' };
-  return `${parts[0]}, ${cm[parts[parts.length-1]] ?? parts[parts.length-1]}`;
-}
-function formatSalary(min, max) {
-  const fmt = (n) => `£${Math.round(n / 1000)}k`;
-  if (min != null && max != null) return `${fmt(min)} – ${fmt(max)}`;
-  if (min != null) return `${fmt(min)}+`;
-  if (max != null) return `Up to ${fmt(max)}`;
-  return '';
-}
-function esc(s)  { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function escA(s) { return String(s ?? '').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
-function showErr(t, m) {
-  document.getElementById('main').innerHTML = `<div class="centered"><div class="err-title">${esc(t)}</div><div class="err-msg">${esc(m)}</div></div>`;
-}
-
-window.addEventListener('load', load);
-</script>
-</body>
-</html>
