@@ -384,32 +384,49 @@ function normalizeLocation(location) {
 // filter/tag by real calculated distance — this is what actually answers "search within
 // 15 miles," not anything LinkedIn's own filter can do.
 //
-// Uses OpenStreetMap's Nominatim (free, no API key) — fine for this app's low volume
-// (a handful of geocode calls per search, only ever run against an already-ranked
-// shortlist of up to 8 candidates, not a whole pool). Nominatim's usage policy caps free
-// use at ~1 request/second and requires a descriptive User-Agent, both respected below.
-// If usage ever grows enough to hit that limit, swap in a paid geocoding provider.
-let lastGeocodeAt = 0;
+// Originally built on OpenStreetMap's Nominatim (free, no API key) — replaced 2026-08-05
+// after a live test came back with unfiltered results (Birmingham/Doncaster/Hartlepool,
+// even a candidate in Iași, Romania, all "matched" to a Brentwood role) and Vercel's
+// per-request External APIs panel showed zero calls to nominatim.openstreetmap.org ever
+// completing — confirmed independently by the same host also being unreachable from a
+// second, unrelated sandboxed environment. Nominatim's free tier is known to be
+// unreliable from datacenter/cloud IP ranges (Vercel's included); when the very first
+// geocode call (for the Role's own location) silently fails, filterByDistance() fails
+// open and returns every candidate unfiltered, which is exactly what was observed.
+//
+// Now uses postcodes.io's Places API (`/places?q=`, backed by Ordnance Survey Open
+// Names, free, no key, no documented rate limit) — UK government-adjacent
+// infrastructure that's been reliably reachable from serverless in practice. It's a
+// free-text search over GB place names, but expects a bare place name ("Great Warley"),
+// not Apify's decorated "Great Warley, England, United Kingdom, GB" strings — hence
+// extractPlaceName() below. Being UK-only by design, it will never resolve a genuinely
+// non-UK location (see the UK_HINTS check in filterByDistance for how that's handled).
+function extractPlaceName(text) {
+  return (text || '').split(',')[0].trim();
+}
+
 const geocodeCache = new Map();
 async function geocodeLocation(text) {
   const key = (text || '').trim().toLowerCase();
   if (!key) return null;
   if (geocodeCache.has(key)) return geocodeCache.get(key);
-  const wait = 1100 - (Date.now() - lastGeocodeAt);
-  if (wait > 0) await new Promise(r => setTimeout(r, wait));
-  lastGeocodeAt = Date.now();
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(text)}`;
-    const r = await fetch(url, { headers: { 'User-Agent': 'TalentKnight-CRM/1.0 (mindweaveai@gmail.com)' } });
-    const data = r.ok ? await r.json() : [];
-    const hit = data[0];
-    const result = hit ? { lat: parseFloat(hit.lat), lon: parseFloat(hit.lon) } : null;
-    geocodeCache.set(key, result);
-    return result;
-  } catch {
-    geocodeCache.set(key, null);
-    return null;
+  const placeName = extractPlaceName(text);
+  let result = null;
+  if (placeName) {
+    try {
+      const url = `https://api.postcodes.io/places?q=${encodeURIComponent(placeName)}&limit=1`;
+      const r = await fetch(url);
+      const data = r.ok ? await r.json() : null;
+      const hit = data?.result?.[0];
+      if (hit && typeof hit.latitude === 'number' && typeof hit.longitude === 'number') {
+        result = { lat: hit.latitude, lon: hit.longitude };
+      }
+    } catch {
+      result = null;
+    }
   }
+  geocodeCache.set(key, result);
+  return result;
 }
 
 function haversineMiles(a, b) {
@@ -424,14 +441,25 @@ function haversineMiles(a, b) {
 // Geocodes the Role's Location once and each candidate's Location, attaches
 // `.distanceMiles` to every candidate that resolved within MAX_COMMUTE_MILES, and drops
 // anyone beyond it. Only ever called on an already-Claude-ranked shortlist (max 8), so
-// worst case is ~9 sequential geocode calls (~10s added, well within Vercel's 5-minute
-// function timeout).
+// worst case is ~9 sequential geocode calls — postcodes.io has no documented rate limit
+// (unlike Nominatim's old ~1req/sec cap), so this no longer needs an enforced delay
+// between calls and should add well under a second per call in practice.
 //
 // If the Role's Location itself doesn't geocode to a specific point — blank, "Remote", a
 // bare country, or just a lookup failure — distance can't mean anything, so every
 // candidate is returned unfiltered rather than silently dropping everyone. Same for a
-// candidate whose own Location fails to geocode: kept, just undecorated, rather than
-// punished for missing/messy data.
+// candidate whose own Location fails to geocode AND still looks plausibly UK-based
+// (postcodes.io's Places data has gaps for very small/obscure locations) — kept
+// undecorated rather than punished for a gap in the geocoder's coverage.
+//
+// But a candidate whose Location text doesn't even look UK-based (no England/Scotland/
+// Wales/Northern Ireland/UK/GB mention) does NOT get that benefit of the doubt — added
+// 2026-08-05 after the live test surfaced a candidate located in Iași, Romania matched
+// to a Brentwood role. postcodes.io is UK-only by design, so it will never resolve a
+// genuinely overseas location, and silently keeping those candidates unfiltered would
+// reopen exactly the bug this whole fix exists to close.
+const UK_HINTS = /\b(united kingdom|england|scotland|wales|northern ireland|gb|uk)\b/i;
+
 async function filterByDistance(roleLocation, candidates) {
   if (!roleLocation?.trim() || !candidates.length) return candidates;
   const roleGeo = await geocodeLocation(roleLocation);
@@ -440,7 +468,11 @@ async function filterByDistance(roleLocation, candidates) {
   const out = [];
   for (const c of candidates) {
     const geo = c.location ? await geocodeLocation(c.location) : null;
-    if (!geo) { out.push(c); continue; }
+    if (!geo) {
+      if (c.location && !UK_HINTS.test(c.location)) continue;
+      out.push(c);
+      continue;
+    }
     const miles = haversineMiles(roleGeo, geo);
     if (miles <= MAX_COMMUTE_MILES) out.push({ ...c, distanceMiles: Math.round(miles * 10) / 10 });
   }
