@@ -493,7 +493,45 @@ function stripDirectionalPrefix(text) {
 // Closing all of this the same way: if the full original text names a country other than
 // the UK, never attempt to geocode it at all — let it fall through to filterByDistance's
 // UK_HINTS text check instead, which correctly excludes it without risking a false match.
-const NON_UK_COUNTRY_HINTS = /\b(south africa|united states|USA|canada|india|united arab emirates|australia|new zealand|ireland|pakistan|nigeria|kenya|philippines|singapore|hong kong|china|germany|france|spain|italy|netherlands|poland|romania|brazil|mexico|eastern cape|western cape|gauteng|ontario|quebec|alberta|british columbia)\b/i;
+//
+// Kept as named groups (not one flat alternation) because filterByDistance needs to reuse
+// the SAME per-country pattern two ways: (1) here, to stop a candidate's location ever
+// being geocoded against a same-named UK place, and (2) to detect when a ROLE's own
+// location names a non-UK country and match candidates against that country by text
+// instead of wrongly funnelling every non-UK role through the UK-only fallback (see
+// filterByDistance's 2026-08-05 "Crypto Knight roles are genuinely US-based" fix below).
+const COUNTRY_GROUPS = [
+  { label: 'united states', re: /\b(united states|USA)\b/i },
+  { label: 'south africa', re: /\b(south africa|eastern cape|western cape|gauteng)\b/i },
+  { label: 'canada', re: /\b(canada|ontario|quebec|alberta|british columbia)\b/i },
+  { label: 'india', re: /\bindia\b/i },
+  { label: 'united arab emirates', re: /\b(united arab emirates|dubai|abu dhabi)\b/i },
+  { label: 'australia', re: /\baustralia\b/i },
+  { label: 'new zealand', re: /\bnew zealand\b/i },
+  { label: 'ireland', re: /\bireland\b/i },
+  { label: 'pakistan', re: /\bpakistan\b/i },
+  { label: 'nigeria', re: /\bnigeria\b/i },
+  { label: 'kenya', re: /\bkenya\b/i },
+  { label: 'philippines', re: /\bphilippines\b/i },
+  { label: 'singapore', re: /\bsingapore\b/i },
+  { label: 'hong kong', re: /\bhong kong\b/i },
+  { label: 'china', re: /\bchina\b/i },
+  { label: 'germany', re: /\bgermany\b/i },
+  { label: 'france', re: /\bfrance\b/i },
+  { label: 'spain', re: /\bspain\b/i },
+  { label: 'italy', re: /\bitaly\b/i },
+  { label: 'netherlands', re: /\bnetherlands\b/i },
+  { label: 'poland', re: /\bpoland\b/i },
+  { label: 'romania', re: /\bromania\b/i },
+  { label: 'brazil', re: /\bbrazil\b/i },
+  { label: 'mexico', re: /\bmexico\b/i },
+];
+const NON_UK_COUNTRY_HINTS = new RegExp(COUNTRY_GROUPS.map(g => g.re.source).join('|'), 'i');
+function detectNonUkCountry(text) {
+  if (!text) return null;
+  for (const g of COUNTRY_GROUPS) if (g.re.test(text)) return g;
+  return null;
+}
 
 const geocodeCache = new Map();
 async function geocodeLocation(text) {
@@ -566,16 +604,39 @@ function haversineMiles(a, b) {
 const UK_HINTS = /\b(united kingdom|england|scotland|wales|northern ireland|gb|uk)\b/i;
 
 async function filterByDistance(roleLocation, candidates) {
-  if (!roleLocation?.trim() || !candidates.length) return candidates;
-  const roleGeo = await geocodeLocation(roleLocation);
+  const loc = (roleLocation || '').trim();
+  if (!loc || !candidates.length) return candidates;
+
+  // "Remote" roles have no fixed base to filter against — must stay unfiltered (this was
+  // the pre-2026-08-05 behaviour and is still correct; only the "geocode genuinely failed"
+  // case below needed tightening, not this one).
+  if (/\bremote\b/i.test(loc)) return candidates;
+
+  // (2026-08-05) TalentKnight isn't UK-only — Crypto Knight's roles are entered with
+  // Location "United States". The Buckley Watson Tax Manager fix above made "role location
+  // didn't geocode" fall back to a UK-only filter, which is correct for a genuinely UK role
+  // with an obscure/misspelled place name, but WRONG for a role that's deliberately
+  // non-UK — postcodes.io will never geocode "United States" (it's UK-only by design), so
+  // every one of those roles would have silently had every real candidate excluded. Detect
+  // the role's own country intent FIRST, before ever calling the UK geocoder on it: if the
+  // Role's location names a specific non-UK country, match candidates by that same country
+  // in their location text instead (no cross-border geocoding available yet, so text
+  // matching is the best available signal) rather than defaulting to "must be UK."
+  const roleCountry = detectNonUkCountry(loc);
+  if (roleCountry) {
+    return candidates.filter(c => !c.location || roleCountry.re.test(c.location));
+  }
+
+  // Presumed-UK role from here on (today's default and the actual common case).
+  const roleGeo = await geocodeLocation(loc);
   if (!roleGeo) {
     // The Role's own location didn't resolve even after geocodeLocation's directional-
-    // prefix retry — could be a genuinely obscure/misspelled place name, or a phrasing
-    // pattern not yet accounted for. Either way, "can't compute distance" must never again
-    // mean "skip geography filtering entirely" (that was the root cause of the Buckley
-    // Watson Tax Manager incident, 2026-08-05 — see geocodeLocation's comment). Degrade to
-    // a country-level filter instead: drop anyone whose location text has no UK indication
-    // at all, keep the rest undecorated (no distanceMiles — genuinely unknown, not zero).
+    // prefix retry — could be a genuinely obscure/misspelled UK place name (not "Remote"
+    // or a named non-UK country, both already handled above). Either way, "can't compute
+    // distance" must never again mean "skip geography filtering entirely" (that was the
+    // root cause of the original Buckley Watson Tax Manager incident, 2026-08-05). Degrade
+    // to a country-level filter instead: drop anyone whose location text has no UK
+    // indication at all, keep the rest undecorated (no distanceMiles — genuinely unknown).
     return candidates.filter(c => !c.location || UK_HINTS.test(c.location));
   }
 
