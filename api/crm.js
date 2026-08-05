@@ -115,6 +115,16 @@ const RMF = {
   // same rankPoolAgainstRole Claude call that produces fitScore. Added 2026-08-05 for the
   // "AI Candidate Summaries" roadmap item.
   summary: 'fld9JdfaoACkdbpMt',
+  // Per-(Candidate, Role) Notes + Placement Salary — added 2026-08-05, replacing the old
+  // flat KF.notes/KF.placementSalary fields on All Candidates. Those were a real
+  // cross-client confidentiality leak: TalentKnight's candidate pool is shared across
+  // every Organization (agency) using the platform, so a recruiter's note written about a
+  // candidate for one client was visible to every OTHER client that candidate also
+  // happened to be matched to — confirmed live on two candidates (Harriet Voss, Owen
+  // Pearce) who were matched to roles under two different Organizations at once. Same fix
+  // pattern as the 2026-08-02 Fit Score/Pipeline Stage migration. The old flat fields are
+  // left in place as a frozen historical snapshot (not deleted, no longer written).
+  notes: 'fldmjbiU5XzAFtFzI', placementSalary: 'fldDF0gK7yMvj7xvG',
 };
 const CHF = {
   label: 'fldqaqYOdK7VRjZ7f', candidate: 'fldLv9NXLNG0gbySX', role: 'fldXGWEke6b7lf6Zf',
@@ -617,6 +627,8 @@ async function fetchAllRoleMatches(h) {
       stage: rec.fields[RMF.pipelineStage] || '',
       stageChangedAt: rec.fields[RMF.stageChangedAt] || '',
       summary: rec.fields[RMF.summary] || '',
+      notes: rec.fields[RMF.notes] || '',
+      placementSalary: typeof rec.fields[RMF.placementSalary] === 'number' ? rec.fields[RMF.placementSalary] : null,
     })));
     offset = res.offset;
   } while (offset);
@@ -786,11 +798,14 @@ async function handleDashboard(req, res) {
       const rawCompany = f[KF.company] || '';
       const company = /^\d+$/.test(rawCompany.trim()) ? '' : rawCompany;
 
-      // Note: pipelineStage/fitScore/stageChangedAt are intentionally NOT read from the
-      // Candidate record here — those flat fields are frozen historical snapshots as of
-      // the 2026-08-02 Role Matches migration. Per-Role values are merged in below from
-      // Role Matches, once per Role, so a candidate matched to 2+ Roles gets the correct
-      // score/stage on each Role's board instead of one shared value.
+      // Note: pipelineStage/fitScore/stageChangedAt/notes/placementSalary are intentionally
+      // NOT read from the Candidate record here — those flat fields are frozen historical
+      // snapshots (pipelineStage/fitScore/stageChangedAt as of the 2026-08-02 Role Matches
+      // migration; notes/placementSalary as of the 2026-08-05 migration that fixed a live
+      // cross-client confidentiality leak — see RMF comment near the top of this file).
+      // Per-Role values are merged in below from Role Matches, once per Role, so a candidate
+      // matched to 2+ Roles/Organizations gets the correct score/stage/notes/salary on each
+      // Role's board instead of one shared value visible across every client.
       candidateMap[rec.id] = {
         id: rec.id,
         name: f[KF.name] || 'Unknown',
@@ -801,7 +816,6 @@ async function handleDashboard(req, res) {
         email: consented ? (f[KF.personalEmail] || '') : '',
         phone: consented ? (f[KF.mobile] || '') : '',
         outreachStatus: f[KF.outreachStatus] || '',
-        notes: f[KF.notes] || '',
         photoUrl: f[KF.photoUrl] || '',
         sector: f[KF.sector] || '',
         yearsExperience: f[KF.yearsExperience] || '',
@@ -816,8 +830,6 @@ async function handleDashboard(req, res) {
         certifications: f[KF.certifications] || '',
         educationLevel: f[KF.educationLevel] || '',
         bio: f[KF.bio] || '',
-        // Earnings pipeline — commercial data, never sent to Company Contacts.
-        placementSalary: isStaff && typeof f[KF.placementSalary] === 'number' ? f[KF.placementSalary] : null,
       };
     });
   }
@@ -854,7 +866,16 @@ async function handleDashboard(req, res) {
                 // Company Contacts never see staff-only stages (e.g. "Matched" — AI
                 // matches awaiting recruiter review) even if linked to their role.
                 if (!isStaff && STAFF_ONLY_STAGES.includes(stage)) return null;
-                return { ...cand, fitScore: m?.fitScore ?? null, pipelineStage: stage, stageChangedAt: m?.stageChangedAt || '', summary: m?.summary || '' };
+                return {
+                  ...cand,
+                  fitScore: m?.fitScore ?? null,
+                  pipelineStage: stage,
+                  stageChangedAt: m?.stageChangedAt || '',
+                  summary: m?.summary || '',
+                  notes: m?.notes || '',
+                  // Earnings pipeline — commercial data, never sent to Company Contacts.
+                  placementSalary: isStaff ? (m?.placementSalary ?? null) : null,
+                };
               })
               .filter(Boolean);
             const base = { ...role, candidateIds: undefined, candidates: roleCandidates };
@@ -1164,7 +1185,10 @@ async function handleAssistantSearch(req, res) {
       linkedinUrl: f[KF.linkedinUrl] || '',
       email: consented ? (f[KF.personalEmail] || '') : '',
       phone: consented ? (f[KF.mobile] || '') : '',
-      notes: f[KF.notes] || '',
+      // Notes intentionally omitted here — this is a role-free, pool-wide search (no
+      // single client relationship to scope a note to), so there's no safe per-role value
+      // to show. See RMF comment near the top of this file for the cross-client leak this
+      // avoids repeating.
       photoUrl: f[KF.photoUrl] || '',
       yearsExperience: f[KF.yearsExperience] || '',
       seniority: f[KF.seniority] || '',
@@ -1246,17 +1270,19 @@ async function handleCompanyRecord(req, res) {
         { headers: h }
       ).then(r => r.json()).catch(() => ({ records: [] }));
       const candNameById = {};
-      const candSalaryById = {};
       (candRes.records || []).forEach(rec => {
         candNameById[rec.id] = rec.fields[KF.name] || 'Unknown';
-        candSalaryById[rec.id] = typeof rec.fields[KF.placementSalary] === 'number' ? rec.fields[KF.placementSalary] : null;
       });
+      // placementSalary comes from the Role Matches row (m.placementSalary), not a flat
+      // Candidate field — see RMF comment near the top of this file. This is naturally
+      // already scoped correctly here since placedMatches is filtered to this company's
+      // own roleIds.
       placements = placedMatches
         .map(m => ({
           candidateId: m.candidateId,
           candidateName: candNameById[m.candidateId] || 'Unknown',
           roleTitle: roleTitleById[m.roleId] || 'Untitled Role',
-          placementSalary: candSalaryById[m.candidateId] ?? null,
+          placementSalary: m.placementSalary ?? null,
           placedAt: m.stageChangedAt || '',
         }))
         .sort((a, b) => new Date(b.placedAt) - new Date(a.placedAt));
@@ -1362,8 +1388,16 @@ async function handleSaveNotes(req, res) {
   const AT_TOKEN = process.env.AT_TOKEN;
   if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
 
-  const { candidateId, notes } = req.body || {};
-  if (!candidateId) return res.status(400).json({ error: 'Missing candidateId' });
+  // roleId is now required — Notes live on the Role Matches row for this specific
+  // (candidate, role) pair, not on the shared Candidate record. That flat field was a
+  // real cross-client confidentiality leak (a note written for one Organization's client
+  // was visible on every other Organization's board the candidate happened to be linked
+  // to — confirmed live on Harriet Voss and Owen Pearce, 2026-08-05). Old clients sending
+  // just {candidateId, notes} get a 400 here; dashboard.html was updated alongside this to
+  // always send roleId (the drawer only allows editing notes when opened in role context).
+  // Mirrors handleUpdateStage's access check and upsert pattern.
+  const { candidateId, roleId, notes } = req.body || {};
+  if (!candidateId || !roleId) return res.status(400).json({ error: 'Missing fields' });
 
   const clerkUserId = await getClerkUserId(req);
   if (!clerkUserId) return res.status(401).json({ error: 'Invalid or missing session' });
@@ -1373,13 +1407,33 @@ async function handleSaveNotes(req, res) {
   if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet." });
 
   const allCompanyIds = access.organizations.flatMap(o => o.companyIds);
-  const check = await candidateAllowed(candidateId, allCompanyIds, h);
-  if (!check.ok) return res.status(check.status).json({ error: check.error });
+  const roleRec = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLES}/${roleId}?returnFieldsByFieldId=true`, { headers: h }).then(r => r.json()).catch(() => null);
+  if (!roleRec?.id) return res.status(404).json({ error: 'Role not found' });
+  const roleCompanyIds = roleRec.fields[RF.company] || [];
+  if (!roleCompanyIds.some(id => allCompanyIds.includes(id))) return res.status(403).json({ error: 'Role not in your access scope' });
 
-  const upd = await fetch(`https://api.airtable.com/v0/${BASE}/${CANDIDATES}/${candidateId}`, {
-    method: 'PATCH', headers: h,
-    body: JSON.stringify({ fields: { [KF.notes]: String(notes ?? '') } }),
-  }).then(r => r.json());
+  const allMatches = await fetchAllRoleMatches(h);
+  const existing = allMatches.find(m => m.roleId === roleId && m.candidateId === candidateId);
+
+  let upd;
+  if (existing) {
+    upd = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLE_MATCHES}/${existing.id}`, {
+      method: 'PATCH', headers: h,
+      body: JSON.stringify({ fields: { [RMF.notes]: String(notes ?? '') } }),
+    }).then(r => r.json());
+  } else {
+    const candRec = await fetch(`https://api.airtable.com/v0/${BASE}/${CANDIDATES}/${candidateId}?returnFieldsByFieldId=true`, { headers: h }).then(r => r.json()).catch(() => null);
+    const candName = candRec?.fields?.[KF.name] || '';
+    const roleTitle = roleRec.fields[RF.title] || '';
+    upd = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLE_MATCHES}`, {
+      method: 'POST', headers: h,
+      body: JSON.stringify({ fields: {
+        [RMF.label]: `${candName} → ${roleTitle}`,
+        [RMF.candidate]: [candidateId], [RMF.role]: [roleId],
+        [RMF.notes]: String(notes ?? ''),
+      } }),
+    }).then(r => r.json());
+  }
 
   return upd.id ? res.status(200).json({ ok: true }) : res.status(500).json({ error: 'Save failed' });
 }
@@ -2113,8 +2167,13 @@ async function handleSavePlacementSalary(req, res) {
   const AT_TOKEN = process.env.AT_TOKEN;
   if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
 
-  const { candidateId, placementSalary } = req.body || {};
-  if (!candidateId) return res.status(400).json({ error: 'candidateId is required' });
+  // roleId is now required — Placement Salary lives on the Role Matches row for this
+  // specific (candidate, role) pair, not on the shared Candidate record. Same 2026-08-05
+  // cross-client leak fix as handleSaveNotes above (see that comment for the fuller
+  // explanation); a placement fee for one Organization's client must never be visible
+  // against that candidate on another Organization's board.
+  const { candidateId, roleId, placementSalary } = req.body || {};
+  if (!candidateId || !roleId) return res.status(400).json({ error: 'Missing fields' });
   if (placementSalary != null && (typeof placementSalary !== 'number' || placementSalary < 0)) {
     return res.status(400).json({ error: 'placementSalary must be a non-negative number' });
   }
@@ -2128,13 +2187,33 @@ async function handleSavePlacementSalary(req, res) {
   if (access.viewerType !== 'staff') return res.status(403).json({ error: 'Only recruiters can set placement salary.' });
 
   const allCompanyIds = access.organizations.flatMap(o => o.companyIds);
-  const check = await candidateAllowed(candidateId, allCompanyIds, h);
-  if (!check.ok) return res.status(check.status).json({ error: check.error });
+  const roleRec = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLES}/${roleId}?returnFieldsByFieldId=true`, { headers: h }).then(r => r.json()).catch(() => null);
+  if (!roleRec?.id) return res.status(404).json({ error: 'Role not found' });
+  const roleCompanyIds = roleRec.fields[RF.company] || [];
+  if (!roleCompanyIds.some(id => allCompanyIds.includes(id))) return res.status(403).json({ error: 'Role not in your access scope' });
 
-  const upd = await fetch(`https://api.airtable.com/v0/${BASE}/${CANDIDATES}/${candidateId}`, {
-    method: 'PATCH', headers: h,
-    body: JSON.stringify({ fields: { [KF.placementSalary]: placementSalary } }),
-  }).then(r => r.json());
+  const allMatches = await fetchAllRoleMatches(h);
+  const existing = allMatches.find(m => m.roleId === roleId && m.candidateId === candidateId);
+
+  let upd;
+  if (existing) {
+    upd = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLE_MATCHES}/${existing.id}`, {
+      method: 'PATCH', headers: h,
+      body: JSON.stringify({ fields: { [RMF.placementSalary]: placementSalary } }),
+    }).then(r => r.json());
+  } else {
+    const candRec = await fetch(`https://api.airtable.com/v0/${BASE}/${CANDIDATES}/${candidateId}?returnFieldsByFieldId=true`, { headers: h }).then(r => r.json()).catch(() => null);
+    const candName = candRec?.fields?.[KF.name] || '';
+    const roleTitle = roleRec.fields[RF.title] || '';
+    upd = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLE_MATCHES}`, {
+      method: 'POST', headers: h,
+      body: JSON.stringify({ fields: {
+        [RMF.label]: `${candName} → ${roleTitle}`,
+        [RMF.candidate]: [candidateId], [RMF.role]: [roleId],
+        [RMF.placementSalary]: placementSalary,
+      } }),
+    }).then(r => r.json());
+  }
 
   return upd.id ? res.status(200).json({ ok: true }) : res.status(500).json({ error: 'Save failed' });
 }
