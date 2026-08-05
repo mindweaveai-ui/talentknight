@@ -26,6 +26,7 @@ export default async function handler(req, res) {
   if (action === 'clarify-brief')      return handleClarifyBrief(req, res);
   if (action === 'candidate-history')  return handleCandidateHistory(req, res);
   if (action === 'add-history')        return handleAddHistory(req, res);
+  if (action === 'assistant-search')   return handleAssistantSearch(req, res);
   if (action === 'generate-token') return res.status(410).json({ error: 'Magic-link tokens are retired. Sign in via Clerk instead.' });
   return res.status(400).json({ error: 'Unknown action' });
 }
@@ -1072,6 +1073,105 @@ async function handleAddHistory(req, res) {
   return written?.id
     ? res.status(200).json({ ok: true })
     : res.status(500).json({ error: 'Failed to log entry' });
+}
+
+// ── AI RECRUITER ASSISTANT ───────────────────────────────────────────
+// Free-text natural-language search across the WHOLE candidate base — "find someone
+// similar to Holly but with payroll bureau experience", "candidates within 15 miles who
+// know CIS". Unlike Find Matches, this isn't scoped to one Role's brief and never writes
+// anything (no Role Matches created, no pipeline stage touched) — it's a read-only
+// exploratory search, so there's no need to exclude PROTECTED_STAGES candidates or
+// restrict by Candidate Type the way runMatchSearch does for actual role-linking.
+//
+// Reuses the exact same building blocks as role matching: extractKeywords() +
+// buildKeywordFilter() to cheaply narrow Airtable's ~8000 candidates down to a plausible
+// pool server-side, then rankPoolAgainstRole() (the query text standing in for a Role's
+// brief) to get Claude-scored results with a one-line "why" summary — the same mechanism
+// that already powers Fit Score/AI Candidate Summaries, just pointed at free text instead
+// of a Role record.
+//
+// Known limitation, not fixed here: a query like "similar to Sean" only works well if
+// Sean's own skills/sector words happen to overlap with other candidates' profile text —
+// there's no special-case lookup that fetches Sean's actual record to compare against.
+// Good enough for a first version; flagging in case results for name-comparison queries
+// feel weaker than skill/location queries.
+async function handleAssistantSearch(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const AT_TOKEN = process.env.AT_TOKEN;
+  if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
+
+  const query = (req.body?.query || '').trim();
+  if (!query) return res.status(400).json({ error: 'Missing query' });
+
+  const clerkUserId = await getClerkUserId(req);
+  if (!clerkUserId) return res.status(401).json({ error: 'Invalid or missing session' });
+
+  const h = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
+  const access = await resolveAccess(clerkUserId, h);
+  if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet." });
+  if (access.viewerType !== 'staff') return res.status(403).json({ error: 'Staff only.' });
+
+  const keywords = extractKeywords(query);
+  if (!keywords.length) {
+    return res.status(200).json({ results: [], note: 'Try adding more specific skills, job titles, or locations to your search.' });
+  }
+
+  const fieldChecks = keywords.map(kw => {
+    const safe = kw.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    return `OR(
+      SEARCH("${safe}", LOWER(IF({${KF.role}}, {${KF.role}}, ""))),
+      SEARCH("${safe}", LOWER(IF({${KF.bio}}, {${KF.bio}}, ""))),
+      SEARCH("${safe}", LOWER(IF({${KF.skills}}, {${KF.skills}}, ""))),
+      SEARCH("${safe}", LOWER(IF({${KF.sector}}, {${KF.sector}}, ""))),
+      SEARCH("${safe}", LOWER(IF({${KF.location}}, {${KF.location}}, ""))),
+      SEARCH("${safe}", LOWER(IF({${KF.company}}, {${KF.company}}, "")))
+    )`;
+  });
+  const formula = buildKeywordFilter(fieldChecks);
+
+  const poolRes = await fetch(
+    `https://api.airtable.com/v0/${BASE}/${CANDIDATES}?filterByFormula=${encodeURIComponent(formula)}&pageSize=60&returnFieldsByFieldId=true`,
+    { headers: h }
+  ).then(r => r.json()).catch(() => ({ records: [] }));
+
+  const pool = (poolRes.records || []).map(rec => {
+    const f = rec.fields;
+    const consented = f[KF.outreachStatus] === 'Interested';
+    const rawCompany = f[KF.company] || '';
+    const company = /^\d+$/.test(rawCompany.trim()) ? '' : rawCompany;
+    return {
+      id: rec.id,
+      name: f[KF.name] || '',
+      role: f[KF.role] || '',
+      company,
+      location: f[KF.location] || '',
+      sector: f[KF.sector] || '',
+      bio: f[KF.bio] || '',
+      linkedinUrl: f[KF.linkedinUrl] || '',
+      email: consented ? (f[KF.personalEmail] || '') : '',
+      phone: consented ? (f[KF.mobile] || '') : '',
+      notes: f[KF.notes] || '',
+      photoUrl: f[KF.photoUrl] || '',
+      yearsExperience: f[KF.yearsExperience] || '',
+      seniority: f[KF.seniority] || '',
+      workPreference: f[KF.workPreference] || '',
+      salaryMin: typeof f[KF.salaryMin] === 'number' ? f[KF.salaryMin] : null,
+      salaryMax: typeof f[KF.salaryMax] === 'number' ? f[KF.salaryMax] : null,
+      noticePeriod: f[KF.noticePeriod] || '',
+      willingToRelocate: f[KF.willingToRelocate] || '',
+      rightToWorkUK: f[KF.rightToWorkUK] || '',
+      skills: f[KF.skills] || '',
+      certifications: f[KF.certifications] || '',
+      educationLevel: f[KF.educationLevel] || '',
+    };
+  }).filter(c => c.name);
+
+  // Soft floor, not MIN_MATCH_SCORE (60) — that threshold is tuned for "should this be
+  // auto-linked as a real Role match", which is a higher bar than "worth showing a
+  // recruiter browsing results for a loose free-text query".
+  const ranked = (await rankPoolAgainstRole(query, pool, 10)).filter(c => c.fitScore >= 40);
+
+  return res.status(200).json({ results: ranked });
 }
 
 // ── SAVE NOTES ────────────────────────────────────────────────────
