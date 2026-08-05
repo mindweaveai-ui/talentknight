@@ -1619,3 +1619,115 @@ async function submitEditRole() {
   const btn = document.getElementById('editRoleSubmitBtn');
   btn.disabled = true; btn.textContent = 'Saving…';
   try {
+    const h = await authHeader();
+    const r = await fetch('/api/crm?action=update-role', {
+      method: 'PATCH', headers: { ...h, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roleId: editingRoleId, title, location, brief, status }),
+    });
+    if (!r.ok) throw new Error();
+    const company = currentCompany();
+    const role = company.roles.find(r => r.id === editingRoleId);
+    if (role) Object.assign(role, { title, location, brief, status });
+    document.getElementById('editRoleModalOverlay').classList.remove('open');
+    editingRoleId = null;
+    render();
+  } catch {
+    alert('Failed to save role — please try again.');
+    btn.disabled = false; btn.textContent = 'Save changes';
+  }
+}
+
+async function confirmDeleteRole() {
+  if (!editingRoleId) return;
+  const company = currentCompany();
+  const role = company.roles.find(r => r.id === editingRoleId);
+  if (!role) return;
+  const candCount = role.candidates.length;
+  const warning = candCount
+    ? `Delete "${role.title}"? This also permanently removes ${candCount} candidate match${candCount !== 1 ? 'es' : ''} linked to this role (the candidates themselves are untouched). This can't be undone.`
+    : `Delete "${role.title}"? This can't be undone.`;
+  if (!confirm(warning)) return;
+
+  const btn = document.getElementById('editRoleDeleteBtn');
+  btn.disabled = true; btn.textContent = 'Deleting…';
+  try {
+    const h = await authHeader();
+    const r = await fetch('/api/crm?action=delete-role', {
+      method: 'POST', headers: { ...h, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roleId: editingRoleId }),
+    });
+    if (!r.ok) throw new Error();
+    company.roles = company.roles.filter(r => r.id !== editingRoleId);
+    roleIdx = Math.min(roleIdx, Math.max(0, company.roles.length - 1));
+    document.getElementById('editRoleModalOverlay').classList.remove('open');
+    editingRoleId = null;
+    searchQuery = '';
+    render();
+  } catch {
+    alert('Failed to delete role — please try again.');
+    btn.disabled = false; btn.textContent = '🗑️ Delete role';
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────
+function stageDays(dateStr) {
+  if (!dateStr) return null;
+  const then = new Date(dateStr + 'T00:00:00');
+  const now = new Date();
+  const diff = Math.floor((now - then) / 86400000);
+  return diff < 0 ? 0 : diff;
+}
+
+function ageClass(days) {
+  if (days >= 14) return 'stage-age-alert';
+  if (days >= 7)  return 'stage-age-warn';
+  return 'stage-age-ok';
+}
+
+function todayISO() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function avatarColor(name) {
+  const p = ['#2563eb','#7c3aed','#db2777','#dc2626','#d97706','#059669','#0891b2','#4f46e5'];
+  let h = 0;
+  for (const ch of String(name)) h = (h * 31 + ch.charCodeAt(0)) & 0x7fffffff;
+  return p[h % p.length];
+}
+function initials(name) {
+  return String(name || '').split(' ').slice(0, 2).map(w => w[0] || '').join('').toUpperCase() || '?';
+}
+// Four-tier bands (2026-08-05) — 90+ Excellent, 80-89 Strong, 70-79 Good, below 70
+// Partial. Class name doubles as the human label (see fitScoreLabel below), replacing
+// the previous two-cutoff good/ok/low scheme (85/70) that didn't match this spec.
+function fitScoreClass(score) {
+  return score >= 90 ? 'excellent' : score >= 80 ? 'strong' : score >= 70 ? 'good' : 'partial';
+}
+function fitScoreLabel(score) {
+  const c = fitScoreClass(score);
+  return c.charAt(0).toUpperCase() + c.slice(1);
+}
+function shortLoc(loc) {
+  if (!loc) return '';
+  const parts = loc.split(',').map(p => p.trim());
+  if (parts.length === 1) return loc;
+  const cm = { 'United Kingdom':'UK','England':'UK','Scotland':'UK','Wales':'UK','Northern Ireland':'UK','United States':'US','United States of America':'US' };
+  return `${parts[0]}, ${cm[parts[parts.length-1]] ?? parts[parts.length-1]}`;
+}
+function formatSalary(min, max) {
+  const fmt = (n) => `£${Math.round(n / 1000)}k`;
+  if (min != null && max != null) return `${fmt(min)} – ${fmt(max)}`;
+  if (min != null) return `${fmt(min)}+`;
+  if (max != null) return `Up to ${fmt(max)}`;
+  return '';
+}
+function esc(s)  { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escA(s) { return String(s ?? '').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function showErr(t, m) {
+  document.getElementById('main').innerHTML = `<div class="centered"><div class="err-title">${esc(t)}</div><div class="err-msg">${esc(m)}</div></div>`;
+}
+
+window.addEventListener('load', load);
+</script>
+</body>
+</html>
