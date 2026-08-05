@@ -338,6 +338,31 @@
     .history-meta { color: var(--dim); font-size: 11px; margin-top: 2px; }
     .history-empty, .history-loading { color: var(--dim); font-size: 12px; padding: 4px 0; }
 
+    /* ── AI RECRUITER ASSISTANT ── added 2026-08-05 */
+    .assistant-search-row { display: flex; gap: 8px; margin-bottom: 18px; max-width: 640px; }
+    .assistant-search-input {
+      font-family: inherit; font-size: 13.5px; flex: 1; min-width: 0;
+      padding: 10px 14px; border: 1px solid var(--border); border-radius: 9px;
+      background: var(--surface); color: var(--text); transition: border-color 0.12s, box-shadow 0.12s;
+    }
+    .assistant-search-input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-light); }
+    .assistant-search-input::placeholder { color: var(--dim); }
+    .assistant-search-btn {
+      font-family: inherit; font-size: 13px; font-weight: 600; color: white;
+      background: var(--blue); border: none; border-radius: 9px; padding: 0 20px;
+      cursor: pointer; transition: background 0.12s; flex-shrink: 0;
+    }
+    .assistant-search-btn:hover { background: #1d4ed8; }
+    .assistant-search-btn:disabled { background: var(--dim); cursor: not-allowed; }
+    .assistant-empty { color: var(--dim); font-size: 13px; padding: 20px 0; max-width: 480px; line-height: 1.6; }
+    .assistant-results-list { display: flex; flex-direction: column; gap: 8px; max-width: 640px; }
+    .assistant-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 9px;
+      padding: 12px 14px; cursor: pointer; display: flex; align-items: flex-start; gap: 10px;
+      transition: box-shadow 0.12s, transform 0.12s;
+    }
+    .assistant-card:hover { box-shadow: 0 3px 10px rgba(15,23,42,0.1); transform: translateY(-1px); }
+
     /* ── DRAWER ── */
     .drawer-backdrop {
       position: fixed; inset: 0; background: rgba(15,23,42,0.25); z-index: 300;
@@ -704,6 +729,7 @@ function render() {
           <div class="role-list"><div class="role-list-empty">No roles yet</div></div>
           <button class="new-role-btn-sidebar" onclick="openRoleModal()">＋ New role</button>
           ${user.isStaff ? `<button class="earnings-toggle-btn" onclick="toggleEarningsView()">Forecast</button>` : ''}
+          ${user.isStaff ? `<button class="earnings-toggle-btn" onclick="toggleAssistantView()">✨ AI Search</button>` : ''}
         </aside>
         <div class="content-area">
           <div class="centered" style="min-height:50vh;">
@@ -736,6 +762,7 @@ function render() {
         </label>
         <button class="new-role-btn-sidebar" onclick="openRoleModal()">＋ New role</button>
         ${user.isStaff ? `<button class="earnings-toggle-btn" onclick="toggleEarningsView()">${viewMode === 'earnings' ? '← Back to pipeline' : 'Forecast'}</button>` : ''}
+        ${user.isStaff ? `<button class="earnings-toggle-btn" onclick="toggleAssistantView()">${viewMode === 'assistant' ? '← Back to pipeline' : '✨ AI Search'}</button>` : ''}
       </aside>
       <div class="content-area" id="contentArea"></div>
     </div>`;
@@ -746,6 +773,8 @@ function render() {
 
   if (viewMode === 'earnings' && user.isStaff) {
     buildEarningsView(company);
+  } else if (viewMode === 'assistant' && user.isStaff) {
+    buildAssistantView();
   } else {
     buildPipelineView(role);
   }
@@ -818,6 +847,106 @@ async function saveDealTerms(roleId) {
 function toggleEarningsView() {
   viewMode = viewMode === 'earnings' ? 'pipeline' : 'earnings';
   render();
+}
+
+function toggleAssistantView() {
+  viewMode = viewMode === 'assistant' ? 'pipeline' : 'assistant';
+  render();
+}
+
+// ── AI Recruiter Assistant ──────────────────────────────────────────
+// Free-text search across the whole candidate base (not scoped to a Role, unlike
+// buildPipelineView's kanban). Query/results kept in module state so switching to
+// Forecast and back doesn't lose the last search.
+let assistantQuery = '';
+let assistantResults = null; // null = no search run yet, [] = ran but zero results
+let assistantSearching = false;
+
+function buildAssistantView() {
+  const contentArea = document.getElementById('contentArea');
+  contentArea.innerHTML = `
+    <div class="content-header">
+      <div class="page-title">✨ AI Search</div>
+      <div class="role-info" style="padding-bottom:14px;">
+        <span style="color:var(--muted);font-size:12.5px;">Search your whole candidate base in plain English — not scoped to one role.</span>
+      </div>
+    </div>
+    <div class="assistant-search-row">
+      <input id="assistantInput" class="assistant-search-input" type="text"
+        placeholder="e.g. Find someone similar to Holly but with payroll bureau experience"
+        value="${esc(assistantQuery)}" autocomplete="off"
+        onkeydown="if(event.key==='Enter') runAssistantSearch()" />
+      <button class="assistant-search-btn" id="assistantSearchBtn" onclick="runAssistantSearch()">Search</button>
+    </div>
+    <div id="assistantResults">${assistantResultsHtml()}</div>`;
+
+  setTimeout(() => document.getElementById('assistantInput')?.focus(), 50);
+  attachAssistantCardListeners();
+}
+
+function assistantResultsHtml() {
+  if (assistantSearching) return `<div class="assistant-empty">Searching…</div>`;
+  if (assistantResults === null) return `<div class="assistant-empty">Try a query above — matches are scored and summarized the same way Find Matches works, just across every candidate instead of one role.</div>`;
+  if (!assistantResults.length) return `<div class="assistant-empty">No strong matches for that query. Try different skills, a job title, or a location.</div>`;
+  return `<div class="assistant-results-list">${assistantResults.map((c, i) => assistantCardHtml(c, i)).join('')}</div>`;
+}
+
+function assistantCardHtml(c, i) {
+  const sub = [c.role, c.company].filter(Boolean).join(' · ');
+  const loc = shortLoc(c.location);
+  return `
+    <div class="assistant-card" data-idx="${i}">
+      <div class="cand-avatar" style="background:${avatarColor(c.name)}">${c.photoUrl ? `<img src="${escA(c.photoUrl)}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.remove()">` : ''}${esc(initials(c.name))}</div>
+      <div class="card-body">
+        <div class="cand-name">${esc(c.name)}</div>
+        ${sub ? `<div class="cand-sub">${esc(sub)}</div>` : ''}
+        ${c.summary ? `<div class="cand-ai-summary">✨ ${esc(c.summary)}</div>` : ''}
+        ${loc ? `<div class="card-loc" style="margin-top:4px;">📍 ${esc(loc)}</div>` : ''}
+      </div>
+      ${c.fitScore != null ? `<span class="fit-badge ${fitScoreClass(c.fitScore)}" title="AI fit score: ${fitScoreLabel(c.fitScore)}">${c.fitScore}</span>` : ''}
+    </div>`;
+}
+
+// Event delegation via data-idx + a fresh listener pass, rather than embedding candidate
+// JSON directly in an onclick attribute (fragile — quoting/escaping a full JSON blob into
+// an HTML attribute is a needless source of bugs). Called after any innerHTML swap of
+// #assistantResults.
+function attachAssistantCardListeners() {
+  document.querySelectorAll('.assistant-card').forEach(el => {
+    el.addEventListener('click', () => {
+      const c = assistantResults[Number(el.dataset.idx)];
+      if (c) openDrawer(c, { roleContext: false });
+    });
+  });
+}
+
+async function runAssistantSearch() {
+  const input = document.getElementById('assistantInput');
+  const query = input.value.trim();
+  if (!query) { input.focus(); return; }
+  assistantQuery = query;
+  assistantSearching = true;
+  const btn = document.getElementById('assistantSearchBtn');
+  btn.disabled = true; btn.textContent = 'Searching…';
+  document.getElementById('assistantResults').innerHTML = assistantResultsHtml();
+  try {
+    const h = await authHeader();
+    const r = await fetch('/api/crm?action=assistant-search', {
+      method: 'POST', headers: { ...h, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+    });
+    if (!r.ok) throw new Error();
+    const data = await r.json();
+    assistantResults = data.results || [];
+  } catch {
+    assistantResults = [];
+  } finally {
+    assistantSearching = false;
+    btn.disabled = false; btn.textContent = 'Search';
+    const resultsEl = document.getElementById('assistantResults');
+    if (resultsEl) resultsEl.innerHTML = assistantResultsHtml();
+    attachAssistantCardListeners();
+  }
 }
 
 function buildEarningsView(company) {
@@ -1210,13 +1339,17 @@ async function refreshDashboard() {
 }
 
 // ── Candidate drawer ────────────────────────────────────────────
-function openDrawer(c) {
+function openDrawer(c, opts = {}) {
   openCand = c;
-  // CRM Intelligence needs the current Role's id (candidate objects don't carry it
-  // themselves — the kanban board is always rendered per-Role, so this is always in scope
-  // whenever a card is clicked). Stored on the module-level state so addHistoryEntry() can
-  // read it without needing it threaded through every call site.
-  openCandRoleId = currentCompany().roles[roleIdx]?.id || null;
+  // `roleContext` is false for candidates opened from AI Search results, which aren't
+  // tied to any specific Role — pipelineStage/placement-salary changes only make sense
+  // scoped to a Role Matches row, and there isn't one here. CRM Intelligence needs the
+  // current Role's id (candidate objects don't otherwise carry it) — the kanban board is
+  // always rendered per-Role, so this is safe to read whenever a kanban card is clicked,
+  // but must be left null in AI Search's role-free case (activity logs still work fine
+  // with a null roleId — see logContactHistory in api/crm.js).
+  const hasRoleContext = opts.roleContext !== false;
+  openCandRoleId = hasRoleContext ? (currentCompany().roles[roleIdx]?.id || null) : null;
   const bg = avatarColor(c.name);
   const sub = [c.role, c.company].filter(Boolean).join(' · ');
   const loc = shortLoc(c.location);
@@ -1302,15 +1435,20 @@ function openDrawer(c) {
       <div style="font-size:13px;line-height:1.6;color:var(--text);">${esc(c.bio)}</div>
     </div>` : ''}
 
+    ${hasRoleContext ? `
     <div class="drawer-section">
       <div class="drawer-section-label">Pipeline stage</div>
       <select class="drawer-stage-select" id="drawerStage" onchange="drawerChangeStage(this)">
         ${STAGES.map(s => `<option value="${s}"${s === c.pipelineStage ? ' selected' : ''}>${s}</option>`).join('')}
       </select>
       ${stageSinceHtml}
-    </div>
+    </div>` : `
+    <div class="drawer-section">
+      <div class="drawer-section-label">Pipeline stage</div>
+      <div style="font-size:12.5px;color:var(--dim);">Not tied to a specific role yet — open this candidate from a role's board to set a stage.</div>
+    </div>`}
 
-    ${state.user.isStaff ? `
+    ${(state.user.isStaff && hasRoleContext) ? `
     <div class="drawer-section">
       <div class="drawer-section-label">Placement salary</div>
       <div class="deal-terms">
