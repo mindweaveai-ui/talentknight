@@ -248,6 +248,13 @@
     }
     .deal-input:focus { outline: none; border-color: var(--blue); }
     .deal-input.salary { width: 78px; }
+    /* Hide native number-input spinner arrows — fiddly to use for typing a figure
+       directly, per feedback 2026-08-05. Applies to Fee %, Target/Salary, and the
+       drawer's Placement salary field, since they all share .deal-input. */
+    .deal-input::-webkit-outer-spin-button, .deal-input::-webkit-inner-spin-button {
+      -webkit-appearance: none; margin: 0;
+    }
+    .deal-input[type=number] { -moz-appearance: textfield; }
     .deal-save-status { font-size: 11px; color: var(--green); opacity: 0; transition: opacity 0.3s; }
     .forecast-pill {
       font-size: 11px; font-weight: 600; color: #6d28d9; background: #f5f3ff;
@@ -812,12 +819,12 @@ function buildPipelineView(role) {
 function dealTermsHtml(role) {
   const feeDisplay = role.feePercent != null ? (role.feePercent * 100).toFixed(1) : '';
   const salaryDisplay = role.targetSalary != null ? role.targetSalary : '';
-  const forecast = role.forecastValue != null ? `<span class="forecast-pill" title="Fee % × Target Salary — full potential if this role closes">Forecast: £${role.forecastValue.toLocaleString()}</span>` : '';
+  const forecast = role.forecastValue != null ? `<span class="forecast-pill" title="Fee % × Salary — full potential if this role closes">Forecast: £${role.forecastValue.toLocaleString()}</span>` : '';
   return `
     <span class="deal-terms">
       Fee <input class="deal-input" id="dealFee" type="number" min="0" max="100" step="0.5" placeholder="—" value="${feeDisplay}"
         onchange="saveDealTerms('${role.id}')" />%
-      · Target <input class="deal-input salary" id="dealSalary" type="number" min="0" step="1000" placeholder="—" value="${salaryDisplay}"
+      · Salary <input class="deal-input salary" id="dealSalary" type="number" min="0" step="1000" placeholder="—" value="${salaryDisplay}"
         onchange="saveDealTerms('${role.id}')" /> £/yr
       <span class="deal-save-status" id="dealSaveStatus">✓ Saved</span>
     </span>
@@ -1004,7 +1011,7 @@ function buildEarningsView(company) {
     </div>
     ${roles.length ? `
     <table class="earnings-table" style="margin-bottom:20px;">
-      <thead><tr><th>Role</th><th>Fee %</th><th>Target salary</th><th>Stage</th><th>Forecast</th></tr></thead>
+      <thead><tr><th>Role</th><th>Fee %</th><th>Salary</th><th>Stage</th><th>Forecast</th></tr></thead>
       <tbody>${roleRows}</tbody>
     </table>` : ''}
     ${placedCandidates.length ? `
