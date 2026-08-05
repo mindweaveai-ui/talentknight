@@ -29,6 +29,8 @@ export default async function handler(req, res) {
   if (action === 'assistant-search')   return handleAssistantSearch(req, res);
   if (action === 'company-record')     return handleCompanyRecord(req, res);
   if (action === 'update-company')     return handleUpdateCompany(req, res);
+  if (action === 'role-activity')      return handleRoleActivity(req, res);
+  if (action === 'similar-candidates') return handleSimilarCandidates(req, res);
   if (action === 'generate-token') return res.status(410).json({ error: 'Magic-link tokens are retired. Sign in via Clerk instead.' });
   return res.status(400).json({ error: 'Unknown action' });
 }
@@ -79,6 +81,10 @@ const RF = {
   candidates: 'fldU795m0fFIMZ2pc', company: 'fldPOW3SzPV0mfg0B',
   // Earnings pipeline — staff-only commercial terms, never sent to Company Contacts.
   feePercent: 'fld8HSTILHFybW4Hj', targetSalary: 'fldVH9W53ozEm4N6G',
+  // Vacancy Dashboard expansion (2026-08-05, roadmap item #2) — hiring manager contact +
+  // a general role-level note, distinct from the per-(candidate,role) Notes on Role Matches.
+  hiringManagerName: 'fldgwOZSWNTaf4jk8', hiringManagerEmail: 'fld0bKtv5cm6Lm4G6', hiringManagerPhone: 'fldSy1xjSkpj8SZeF',
+  roleNotes: 'fld79A1JKsXv50YRS',
 };
 const KF = {
   name: 'fld8k1UET3DWwJV3S', role: 'fldwOPyq4vmWzEquB', company: 'fldJYcW9eWMMnFPDS',
@@ -777,6 +783,11 @@ async function handleDashboard(req, res) {
         brief: rec.fields[RF.brief] || '',
         status: rec.fields[RF.status] || 'Active',
         candidateIds: rec.fields[RF.candidates] || [],
+        // Vacancy Dashboard (2026-08-05) — visible to every viewer, same as location/brief.
+        hiringManagerName: rec.fields[RF.hiringManagerName] || '',
+        hiringManagerEmail: rec.fields[RF.hiringManagerEmail] || '',
+        hiringManagerPhone: rec.fields[RF.hiringManagerPhone] || '',
+        roleNotes: rec.fields[RF.roleNotes] || '',
         feePercent: typeof rec.fields[RF.feePercent] === 'number' ? rec.fields[RF.feePercent] : null,
         targetSalary: typeof rec.fields[RF.targetSalary] === 'number' ? rec.fields[RF.targetSalary] : null,
       };
@@ -1108,6 +1119,155 @@ async function handleAddHistory(req, res) {
   return written?.id
     ? res.status(200).json({ ok: true })
     : res.status(500).json({ error: 'Failed to log entry' });
+}
+
+// ── ROLE ACTIVITY (Vacancy Dashboard, 2026-08-05) ────────────────────
+// Same Contact History table as handleCandidateHistory, but aggregated across every
+// candidate touching this one Role instead of scoped to one candidate — lets a recruiter
+// see the whole vacancy's timeline (stage changes, calls, notes) in one place without
+// opening each candidate individually. Staff-only, same as candidate-level history.
+async function handleRoleActivity(req, res) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  const AT_TOKEN = process.env.AT_TOKEN;
+  if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
+
+  const roleId = req.query.roleId;
+  if (!roleId) return res.status(400).json({ error: 'Missing roleId' });
+
+  const clerkUserId = await getClerkUserId(req);
+  if (!clerkUserId) return res.status(401).json({ error: 'Invalid or missing session' });
+
+  const h = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
+  const access = await resolveAccess(clerkUserId, h);
+  if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet." });
+  if (access.viewerType !== 'staff') return res.status(403).json({ error: 'Staff only.' });
+
+  const allCompanyIds = access.organizations.flatMap(o => o.companyIds);
+  const roleRec = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLES}/${roleId}?returnFieldsByFieldId=true`, { headers: h }).then(r => r.json()).catch(() => null);
+  if (!roleRec?.id) return res.status(404).json({ error: 'Role not found' });
+  const roleCompanyIds = roleRec.fields[RF.company] || [];
+  if (!roleCompanyIds.some(id => allCompanyIds.includes(id))) return res.status(403).json({ error: 'Role not in your access scope' });
+
+  let all = [];
+  let offset;
+  do {
+    const url = `https://api.airtable.com/v0/${BASE}/${CONTACT_HISTORY}?returnFieldsByFieldId=true&pageSize=100${offset ? `&offset=${offset}` : ''}`;
+    const r = await fetch(url, { headers: h }).then(r => r.json()).catch(() => ({ records: [] }));
+    all = all.concat(r.records || []);
+    offset = r.offset;
+  } while (offset);
+
+  const relevant = all.filter(rec => (rec.fields[CHF.role] || []).includes(roleId));
+
+  // Batch-fetch candidate names so each entry can show "who" — entries only carry a
+  // candidateId, unlike the per-candidate history view where that's already known from context.
+  const candIds = [...new Set(relevant.flatMap(rec => rec.fields[CHF.candidate] || []))];
+  const candNameById = {};
+  if (candIds.length) {
+    const candRes = await fetch(
+      `https://api.airtable.com/v0/${BASE}/${CANDIDATES}?filterByFormula=${encodeURIComponent(`OR(${candIds.map(id => `RECORD_ID()='${id}'`).join(',')})`)}&returnFieldsByFieldId=true&pageSize=100`,
+      { headers: h }
+    ).then(r => r.json()).catch(() => ({ records: [] }));
+    (candRes.records || []).forEach(rec => { candNameById[rec.id] = rec.fields[KF.name] || 'Unknown'; });
+  }
+
+  const entries = relevant
+    .map(rec => ({
+      id: rec.id,
+      type: rec.fields[CHF.type] || 'Note',
+      summary: rec.fields[CHF.summary] || '',
+      loggedAt: rec.fields[CHF.loggedAt] || rec.createdTime,
+      loggedBy: rec.fields[CHF.loggedBy] || '',
+      candidateId: (rec.fields[CHF.candidate] || [])[0] || null,
+      candidateName: candNameById[(rec.fields[CHF.candidate] || [])[0]] || 'Unknown',
+    }))
+    .sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt))
+    .slice(0, 40);
+
+  return res.status(200).json({ entries });
+}
+
+// ── SIMILAR LIVE CANDIDATES (Vacancy Dashboard, 2026-08-05) ──────────
+// Read-only suggestion panel for a Role — "who else in the pool looks like a fit" without
+// actually linking anyone. Deliberately separate from Find Matches (runMatchSearch): this
+// never writes Assigned Role/Matched stage, never kicks off an Apify run, and uses a lower
+// soft floor (45, matching AI Recruiter Assistant's exploratory bar) rather than
+// MIN_MATCH_SCORE's stricter auto-link threshold (60) — it's advisory, a recruiter decides
+// whether to act on it. Excludes candidates already on this Role's board and anyone in a
+// PROTECTED_STAGES match elsewhere (same reasoning as runMatchSearch — don't suggest
+// poaching someone mid-process on another Role).
+async function handleSimilarCandidates(req, res) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  const AT_TOKEN = process.env.AT_TOKEN;
+  if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
+
+  const roleId = req.query.roleId;
+  if (!roleId) return res.status(400).json({ error: 'Missing roleId' });
+
+  const clerkUserId = await getClerkUserId(req);
+  if (!clerkUserId) return res.status(401).json({ error: 'Invalid or missing session' });
+
+  const h = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
+  const access = await resolveAccess(clerkUserId, h);
+  if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet." });
+  if (access.viewerType !== 'staff') return res.status(403).json({ error: 'Staff only.' });
+
+  const allCompanyIds = access.organizations.flatMap(o => o.companyIds);
+  const roleRec = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLES}/${roleId}?returnFieldsByFieldId=true`, { headers: h }).then(r => r.json()).catch(() => null);
+  if (!roleRec?.id) return res.status(404).json({ error: 'Role not found' });
+  const roleCompanyIds = roleRec.fields[RF.company] || [];
+  if (!roleCompanyIds.some(id => allCompanyIds.includes(id))) return res.status(403).json({ error: 'Role not in your access scope' });
+
+  const title = roleRec.fields[RF.title] || '';
+  const location = roleRec.fields[RF.location] || '';
+  const brief = roleRec.fields[RF.brief] || '';
+  const existingCandidateIds = new Set(roleRec.fields[RF.candidates] || []);
+
+  const briefText = [title, location, brief].filter(Boolean).join(' — ');
+  const keywords = extractKeywords(briefText);
+  if (!keywords.length) return res.status(200).json({ results: [] });
+
+  const ALLOWED_TYPES = ['LinkedIn', 'live'];
+  const fieldChecks = keywords.map(kw => {
+    const safe = kw.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    return `OR(
+      SEARCH("${safe}", LOWER(IF({${KF.role}}, {${KF.role}}, ""))),
+      SEARCH("${safe}", LOWER(IF({${KF.bio}}, {${KF.bio}}, ""))),
+      SEARCH("${safe}", LOWER(IF({${KF.skills}}, {${KF.skills}}, ""))),
+      SEARCH("${safe}", LOWER(IF({${KF.sector}}, {${KF.sector}}, ""))),
+      SEARCH("${safe}", LOWER(IF({${KF.location}}, {${KF.location}}, ""))),
+      SEARCH("${safe}", LOWER(IF({${KF.company}}, {${KF.company}}, "")))
+    )`;
+  });
+  const typeFilter = `OR(${ALLOWED_TYPES.map(t => `{${KF.type}} = '${t}'`).join(',')})`;
+  const formula = `AND(${typeFilter}, ${buildKeywordFilter(fieldChecks)})`;
+
+  const poolRes = await fetch(
+    `https://api.airtable.com/v0/${BASE}/${CANDIDATES}?filterByFormula=${encodeURIComponent(formula)}&pageSize=60&returnFieldsByFieldId=true`,
+    { headers: h }
+  ).then(r => r.json()).catch(() => ({ records: [] }));
+
+  const allMatches = await fetchAllRoleMatches(h);
+  const protectedIds = new Set(
+    allMatches.filter(m => PROTECTED_STAGES.includes(m.stage)).map(m => m.candidateId)
+  );
+
+  const pool = (poolRes.records || []).map(rec => ({
+    id: rec.id,
+    name: rec.fields[KF.name] || '',
+    role: rec.fields[KF.role] || '',
+    company: rec.fields[KF.company] || '',
+    location: rec.fields[KF.location] || '',
+    sector: rec.fields[KF.sector] || '',
+    bio: rec.fields[KF.bio] || '',
+    linkedinUrl: rec.fields[KF.linkedinUrl] || '',
+    photoUrl: rec.fields[KF.photoUrl] || '',
+  })).filter(c => c.name && !existingCandidateIds.has(c.id) && !protectedIds.has(c.id));
+
+  let ranked = (await rankPoolAgainstRole(briefText, pool, 6)).filter(c => c.fitScore >= 45);
+  ranked = await filterByDistance(location, ranked);
+
+  return res.status(200).json({ results: ranked.slice(0, 5) });
 }
 
 // ── AI RECRUITER ASSISTANT ───────────────────────────────────────────
@@ -2080,7 +2240,7 @@ async function handleUpdateRole(req, res) {
   const AT_TOKEN = process.env.AT_TOKEN;
   if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
 
-  const { roleId, title, location, brief, status } = req.body || {};
+  const { roleId, title, location, brief, status, hiringManagerName, hiringManagerEmail, hiringManagerPhone, roleNotes } = req.body || {};
   if (!roleId) return res.status(400).json({ error: 'roleId is required' });
   if (title !== undefined && !title.trim()) return res.status(400).json({ error: 'title cannot be empty' });
   const VALID_STATUSES = ['Active', 'Paused', 'Filled', 'Closed'];
@@ -2105,6 +2265,10 @@ async function handleUpdateRole(req, res) {
   if (location !== undefined) fields[RF.location] = location.trim();
   if (brief !== undefined) fields[RF.brief] = brief.trim();
   if (status !== undefined) fields[RF.status] = status;
+  if (hiringManagerName !== undefined) fields[RF.hiringManagerName] = hiringManagerName.trim();
+  if (hiringManagerEmail !== undefined) fields[RF.hiringManagerEmail] = hiringManagerEmail.trim();
+  if (hiringManagerPhone !== undefined) fields[RF.hiringManagerPhone] = hiringManagerPhone.trim();
+  if (roleNotes !== undefined) fields[RF.roleNotes] = roleNotes.trim();
 
   const upd = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLES}/${roleId}`, {
     method: 'PATCH', headers: h,
