@@ -24,6 +24,8 @@ export default async function handler(req, res) {
   if (action === 'save-placement-salary') return handleSavePlacementSalary(req, res);
   if (action === 'rematch-pool')       return handleRematchPool(req, res);
   if (action === 'clarify-brief')      return handleClarifyBrief(req, res);
+  if (action === 'candidate-history')  return handleCandidateHistory(req, res);
+  if (action === 'add-history')        return handleAddHistory(req, res);
   if (action === 'generate-token') return res.status(410).json({ error: 'Magic-link tokens are retired. Sign in via Clerk instead.' });
   return res.status(400).json({ error: 'Unknown action' });
 }
@@ -44,6 +46,14 @@ const COMPANY_CONTACTS = 'tblw8aIC6fGAVKRi8';
 // moved it on all of them. The old flat fields (KF.fitScore/pipelineStage/stageChangedAt)
 // are left in place as a frozen historical snapshot as of the migration — no longer written.
 const ROLE_MATCHES = 'tblVD5U84GIci7Jkq';
+
+// CRM Intelligence (added 2026-08-05): a chronological log of interactions per Candidate,
+// optionally scoped to a Role — calls, emails, interviews, stage changes, submissions,
+// offers, placements, and free-text notes. Auto-logged by handleUpdateStage on every stage
+// change; manually logged by staff via the new candidate-history/add-history actions.
+// Staff-only (like the Matched stage) — internal call/note history is never surfaced to
+// Company Contacts.
+const CONTACT_HISTORY = 'tblSWBpdU3T1twcBk';
 
 // Same Apify actor the public Vesper search on demo.html uses for live LinkedIn top-up.
 const APIFY_ACTOR = 'harvestapi~linkedin-profile-search';
@@ -90,6 +100,11 @@ const RMF = {
   // same rankPoolAgainstRole Claude call that produces fitScore. Added 2026-08-05 for the
   // "AI Candidate Summaries" roadmap item.
   summary: 'fld9JdfaoACkdbpMt',
+};
+const CHF = {
+  label: 'fldqaqYOdK7VRjZ7f', candidate: 'fldLv9NXLNG0gbySX', role: 'fldXGWEke6b7lf6Zf',
+  type: 'flddkAhMPro2NafjX', summary: 'fldu0oKZifl6BEFIv', loggedAt: 'fldQfqojDi7RDmnTo',
+  loggedBy: 'fldkIvwxNR7n70EYK',
 };
 
 // Stages that only Org Staff (Admin/Consultant) may see or set. "Matched" is where Vesper's
@@ -910,6 +925,7 @@ async function handleUpdateStage(req, res) {
   const existing = allMatches.find(m => m.roleId === roleId && m.candidateId === candidateId);
 
   let upd;
+  let candNameForLog = null;
   if (existing) {
     upd = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLE_MATCHES}/${existing.id}`, {
       method: 'PATCH', headers: h,
@@ -918,6 +934,7 @@ async function handleUpdateStage(req, res) {
   } else {
     const candRec = await fetch(`https://api.airtable.com/v0/${BASE}/${CANDIDATES}/${candidateId}?returnFieldsByFieldId=true`, { headers: h }).then(r => r.json()).catch(() => null);
     const candName = candRec?.fields?.[KF.name] || '';
+    candNameForLog = candName;
     const roleTitle = roleRec.fields[RF.title] || '';
     upd = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLE_MATCHES}`, {
       method: 'POST', headers: h,
@@ -929,9 +946,132 @@ async function handleUpdateStage(req, res) {
     }).then(r => r.json());
   }
 
+  // CRM Intelligence (2026-08-05): auto-log every stage change to Contact History so a
+  // candidate's activity timeline reflects pipeline movement without recruiters having to
+  // log it by hand. Best-effort — a logging failure should never fail the stage update
+  // itself, which is why this runs after `upd` is already known to have succeeded.
+  if (upd.id) {
+    try {
+      if (candNameForLog === null) {
+        const candRec2 = await fetch(`https://api.airtable.com/v0/${BASE}/${CANDIDATES}/${candidateId}?returnFieldsByFieldId=true`, { headers: h }).then(r => r.json()).catch(() => null);
+        candNameForLog = candRec2?.fields?.[KF.name] || '';
+      }
+      await logContactHistory({
+        candidateId, roleId, type: 'Stage Change',
+        summary: `Stage changed to ${stage}`,
+        label: `${candNameForLog} → ${stage}`,
+        loggedBy: access.name,
+      }, h);
+    } catch { /* best-effort — never block the stage update on a logging failure */ }
+  }
+
   return upd.id
     ? res.status(200).json({ ok: true, stage, stageChangedAt: today })
     : res.status(500).json({ error: 'Update failed' });
+}
+
+// ── CRM INTELLIGENCE (Contact History) ─────────────────────────────
+// Shared writer used by both the auto-log-on-stage-change path above and the manual
+// add-history action below. Staff-only concept — Company Contacts never write or read
+// this table (internal call/note history isn't something to expose to clients).
+async function logContactHistory({ candidateId, roleId, type, summary, label, loggedBy }, h) {
+  const fields = {
+    [CHF.candidate]: [candidateId],
+    [CHF.type]: type,
+    [CHF.summary]: summary,
+    [CHF.loggedAt]: new Date().toISOString(),
+    [CHF.loggedBy]: loggedBy || '',
+    [CHF.label]: label || `${type} — ${summary}`.slice(0, 100),
+  };
+  if (roleId) fields[CHF.role] = [roleId];
+  return fetch(`https://api.airtable.com/v0/${BASE}/${CONTACT_HISTORY}`, {
+    method: 'POST', headers: h,
+    body: JSON.stringify({ fields }),
+  }).then(r => r.json()).catch(() => null);
+}
+
+const CONTACT_HISTORY_TYPES = ['Note', 'Call', 'Email', 'Interview', 'Stage Change', 'Submission', 'Offer', 'Placement'];
+
+// ── CANDIDATE HISTORY (read) ────────────────────────────────────────
+// Returns a candidate's Contact History timeline, newest first. Fetches broadly then
+// filters/sorts client-side, same pattern as fetchAllRoleMatches — Airtable's
+// filterByFormula can't reliably match linked-record fields against a record ID (see that
+// function's comment for the fuller explanation). Table is expected to stay small enough
+// per-candidate that this is fine; revisit with a real filter if it ever isn't.
+async function handleCandidateHistory(req, res) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  const AT_TOKEN = process.env.AT_TOKEN;
+  if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
+
+  const candidateId = req.query.candidateId;
+  if (!candidateId) return res.status(400).json({ error: 'Missing candidateId' });
+
+  const clerkUserId = await getClerkUserId(req);
+  if (!clerkUserId) return res.status(401).json({ error: 'Invalid or missing session' });
+
+  const h = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
+  const access = await resolveAccess(clerkUserId, h);
+  if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet." });
+  if (access.viewerType !== 'staff') return res.status(403).json({ error: 'Staff only.' });
+
+  const allCompanyIds = access.organizations.flatMap(o => o.companyIds);
+  const check = await candidateAllowed(candidateId, allCompanyIds, h);
+  if (!check.ok) return res.status(check.status).json({ error: check.error });
+
+  let all = [];
+  let offset;
+  do {
+    const url = `https://api.airtable.com/v0/${BASE}/${CONTACT_HISTORY}?returnFieldsByFieldId=true&pageSize=100${offset ? `&offset=${offset}` : ''}`;
+    const r = await fetch(url, { headers: h }).then(r => r.json()).catch(() => ({ records: [] }));
+    all = all.concat(r.records || []);
+    offset = r.offset;
+  } while (offset);
+
+  const entries = all
+    .filter(rec => (rec.fields[CHF.candidate] || []).includes(candidateId))
+    .map(rec => ({
+      id: rec.id,
+      type: rec.fields[CHF.type] || 'Note',
+      summary: rec.fields[CHF.summary] || '',
+      loggedAt: rec.fields[CHF.loggedAt] || rec.createdTime,
+      loggedBy: rec.fields[CHF.loggedBy] || '',
+    }))
+    .sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt))
+    .slice(0, 25);
+
+  return res.status(200).json({ entries });
+}
+
+// ── ADD HISTORY (write) ─────────────────────────────────────────────
+async function handleAddHistory(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const AT_TOKEN = process.env.AT_TOKEN;
+  if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
+
+  const { candidateId, roleId, type, summary } = req.body || {};
+  if (!candidateId || !type || !summary?.trim()) return res.status(400).json({ error: 'Missing fields' });
+  if (!CONTACT_HISTORY_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid type' });
+
+  const clerkUserId = await getClerkUserId(req);
+  if (!clerkUserId) return res.status(401).json({ error: 'Invalid or missing session' });
+
+  const h = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
+  const access = await resolveAccess(clerkUserId, h);
+  if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet." });
+  if (access.viewerType !== 'staff') return res.status(403).json({ error: 'Staff only.' });
+
+  const allCompanyIds = access.organizations.flatMap(o => o.companyIds);
+  const check = await candidateAllowed(candidateId, allCompanyIds, h);
+  if (!check.ok) return res.status(check.status).json({ error: check.error });
+
+  const written = await logContactHistory({
+    candidateId, roleId: roleId || null, type, summary: summary.trim(),
+    loggedBy: access.name,
+  }, h);
+
+  return written?.id
+    ? res.status(200).json({ ok: true })
+    : res.status(500).json({ error: 'Failed to log entry' });
 }
 
 // ── SAVE NOTES ────────────────────────────────────────────────────
