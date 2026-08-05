@@ -72,6 +72,12 @@
       background: var(--bg); color: var(--text); cursor: pointer;
     }
     .company-select:focus { outline: none; border-color: var(--blue); }
+    .client-record-link {
+      font-family: inherit; font-size: 11.5px; font-weight: 600; color: var(--blue);
+      background: none; border: none; padding: 6px 0 0; cursor: pointer; text-align: left;
+      display: block;
+    }
+    .client-record-link:hover { text-decoration: underline; }
     .sidebar-search { padding: 10px 12px; border-bottom: 1px solid var(--border); }
     .role-search-input {
       font-family: inherit; font-size: 12px; width: 100%;
@@ -369,6 +375,42 @@
       transition: box-shadow 0.12s, transform 0.12s;
     }
     .assistant-card:hover { box-shadow: 0 3px 10px rgba(15,23,42,0.1); transform: translateY(-1px); }
+
+    /* ── RICH CLIENT RECORDS ── added 2026-08-05 */
+    .client-back-btn {
+      font-family: inherit; font-size: 12px; font-weight: 600; color: var(--muted);
+      background: none; border: none; padding: 0 0 8px; cursor: pointer; display: block;
+    }
+    .client-back-btn:hover { color: var(--text); }
+    .client-header-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      padding: 16px; margin-bottom: 12px; max-width: 680px;
+    }
+    .client-header-top { display: flex; align-items: center; gap: 12px; }
+    .client-avatar {
+      width: 44px; height: 44px; border-radius: 10px; background: var(--blue); color: white;
+      font-size: 15px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .client-name { font-size: 17px; font-weight: 700; color: var(--text); }
+    .client-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .client-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; max-width: 680px; }
+    .client-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+    .client-card-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--dim); margin-bottom: 8px;
+    }
+    .client-section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; max-width: 680px; }
+    .client-vacancy-row {
+      display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border);
+    }
+    .client-vacancy-row:last-child { border-bottom: none; }
+    .client-edit-toggle {
+      font-family: inherit; font-size: 12px; font-weight: 600; color: var(--blue);
+      background: none; border: none; cursor: pointer; margin-left: auto;
+    }
+    .client-edit-toggle:hover { text-decoration: underline; }
+    .client-edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .client-save-status { font-size: 12px; color: var(--green); opacity: 0; transition: opacity 0.3s; margin-left: 8px; }
 
     /* ── DRAWER ── */
     .drawer-backdrop {
@@ -732,22 +774,24 @@ function render() {
     main.innerHTML = `
       <div class="app-layout">
         <aside class="sidebar">
-          <div class="sidebar-top">${orgSelectHtml(organizations)}${companySelectHtml(companies)}</div>
+          <div class="sidebar-top">${orgSelectHtml(organizations)}${companySelectHtml(companies)}${user.isStaff ? `<button class="client-record-link" onclick="openClientRecord()">🏢 View client record</button>` : ''}</div>
           <div class="role-list"><div class="role-list-empty">No roles yet</div></div>
           <button class="new-role-btn-sidebar" onclick="openRoleModal()">＋ New role</button>
           ${user.isStaff ? `<button class="earnings-toggle-btn" onclick="toggleEarningsView()">Forecast</button>` : ''}
           ${user.isStaff ? `<button class="earnings-toggle-btn" onclick="toggleAssistantView()">✨ AI Search</button>` : ''}
         </aside>
-        <div class="content-area">
+        <div class="content-area" id="contentArea">
+          ${viewMode !== 'client' ? `
           <div class="centered" style="min-height:50vh;">
             <div style="font-size:36px;">📋</div>
             <div style="font-size:16px;font-weight:600;">No roles yet</div>
             <div style="color:var(--muted);font-size:13px;">Click <strong>＋ New role</strong> to request your first search.</div>
-          </div>
+          </div>` : ''}
         </div>
       </div>`;
     attachCompanySelectListener();
     attachOrgSelectListener();
+    if (viewMode === 'client' && user.isStaff) buildClientRecordView(company);
     return;
   }
 
@@ -757,7 +801,7 @@ function render() {
   main.innerHTML = `
     <div class="app-layout">
       <aside class="sidebar">
-        <div class="sidebar-top">${orgSelectHtml(organizations)}${companySelectHtml(companies)}</div>
+        <div class="sidebar-top">${orgSelectHtml(organizations)}${companySelectHtml(companies)}${user.isStaff ? `<button class="client-record-link" onclick="openClientRecord()">🏢 View client record</button>` : ''}</div>
         <div class="sidebar-search">
           <input id="roleSearchInput" class="role-search-input" type="search" placeholder="Search roles…"
             oninput="onRoleSearch(this.value)" value="${esc(roleSearchQuery)}" autocomplete="off" />
@@ -782,9 +826,16 @@ function render() {
     buildEarningsView(company);
   } else if (viewMode === 'assistant' && user.isStaff) {
     buildAssistantView();
+  } else if (viewMode === 'client' && user.isStaff) {
+    buildClientRecordView(company);
   } else {
     buildPipelineView(role);
   }
+}
+
+function openClientRecord() {
+  viewMode = 'client';
+  render();
 }
 
 function buildPipelineView(role) {
@@ -953,6 +1004,193 @@ async function runAssistantSearch() {
     const resultsEl = document.getElementById('assistantResults');
     if (resultsEl) resultsEl.innerHTML = assistantResultsHtml();
     attachAssistantCardListeners();
+  }
+}
+
+// ── Rich Client Records ─────────────────────────────────────────────
+// Placement history and Recent activity are entirely derived from existing data
+// (Role Matches + Contact History, scoped to this company's roles server-side) — only
+// the profile fields (website, industry, main contact, etc.) are genuinely new data.
+let clientRecordData = null; // last-loaded record for the currently open company
+let clientEditMode = false;
+
+function backToPipeline() {
+  viewMode = 'pipeline';
+  render();
+}
+
+function buildClientRecordView(company) {
+  const contentArea = document.getElementById('contentArea');
+  contentArea.innerHTML = `
+    <button class="client-back-btn" onclick="backToPipeline()">← Back to pipeline</button>
+    <div id="clientRecordBody"><div class="assistant-empty">Loading client record…</div></div>`;
+  loadClientRecord(company.id);
+}
+
+async function loadClientRecord(companyId) {
+  clientEditMode = false;
+  try {
+    const h = await authHeader();
+    const r = await fetch(`/api/crm?action=company-record&companyId=${encodeURIComponent(companyId)}`, { headers: h });
+    if (!r.ok) throw new Error();
+    clientRecordData = await r.json();
+    renderClientRecordBody();
+  } catch {
+    const body = document.getElementById('clientRecordBody');
+    if (body) body.innerHTML = `<div class="assistant-empty">Couldn't load this client record.</div>`;
+  }
+}
+
+function renderClientRecordBody() {
+  const body = document.getElementById('clientRecordBody');
+  if (!body || !clientRecordData) return;
+  const { company: c, roles, placements, activity } = clientRecordData;
+
+  const metaParts = [c.industry, c.companySize, c.officeLocations].filter(Boolean);
+  const since = c.createdDate ? new Date(c.createdDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : '';
+
+  body.innerHTML = `
+    <div class="client-header-card">
+      <div class="client-header-top">
+        <div class="client-avatar">${esc(initials(c.name))}</div>
+        <div style="flex:1;">
+          <div class="client-name">${esc(c.name)}</div>
+          ${metaParts.length ? `<div class="client-meta">${esc(metaParts.join(' · '))}</div>` : ''}
+        </div>
+        ${c.website ? `<a href="${escA(c.website)}" target="_blank" style="font-size:12px;color:var(--blue);text-decoration:none;font-weight:600;">Website ↗</a>` : ''}
+        ${c.linkedinUrl ? `<a href="${escA(c.linkedinUrl)}" target="_blank" style="font-size:12px;color:var(--blue);text-decoration:none;font-weight:600;margin-left:10px;">LinkedIn ↗</a>` : ''}
+        <button class="client-edit-toggle" onclick="toggleClientEdit()">${clientEditMode ? 'Cancel' : '✏️ Edit'}</button>
+      </div>
+    </div>
+
+    ${clientEditMode ? clientEditFormHtml(c) : `
+    <div class="client-grid">
+      <div class="client-card">
+        <div class="client-card-label">Main contact</div>
+        ${c.mainContactName ? `<div style="font-size:13px;font-weight:600;color:var(--text);">${esc(c.mainContactName)}</div>` : `<div style="font-size:12.5px;color:var(--dim);">Not set</div>`}
+        ${c.mainContactTitle ? `<div style="font-size:12px;color:var(--muted);margin-top:1px;">${esc(c.mainContactTitle)}</div>` : ''}
+        ${c.mainContactEmail ? `<div style="font-size:12px;color:var(--green);font-weight:500;margin-top:6px;">${esc(c.mainContactEmail)}</div>` : ''}
+        ${c.mainContactPhone ? `<div style="font-size:12px;color:var(--text);margin-top:2px;">${esc(c.mainContactPhone)}</div>` : ''}
+      </div>
+      <div class="client-card">
+        <div class="client-card-label">Terms agreed</div>
+        ${c.feeTerms ? `<div style="font-size:13px;color:var(--text);">${esc(c.feeTerms)}</div>` : `<div style="font-size:12.5px;color:var(--dim);">Not set</div>`}
+        ${since ? `<div style="font-size:12px;color:var(--muted);margin-top:6px;">Client since ${esc(since)}</div>` : ''}
+      </div>
+    </div>`}
+
+    <div class="client-section">
+      <div class="client-card-label">Open vacancies · ${roles.length}</div>
+      ${roles.length ? roles.map(r => {
+        const dot = { active: '#16a34a', paused: '#d97706', filled: '#2563eb', closed: '#94a3b8' }[r.status.toLowerCase()] || '#94a3b8';
+        return `<div class="client-vacancy-row">
+          <span style="width:7px;height:7px;border-radius:50%;background:${dot};flex-shrink:0;"></span>
+          <span style="font-size:13px;color:var(--text);flex:1;">${esc(r.title)}</span>
+          <span style="font-size:11px;color:var(--dim);">${r.candidateCount} candidate${r.candidateCount !== 1 ? 's' : ''}</span>
+        </div>`;
+      }).join('') : `<div style="font-size:12.5px;color:var(--dim);">No roles yet.</div>`}
+    </div>
+
+    <div class="client-section">
+      <div class="client-card-label">Placement history · ${placements.length}</div>
+      ${placements.length ? `
+      <table class="earnings-table">
+        <thead><tr><th>Candidate</th><th>Role</th><th>Salary</th><th>Placed</th></tr></thead>
+        <tbody>${placements.map(p => `
+          <tr>
+            <td>${esc(p.candidateName)}</td>
+            <td>${esc(p.roleTitle)}</td>
+            <td class="num">${p.placementSalary != null ? '£' + p.placementSalary.toLocaleString() : '—'}</td>
+            <td class="num">${p.placedAt ? new Date(p.placedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
+          </tr>`).join('')}</tbody>
+      </table>` : `<div style="font-size:12.5px;color:var(--dim);">No placements yet.</div>`}
+    </div>
+
+    <div class="client-section">
+      <div class="client-card-label">Recent activity</div>
+      ${activity.length ? `<div class="history-list">${activity.map(e => {
+        const when = new Date(e.loggedAt);
+        const dateStr = isNaN(when) ? '' : when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        return `<div class="history-entry">
+          <span class="history-type-badge">${esc(e.type)}</span>${esc(e.summary)}
+          <div class="history-meta">${esc(dateStr)}${e.loggedBy ? ` · ${esc(e.loggedBy)}` : ''}</div>
+        </div>`;
+      }).join('')}</div>` : `<div style="font-size:12.5px;color:var(--dim);">No activity logged against this client's roles yet.</div>`}
+    </div>
+
+    ${!clientEditMode && c.notes ? `
+    <div class="client-section">
+      <div class="client-card-label">Notes</div>
+      <div style="font-size:13px;line-height:1.6;color:var(--text);white-space:pre-wrap;">${esc(c.notes)}</div>
+    </div>` : ''}`;
+}
+
+function toggleClientEdit() {
+  clientEditMode = !clientEditMode;
+  renderClientRecordBody();
+}
+
+function clientEditFormHtml(c) {
+  const field = (id, label, value, type = 'text') => `
+    <div class="modal-field">
+      <label>${esc(label)}</label>
+      <input id="${id}" class="modal-input" type="${type}" value="${escA(value || '')}" />
+    </div>`;
+  return `
+    <div class="client-section">
+      <div class="client-edit-grid">
+        ${field('editWebsite', 'Website', c.website, 'url')}
+        ${field('editIndustry', 'Industry', c.industry)}
+        ${field('editCompanySize', 'Company size', c.companySize)}
+        ${field('editLinkedinUrl', 'LinkedIn URL', c.linkedinUrl, 'url')}
+        ${field('editOfficeLocations', 'Office locations', c.officeLocations)}
+        ${field('editFeeTerms', 'Fee terms', c.feeTerms)}
+        ${field('editMainContactName', 'Main contact name', c.mainContactName)}
+        ${field('editMainContactTitle', 'Main contact title', c.mainContactTitle)}
+        ${field('editMainContactEmail', 'Main contact email', c.mainContactEmail, 'email')}
+        ${field('editMainContactPhone', 'Main contact phone', c.mainContactPhone)}
+      </div>
+      <div class="modal-field" style="margin-top:12px;">
+        <label>Notes</label>
+        <textarea id="editNotes" class="modal-textarea">${esc(c.notes || '')}</textarea>
+      </div>
+      <div style="margin-top:12px;display:flex;align-items:center;">
+        <button class="modal-submit" id="clientSaveBtn" onclick="saveClientRecord()">Save changes</button>
+        <span class="client-save-status" id="clientSaveStatus">✓ Saved</span>
+      </div>
+    </div>`;
+}
+
+async function saveClientRecord() {
+  if (!clientRecordData) return;
+  const btn = document.getElementById('clientSaveBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const updates = {
+    website: document.getElementById('editWebsite').value.trim(),
+    industry: document.getElementById('editIndustry').value.trim(),
+    companySize: document.getElementById('editCompanySize').value.trim(),
+    linkedinUrl: document.getElementById('editLinkedinUrl').value.trim(),
+    officeLocations: document.getElementById('editOfficeLocations').value.trim(),
+    feeTerms: document.getElementById('editFeeTerms').value.trim(),
+    mainContactName: document.getElementById('editMainContactName').value.trim(),
+    mainContactTitle: document.getElementById('editMainContactTitle').value.trim(),
+    mainContactEmail: document.getElementById('editMainContactEmail').value.trim(),
+    mainContactPhone: document.getElementById('editMainContactPhone').value.trim(),
+    notes: document.getElementById('editNotes').value,
+  };
+  try {
+    const h = await authHeader();
+    const r = await fetch('/api/crm?action=update-company', {
+      method: 'PATCH', headers: { ...h, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId: clientRecordData.company.id, ...updates }),
+    });
+    if (!r.ok) throw new Error();
+    Object.assign(clientRecordData.company, updates);
+    clientEditMode = false;
+    renderClientRecordBody();
+  } catch {
+    alert('Failed to save — please try again.');
+    btn.disabled = false; btn.textContent = 'Save changes';
   }
 }
 
