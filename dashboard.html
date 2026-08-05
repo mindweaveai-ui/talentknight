@@ -279,17 +279,27 @@
       min-width: 26px; height: 20px; padding: 0 6px; border-radius: 10px;
       font-size: 11px; font-weight: 700; flex-shrink: 0;
     }
-    .fit-badge.good { background: #dcfce7; color: #166534; }
-    .fit-badge.ok   { background: #fef3c7; color: #92400e; }
-    .fit-badge.low  { background: #fee2e2; color: #b91c1c; }
+    /* Four-tier scheme (2026-08-05, replacing a two-cutoff good/ok/low scheme) — matches
+       Mike's own bands: 90+ Excellent, 80-89 Strong, 70-79 Good, below 70 Partial. Class
+       names use his exact words so fitScoreClass()'s output can double as the label text. */
+    .fit-badge.excellent { background: #dcfce7; color: #166534; }
+    .fit-badge.strong    { background: #cffafe; color: #0e7490; }
+    .fit-badge.good      { background: #fef3c7; color: #92400e; }
+    .fit-badge.partial   { background: #fee2e2; color: #b91c1c; }
     .fit-score-row { display: flex; align-items: center; gap: 10px; }
     .fit-score-num { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
     .fit-score-num .fit-score-max { font-size: 12px; font-weight: 500; color: var(--dim); }
+    .fit-score-label { font-size: 12px; font-weight: 600; }
+    .fit-score-label.excellent { color: #166534; }
+    .fit-score-label.strong    { color: #0e7490; }
+    .fit-score-label.good      { color: #92400e; }
+    .fit-score-label.partial   { color: #b91c1c; }
     .fit-score-bar { flex: 1; height: 6px; border-radius: 3px; background: var(--bg); overflow: hidden; }
     .fit-score-bar-fill { height: 100%; border-radius: 3px; }
-    .fit-score-bar-fill.good { background: var(--green); }
-    .fit-score-bar-fill.ok   { background: var(--amber); }
-    .fit-score-bar-fill.low  { background: var(--rose); }
+    .fit-score-bar-fill.excellent { background: var(--green); }
+    .fit-score-bar-fill.strong    { background: #0891b2; }
+    .fit-score-bar-fill.good      { background: var(--amber); }
+    .fit-score-bar-fill.partial   { background: var(--rose); }
 
     /* ── DRAWER ── */
     .drawer-backdrop {
@@ -485,6 +495,7 @@
         <label>Brief / key requirements</label>
         <textarea id="roleBrief" class="modal-textarea" placeholder="Qualifications, years of experience, specialisms, salary range…"></textarea>
       </div>
+      <div id="roleClarifyQuestions"></div>
     </div>
     <div class="modal-footer">
       <button class="modal-cancel" onclick="closeRoleModal()">Cancel</button>
@@ -1032,7 +1043,7 @@ function makeCard(c) {
         <div class="cand-name" title="${esc(c.name)}">${hl(c.name)}</div>
         ${sub ? `<div class="cand-sub" title="${esc(sub)}">${hl(sub)}</div>` : ''}
       </div>
-      ${c.fitScore != null ? `<span class="fit-badge ${fitScoreClass(c.fitScore)}" title="AI fit score">${c.fitScore}</span>` : ''}
+      ${c.fitScore != null ? `<span class="fit-badge ${fitScoreClass(c.fitScore)}" title="AI fit score: ${fitScoreLabel(c.fitScore)}">${c.fitScore}</span>` : ''}
     </div>
     <div class="card-footer">
       <span class="card-loc">${loc ? `📍 ${hl(loc)}` : ''}</span>
@@ -1223,6 +1234,7 @@ function openDrawer(c) {
       <div class="fit-score-row">
         <div class="fit-score-num">${c.fitScore}<span class="fit-score-max">/100</span></div>
         <div class="fit-score-bar"><div class="fit-score-bar-fill ${fitScoreClass(c.fitScore)}" style="width:${c.fitScore}%"></div></div>
+        <div class="fit-score-label ${fitScoreClass(c.fitScore)}">${fitScoreLabel(c.fitScore)}</div>
       </div>
     </div>` : ''}
 
@@ -1351,10 +1363,23 @@ async function savePlacementSalary(candidateId) {
 }
 
 // ── Role modal ─────────────────────────────────────────────────────
+// Two-phase submit (added 2026-08-05, wiring up the clarify-brief backend action that
+// already existed in api/crm.js but was never called from here — see roadmap notes).
+// First click checks with Claude whether the brief is missing anything worth asking
+// about (must-have vs nice-to-have, seniority, remote/hybrid/onsite, salary range,
+// sector specifics). If nothing's missing, clarify-brief returns [] and the role is
+// created immediately — no extra step for a brief that's already detailed. If there
+// are questions, they're rendered inline and the button becomes "Continue"; the second
+// click appends any answers to the brief text (skipped answers are just omitted) and
+// creates the role as before.
+let pendingClarifyQuestions = [];
+
 function openRoleModal() {
   document.getElementById('roleTitle').value = '';
   document.getElementById('roleLocation').value = '';
   document.getElementById('roleBrief').value = '';
+  document.getElementById('roleClarifyQuestions').innerHTML = '';
+  pendingClarifyQuestions = [];
   document.getElementById('roleSubmitBtn').disabled = false;
   document.getElementById('roleSubmitBtn').textContent = 'Submit role';
   document.getElementById('roleModalOverlay').classList.add('open');
@@ -1366,12 +1391,48 @@ function closeRoleModal(e) {
   document.getElementById('roleModalOverlay').classList.remove('open');
 }
 
+function renderClarifyQuestions(questions) {
+  const wrap = document.getElementById('roleClarifyQuestions');
+  wrap.innerHTML = `<div style="font-size:12px;color:var(--muted);margin:2px 0 4px;">A couple of quick questions to sharpen this brief before we search — leave any blank to skip.</div>` +
+    questions.map((q, i) => `
+      <div class="modal-field">
+        <label>${esc(q)}</label>
+        <input id="clarifyAnswer${i}" class="modal-input" type="text" />
+      </div>`).join('');
+}
+
 async function submitNewRole() {
   const title = document.getElementById('roleTitle').value.trim();
   if (!title) { document.getElementById('roleTitle').focus(); return; }
   const location = document.getElementById('roleLocation').value.trim();
-  const brief = document.getElementById('roleBrief').value.trim();
+  let brief = document.getElementById('roleBrief').value.trim();
   const btn = document.getElementById('roleSubmitBtn');
+
+  if (!pendingClarifyQuestions.length) {
+    btn.disabled = true; btn.textContent = 'Checking brief…';
+    try {
+      const h = await authHeader();
+      const r = await fetch('/api/crm?action=clarify-brief', {
+        method: 'POST', headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, location, brief }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        if (data.questions?.length) {
+          pendingClarifyQuestions = data.questions;
+          renderClarifyQuestions(pendingClarifyQuestions);
+          btn.disabled = false; btn.textContent = 'Continue';
+          return;
+        }
+      }
+    } catch { /* best-effort — fall through and create the role on the original brief */ }
+  }
+
+  const answered = pendingClarifyQuestions
+    .map((q, i) => document.getElementById(`clarifyAnswer${i}`)?.value.trim())
+    .filter(Boolean);
+  if (answered.length) brief = [brief, ...answered].filter(Boolean).join(' — ');
+
   btn.disabled = true; btn.textContent = 'Submitting…';
   try {
     const companyId = currentCompany().id;
@@ -1387,6 +1448,7 @@ async function submitNewRole() {
     roleIdx = company.roles.length - 1;
     searchQuery = '';
     roleSearchQuery = '';
+    pendingClarifyQuestions = [];
     document.getElementById('roleModalOverlay').classList.remove('open');
     render();
   } catch {
@@ -1514,8 +1576,15 @@ function avatarColor(name) {
 function initials(name) {
   return String(name || '').split(' ').slice(0, 2).map(w => w[0] || '').join('').toUpperCase() || '?';
 }
+// Four-tier bands (2026-08-05) — 90+ Excellent, 80-89 Strong, 70-79 Good, below 70
+// Partial. Class name doubles as the human label (see fitScoreLabel below), replacing
+// the previous two-cutoff good/ok/low scheme (85/70) that didn't match this spec.
 function fitScoreClass(score) {
-  return score >= 85 ? 'good' : score >= 70 ? 'ok' : 'low';
+  return score >= 90 ? 'excellent' : score >= 80 ? 'strong' : score >= 70 ? 'good' : 'partial';
+}
+function fitScoreLabel(score) {
+  const c = fitScoreClass(score);
+  return c.charAt(0).toUpperCase() + c.slice(1);
 }
 function shortLoc(loc) {
   if (!loc) return '';
