@@ -1720,10 +1720,21 @@ function openDrawer(c, opts = {}) {
       <div class="history-list" id="historyList"><div class="history-loading">Loading activity…</div></div>
     </div>` : ''}
 
+    ${hasRoleContext ? `
     <div class="drawer-section" style="flex:1;">
       <div class="drawer-section-label">Notes</div>
       <textarea class="drawer-notes" id="drawerNotes" placeholder="Add notes about this candidate…">${esc(c.notes || '')}</textarea>
-    </div>`;
+    </div>` : `
+    <div class="drawer-section" style="flex:1;">
+      <div class="drawer-section-label">Notes</div>
+      <div style="font-size:12.5px;color:var(--dim);">Notes are specific to a client relationship — open this candidate from a role's board to add or view notes.</div>
+    </div>`}`;
+
+  // Notes are role-scoped now (see the drawer-body notes section above) — hide the footer
+  // Save button entirely when there's no role in context (AI Search drawer opens), rather
+  // than leaving a button that would either no-op or throw on a missing #drawerNotes.
+  const footer = document.querySelector('.drawer-footer');
+  if (footer) footer.style.display = hasRoleContext ? '' : 'none';
 
   document.getElementById('drawerBackdrop').classList.add('open');
   document.getElementById('drawer').classList.add('open');
@@ -1812,8 +1823,14 @@ async function drawerChangeStage(sel) {
 }
 
 async function saveNotes() {
-  if (!openCand) return;
-  const notes = document.getElementById('drawerNotes').value;
+  // Notes are role-scoped (Role Matches row for this candidate+role), not a flat
+  // Candidate field — see api/crm.js's RMF comment for why. The footer button is hidden
+  // whenever the drawer has no role in context (openDrawer), but guard here too in case
+  // this is ever reachable another way.
+  if (!openCand || !openCandRoleId) return;
+  const notesEl = document.getElementById('drawerNotes');
+  if (!notesEl) return;
+  const notes = notesEl.value;
   const btn = document.getElementById('saveBtn');
   const status = document.getElementById('saveStatus');
   btn.disabled = true; btn.textContent = 'Saving…';
@@ -1821,7 +1838,7 @@ async function saveNotes() {
     const h = await authHeader();
     const r = await fetch('/api/crm?action=save-notes', {
       method: 'PATCH', headers: { ...h, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ candidateId: openCand.id, notes }),
+      body: JSON.stringify({ candidateId: openCand.id, roleId: openCandRoleId, notes }),
     });
     if (!r.ok) throw new Error();
     openCand.notes = notes;
@@ -1832,6 +1849,8 @@ async function saveNotes() {
 }
 
 async function savePlacementSalary(candidateId) {
+  // Role-scoped, same reasoning as saveNotes() above — this field is only ever rendered
+  // when hasRoleContext is true, so openCandRoleId is guaranteed set here.
   const input = document.getElementById('drawerPlacementSalary');
   const status = document.getElementById('placementSaveStatus');
   const placementSalary = input.value === '' ? null : Number(input.value);
@@ -1839,7 +1858,7 @@ async function savePlacementSalary(candidateId) {
     const h = await authHeader();
     const r = await fetch('/api/crm?action=save-placement-salary', {
       method: 'PATCH', headers: { ...h, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ candidateId, placementSalary }),
+      body: JSON.stringify({ candidateId, roleId: openCandRoleId, placementSalary }),
     });
     if (!r.ok) throw new Error();
 
