@@ -355,6 +355,43 @@
     .history-meta { color: var(--dim); font-size: 11px; margin-top: 2px; }
     .history-empty, .history-loading { color: var(--dim); font-size: 12px; padding: 4px 0; }
 
+    /* ── VACANCY DASHBOARD (hiring manager / role notes / activity+similar panels) ── added 2026-08-05 */
+    .hiring-manager-line, .role-notes-line {
+      font-size: 12px; color: var(--muted); padding: 0 0 10px;
+    }
+    .hiring-manager-line a { color: var(--blue); text-decoration: none; }
+    .hiring-manager-line a:hover { text-decoration: underline; }
+    .role-notes-line { color: var(--dim); font-style: italic; }
+    .role-panel {
+      border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
+      padding: 14px 16px; margin-bottom: 14px;
+    }
+    .role-panel-title {
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;
+      color: var(--muted); margin-bottom: 10px;
+    }
+    .role-panel-loading, .role-panel-empty { color: var(--dim); font-size: 12.5px; }
+    .history-entry-who { font-weight: 600; color: var(--text); margin-right: 4px; }
+    .similar-cand-row {
+      display: flex; align-items: flex-start; gap: 10px; padding: 9px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .similar-cand-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .similar-cand-avatar {
+      width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 11px; font-weight: 700;
+    }
+    .similar-cand-info { flex: 1; min-width: 0; }
+    .similar-cand-name { font-size: 13px; font-weight: 600; }
+    .similar-cand-score {
+      font-size: 10.5px; font-weight: 700; color: var(--blue); background: var(--blue-light);
+      border-radius: 4px; padding: 1px 5px; margin-left: 4px;
+    }
+    .similar-cand-sub { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+    .similar-cand-summary { font-size: 11px; color: #4c6ef5; font-style: italic; margin-top: 3px; }
+    .similar-cand-linkedin { text-decoration: none; font-size: 14px; flex-shrink: 0; }
+
     /* ── AI RECRUITER ASSISTANT ── added 2026-08-05 */
     .assistant-search-row { display: flex; gap: 8px; margin-bottom: 18px; max-width: 640px; }
     .assistant-search-input {
@@ -648,6 +685,22 @@
           <option value="Closed">Closed</option>
         </select>
       </div>
+      <div class="modal-field">
+        <label>Hiring manager name</label>
+        <input id="editRoleHMName" class="modal-input" type="text" />
+      </div>
+      <div class="modal-field">
+        <label>Hiring manager email</label>
+        <input id="editRoleHMEmail" class="modal-input" type="email" />
+      </div>
+      <div class="modal-field">
+        <label>Hiring manager phone</label>
+        <input id="editRoleHMPhone" class="modal-input" type="text" />
+      </div>
+      <div class="modal-field">
+        <label>Role notes</label>
+        <textarea id="editRoleNotes" class="modal-textarea" placeholder="General notes about this vacancy — separate from per-candidate notes."></textarea>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="role-icon-btn danger" id="editRoleDeleteBtn" onclick="confirmDeleteRole()" style="margin-right:auto;">🗑️ Delete role</button>
@@ -844,6 +897,11 @@ function openClientRecord() {
 
 function buildPipelineView(role) {
   const contentArea = document.getElementById('contentArea');
+  // Each call rebuilds #rolePanel fresh (closed) — reset the tracker to match, otherwise a
+  // panel left open on the previous role would make the next click on the same button
+  // think it's already open and toggle it shut instead of loading the new role's data.
+  openRolePanel = null;
+  const hm = [role.hiringManagerName, role.hiringManagerEmail, role.hiringManagerPhone].some(Boolean);
   contentArea.innerHTML = `
     <div class="content-header">
       <div class="page-title">${esc(role.title)}</div>
@@ -853,9 +911,16 @@ function buildPipelineView(role) {
         ${role.brief ? `<span class="role-brief" title="${esc(role.brief)}">${esc(role.brief)}</span>` : ''}
         ${state.user.isStaff ? `<button class="role-icon-btn" onclick="openEditRoleModal('${role.id}')" title="Edit role">✏️ Edit</button>` : ''}
         ${state.user.isStaff ? `<button class="find-matches-btn" id="findMatchesBtn" onclick="findMatches('${role.id}')">🔍 Find matches</button><span class="find-matches-status" id="findMatchesStatus"></span>` : ''}
+        ${state.user.isStaff ? `<button class="role-icon-btn" onclick="toggleRolePanel('activity','${role.id}')">📋 Activity</button>` : ''}
+        ${state.user.isStaff ? `<button class="role-icon-btn" onclick="toggleRolePanel('similar','${role.id}')">✨ Similar candidates</button>` : ''}
         ${state.user.isStaff ? dealTermsHtml(role) : ''}
       </div>
+      ${hm ? `<div class="hiring-manager-line">
+        👤 ${esc(role.hiringManagerName || 'Hiring manager')}${role.hiringManagerEmail ? ` · <a href="mailto:${escA(role.hiringManagerEmail)}">${esc(role.hiringManagerEmail)}</a>` : ''}${role.hiringManagerPhone ? ` · <a href="tel:${escA(role.hiringManagerPhone)}">${esc(role.hiringManagerPhone)}</a>` : ''}
+      </div>` : ''}
+      ${role.roleNotes ? `<div class="role-notes-line">📝 ${esc(role.roleNotes)}</div>` : ''}
     </div>
+    <div class="role-panel" id="rolePanel" style="display:none;"></div>
     <div class="search-row">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
@@ -869,6 +934,71 @@ function buildPipelineView(role) {
 
   updateSearchClear();
   buildKanban(role);
+}
+
+// ── Vacancy Dashboard panels: Activity + Similar candidates (2026-08-05) ────
+// Both lazy-load on first open (no cost on every role view) and toggle closed on a second
+// click of the same button. Kept as plain fetch-and-render rather than persisted state —
+// these are advisory/read views, nothing here needs to survive a re-render.
+let openRolePanel = null; // 'activity' | 'similar' | null
+async function toggleRolePanel(kind, roleId) {
+  const panel = document.getElementById('rolePanel');
+  if (!panel) return;
+  if (openRolePanel === kind) {
+    openRolePanel = null;
+    panel.style.display = 'none';
+    panel.innerHTML = '';
+    return;
+  }
+  openRolePanel = kind;
+  panel.style.display = 'block';
+  panel.innerHTML = `<div class="role-panel-loading">Loading…</div>`;
+  try {
+    const h = await authHeader();
+    if (kind === 'activity') {
+      const r = await fetch(`/api/crm?action=role-activity&roleId=${encodeURIComponent(roleId)}`, { headers: h });
+      if (!r.ok) throw new Error();
+      const data = await r.json();
+      panel.innerHTML = renderRoleActivity(data.entries || []);
+    } else {
+      const r = await fetch(`/api/crm?action=similar-candidates&roleId=${encodeURIComponent(roleId)}`, { headers: h });
+      if (!r.ok) throw new Error();
+      const data = await r.json();
+      panel.innerHTML = renderSimilarCandidates(data.results || []);
+    }
+  } catch {
+    panel.innerHTML = `<div class="role-panel-loading">Failed to load — try again.</div>`;
+  }
+}
+
+function renderRoleActivity(entries) {
+  if (!entries.length) return `<div class="role-panel-empty">No activity logged against this role yet.</div>`;
+  const rows = entries.map(e => {
+    const when = new Date(e.loggedAt);
+    const dateStr = isNaN(when) ? '' : when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) +
+      ' at ' + when.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    return `
+      <div class="history-entry">
+        <span class="history-type-badge">${esc(e.type)}</span><strong>${esc(e.candidateName)}</strong> — ${esc(e.summary)}
+        <div class="history-meta">${esc(dateStr)}${e.loggedBy ? ` · ${esc(e.loggedBy)}` : ''}</div>
+      </div>`;
+  }).join('');
+  return `<div class="role-panel-title">Activity across this role</div><div class="history-list">${rows}</div>`;
+}
+
+function renderSimilarCandidates(results) {
+  if (!results.length) return `<div class="role-panel-empty">No strong suggestions right now — try Find matches for a fuller search.</div>`;
+  const rows = results.map(c => `
+    <div class="similar-cand-row">
+      <div class="similar-cand-avatar" style="background:${avatarColor(c.name)}">${esc(initials(c.name))}</div>
+      <div class="similar-cand-info">
+        <div class="similar-cand-name">${esc(c.name)} <span class="similar-cand-score">${c.fitScore}</span></div>
+        <div class="similar-cand-sub">${esc([c.role, shortLoc(c.location)].filter(Boolean).join(' · '))}</div>
+        ${c.summary ? `<div class="similar-cand-summary">${esc(c.summary)}</div>` : ''}
+      </div>
+      ${c.linkedinUrl ? `<a class="similar-cand-linkedin" href="${escA(c.linkedinUrl)}" target="_blank" rel="noopener" title="LinkedIn">🔗</a>` : ''}
+    </div>`).join('');
+  return `<div class="role-panel-title">Similar live candidates (not yet on this board)</div>${rows}`;
 }
 
 function dealTermsHtml(role) {
@@ -2012,6 +2142,10 @@ function openEditRoleModal(roleId) {
   document.getElementById('editRoleLocation').value = role.location || '';
   document.getElementById('editRoleBrief').value = role.brief || '';
   document.getElementById('editRoleStatus').value = role.status;
+  document.getElementById('editRoleHMName').value = role.hiringManagerName || '';
+  document.getElementById('editRoleHMEmail').value = role.hiringManagerEmail || '';
+  document.getElementById('editRoleHMPhone').value = role.hiringManagerPhone || '';
+  document.getElementById('editRoleNotes').value = role.roleNotes || '';
   document.getElementById('editRoleSubmitBtn').disabled = false;
   document.getElementById('editRoleSubmitBtn').textContent = 'Save changes';
   document.getElementById('editRoleModalOverlay').classList.add('open');
@@ -2031,18 +2165,22 @@ async function submitEditRole() {
   const location = document.getElementById('editRoleLocation').value.trim();
   const brief = document.getElementById('editRoleBrief').value.trim();
   const status = document.getElementById('editRoleStatus').value;
+  const hiringManagerName = document.getElementById('editRoleHMName').value.trim();
+  const hiringManagerEmail = document.getElementById('editRoleHMEmail').value.trim();
+  const hiringManagerPhone = document.getElementById('editRoleHMPhone').value.trim();
+  const roleNotes = document.getElementById('editRoleNotes').value.trim();
   const btn = document.getElementById('editRoleSubmitBtn');
   btn.disabled = true; btn.textContent = 'Saving…';
   try {
     const h = await authHeader();
     const r = await fetch('/api/crm?action=update-role', {
       method: 'PATCH', headers: { ...h, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roleId: editingRoleId, title, location, brief, status }),
+      body: JSON.stringify({ roleId: editingRoleId, title, location, brief, status, hiringManagerName, hiringManagerEmail, hiringManagerPhone, roleNotes }),
     });
     if (!r.ok) throw new Error();
     const company = currentCompany();
     const role = company.roles.find(r => r.id === editingRoleId);
-    if (role) Object.assign(role, { title, location, brief, status });
+    if (role) Object.assign(role, { title, location, brief, status, hiringManagerName, hiringManagerEmail, hiringManagerPhone, roleNotes });
     document.getElementById('editRoleModalOverlay').classList.remove('open');
     editingRoleId = null;
     render();
