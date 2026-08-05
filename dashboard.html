@@ -211,6 +211,13 @@
     .card-body { flex: 1; min-width: 0; }
     .cand-name { font-size: 12px; font-weight: 600; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .cand-sub { font-size: 11px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }
+    /* AI Candidate Summaries (2026-08-05) — one-line "why they fit" from rankPoolAgainstRole,
+       shown on the card so recruiters don't have to open every profile. Styled distinctly
+       from .cand-sub (italic, blue-tinted) so it reads as "AI's take" not raw profile data. */
+    .cand-ai-summary {
+      font-size: 11px; color: #4c6ef5; font-style: italic; margin-top: 3px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4;
+    }
     .card-footer {
       display: flex; align-items: center; justify-content: space-between;
       margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); gap: 4px;
@@ -1042,6 +1049,7 @@ function makeCard(c) {
       <div class="card-body">
         <div class="cand-name" title="${esc(c.name)}">${hl(c.name)}</div>
         ${sub ? `<div class="cand-sub" title="${esc(sub)}">${hl(sub)}</div>` : ''}
+        ${c.summary ? `<div class="cand-ai-summary" title="${esc(c.summary)}">✨ ${hl(c.summary)}</div>` : ''}
       </div>
       ${c.fitScore != null ? `<span class="fit-badge ${fitScoreClass(c.fitScore)}" title="AI fit score: ${fitScoreLabel(c.fitScore)}">${c.fitScore}</span>` : ''}
     </div>
@@ -1236,6 +1244,7 @@ function openDrawer(c) {
         <div class="fit-score-bar"><div class="fit-score-bar-fill ${fitScoreClass(c.fitScore)}" style="width:${c.fitScore}%"></div></div>
         <div class="fit-score-label ${fitScoreClass(c.fitScore)}">${fitScoreLabel(c.fitScore)}</div>
       </div>
+      ${c.summary ? `<div style="font-size:12.5px;color:#4c6ef5;font-style:italic;margin-top:8px;line-height:1.5;">✨ ${esc(c.summary)}</div>` : ''}
     </div>` : ''}
 
     ${(profileRows.length || compRows.length) ? `
