@@ -405,8 +405,17 @@ function normalizeLocation(location) {
 // not Apify's decorated "Great Warley, England, United Kingdom, GB" strings — hence
 // extractPlaceName() below. Being UK-only by design, it will never resolve a genuinely
 // non-UK location (see the UK_HINTS check in filterByDistance for how that's handled).
+//
+// (2026-08-05) Also strips a leading "Greater " — LinkedIn locations are frequently
+// metro-area labels like "Greater Nottingham" or "Greater London", and postcodes.io's
+// Places API returns zero results for those exact strings (confirmed directly: "Greater
+// Nottingham" → [], "Nottingham" → resolves fine). Left unstripped, that geocode call
+// fails, and because the candidate's raw location text still contains a UK hint ("GB"),
+// filterByDistance()'s benefit-of-the-doubt fallback let them through completely
+// unfiltered — reopening the exact bug the distance filter was built to close, just via a
+// different trigger (a Nottingham candidate matched to a Leigh-on-Sea role surfaced this).
 function extractPlaceName(text) {
-  return (text || '').split(',')[0].trim();
+  return (text || '').replace(/^greater\s+/i, '').split(',')[0].trim();
 }
 
 const geocodeCache = new Map();
