@@ -479,11 +479,32 @@ function stripDirectionalPrefix(text) {
   return stripped && stripped.toLowerCase() !== (text || '').trim().toLowerCase() ? stripped : null;
 }
 
+// (2026-08-05, same day as the fix above) The directional-prefix retry immediately caused
+// a worse regression: candidates in "East London, Eastern Cape, South Africa, ZA" got
+// extractPlaceName → "East London" → fails → stripDirectionalPrefix → "London" → resolves
+// to LONDON, UK — so a South African candidate was scored 0 miles from a London role
+// (confirmed live: Walter Nelson and Onke Nokwe, both East London ZA, both got
+// distanceMiles: 0 the moment this shipped). Blindly retrying without checking WHOSE
+// country the text names turns "can't geocode" into "confidently geocode to the wrong
+// country," which is worse than the original bug. This also isn't unique to compass
+// prefixes — extractPlaceName has always taken just the first comma segment regardless of
+// country, so a candidate in "Cambridge, Ontario, Canada" or "London, Ontario, Canada"
+// would resolve to the identically-named UK place too, pre-dating this fix entirely.
+// Closing all of this the same way: if the full original text names a country other than
+// the UK, never attempt to geocode it at all — let it fall through to filterByDistance's
+// UK_HINTS text check instead, which correctly excludes it without risking a false match.
+const NON_UK_COUNTRY_HINTS = /\b(south africa|united states|USA|canada|india|united arab emirates|australia|new zealand|ireland|pakistan|nigeria|kenya|philippines|singapore|hong kong|china|germany|france|spain|italy|netherlands|poland|romania|brazil|mexico|eastern cape|western cape|gauteng|ontario|quebec|alberta|british columbia)\b/i;
+
 const geocodeCache = new Map();
 async function geocodeLocation(text) {
   const key = (text || '').trim().toLowerCase();
   if (!key) return null;
   if (geocodeCache.has(key)) return geocodeCache.get(key);
+
+  if (NON_UK_COUNTRY_HINTS.test(text)) {
+    geocodeCache.set(key, null);
+    return null;
+  }
 
   const tryQuery = async (placeName) => {
     if (!placeName) return null;
@@ -503,7 +524,9 @@ async function geocodeLocation(text) {
   let result = await tryQuery(placeName);
   if (!result) {
     // Second attempt: strip a leading compass direction ("East London" → "London") that
-    // extractPlaceName's "greater " strip doesn't cover, and retry once.
+    // extractPlaceName's "greater " strip doesn't cover, and retry once. Safe now that the
+    // NON_UK_COUNTRY_HINTS check above already ruled out this being a same-named place in
+    // a different country.
     const directional = stripDirectionalPrefix(placeName);
     if (directional) result = await tryQuery(directional);
   }
