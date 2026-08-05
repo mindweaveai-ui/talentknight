@@ -27,6 +27,8 @@ export default async function handler(req, res) {
   if (action === 'candidate-history')  return handleCandidateHistory(req, res);
   if (action === 'add-history')        return handleAddHistory(req, res);
   if (action === 'assistant-search')   return handleAssistantSearch(req, res);
+  if (action === 'company-record')     return handleCompanyRecord(req, res);
+  if (action === 'update-company')     return handleUpdateCompany(req, res);
   if (action === 'generate-token') return res.status(410).json({ error: 'Magic-link tokens are retired. Sign in via Clerk instead.' });
   return res.status(400).json({ error: 'Unknown action' });
 }
@@ -59,7 +61,19 @@ const CONTACT_HISTORY = 'tblSWBpdU3T1twcBk';
 // Same Apify actor the public Vesper search on demo.html uses for live LinkedIn top-up.
 const APIFY_ACTOR = 'harvestapi~linkedin-profile-search';
 
-const CF = { name: 'fld7AIteYYVxT41lf', active: 'fldBIoBDtUBN5tTPY', roles: 'fldXNHwOWNxZ6JcqF' };
+const CF = {
+  name: 'fld7AIteYYVxT41lf', active: 'fldBIoBDtUBN5tTPY', roles: 'fldXNHwOWNxZ6JcqF',
+  notes: 'flddKugZtkcL2cojH',
+  // Rich Client Records (added 2026-08-05) — company profile fields for the new client
+  // record page. Main Contact is the client's day-to-day point of contact, deliberately
+  // separate from Company Contacts (that table is portal login users — not always the
+  // same person as who you'd actually call).
+  website: 'fldnKGDC5eSzNAsQy', industry: 'fldGXGfFA3v7lizRV', companySize: 'fldRqLea5ufzthldz',
+  linkedinUrl: 'flddG9orkv9ncuGXW', mainContactName: 'fldyxLGgrY9OlttoB', mainContactTitle: 'fldlfq2u6oq00VueK',
+  mainContactEmail: 'fldrzR2aaPumvHh4X', mainContactPhone: 'fldULpq6esdTVk1r8',
+  feeTerms: 'fldkNO2L5rRUk2FS6', officeLocations: 'fldG68kB5UuZYQrF5',
+  createdDate: 'fldtwEfCtHWCNqxLY',
+};
 const RF = {
   title: 'fldO3J0Fh0JaZ5lRW', location: 'flddgoDm9N0krVu13', brief: 'fldGLYE5iZxdZsFEg', status: 'fldNdoolFfZisVSFS',
   candidates: 'fldU795m0fFIMZ2pc', company: 'fldPOW3SzPV0mfg0B',
@@ -1172,6 +1186,174 @@ async function handleAssistantSearch(req, res) {
   const ranked = (await rankPoolAgainstRole(query, pool, 10)).filter(c => c.fitScore >= 40);
 
   return res.status(200).json({ results: ranked });
+}
+
+// ── RICH CLIENT RECORDS ──────────────────────────────────────────────
+// Full client profile: company details, main contact, terms, open vacancies, placement
+// history, and recent activity. Placement history and activity are entirely derived from
+// data that already exists (Role Matches + Contact History) — no new tables needed for
+// those. Only the company-profile fields themselves (website, industry, main contact,
+// etc.) are new Airtable fields, added 2026-08-05 directly on Companies.
+async function handleCompanyRecord(req, res) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  const AT_TOKEN = process.env.AT_TOKEN;
+  if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
+
+  const companyId = req.query.companyId;
+  if (!companyId) return res.status(400).json({ error: 'Missing companyId' });
+
+  const clerkUserId = await getClerkUserId(req);
+  if (!clerkUserId) return res.status(401).json({ error: 'Invalid or missing session' });
+
+  const h = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
+  const access = await resolveAccess(clerkUserId, h);
+  if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet." });
+  if (access.viewerType !== 'staff') return res.status(403).json({ error: 'Staff only.' });
+
+  const allCompanyIds = access.organizations.flatMap(o => o.companyIds);
+  if (!allCompanyIds.includes(companyId)) return res.status(403).json({ error: 'Company not in your access scope' });
+
+  const companyRec = await fetch(`https://api.airtable.com/v0/${BASE}/${COMPANIES}/${companyId}?returnFieldsByFieldId=true`, { headers: h }).then(r => r.json()).catch(() => null);
+  if (!companyRec?.id) return res.status(404).json({ error: 'Company not found' });
+  const cf = companyRec.fields;
+
+  const roleIds = cf[CF.roles] || [];
+  let roles = [];
+  let placements = [];
+  let activity = [];
+
+  if (roleIds.length) {
+    const rolesRes = await fetch(
+      `https://api.airtable.com/v0/${BASE}/${ROLES}?filterByFormula=${encodeURIComponent(`OR(${roleIds.map(id => `RECORD_ID()='${id}'`).join(',')})`)}&returnFieldsByFieldId=true&pageSize=100`,
+      { headers: h }
+    ).then(r => r.json()).catch(() => ({ records: [] }));
+
+    roles = (rolesRes.records || []).map(rec => ({
+      id: rec.id,
+      title: rec.fields[RF.title] || 'Untitled Role',
+      status: rec.fields[RF.status] || 'Active',
+      candidateCount: (rec.fields[RF.candidates] || []).length,
+    }));
+    const roleTitleById = Object.fromEntries(roles.map(r => [r.id, r.title]));
+
+    const allMatches = await fetchAllRoleMatches(h);
+    const placedMatches = allMatches.filter(m => roleIds.includes(m.roleId) && m.stage === 'Placed');
+
+    if (placedMatches.length) {
+      const candIds = [...new Set(placedMatches.map(m => m.candidateId))];
+      const candRes = await fetch(
+        `https://api.airtable.com/v0/${BASE}/${CANDIDATES}?filterByFormula=${encodeURIComponent(`OR(${candIds.map(id => `RECORD_ID()='${id}'`).join(',')})`)}&returnFieldsByFieldId=true&pageSize=100`,
+        { headers: h }
+      ).then(r => r.json()).catch(() => ({ records: [] }));
+      const candNameById = {};
+      const candSalaryById = {};
+      (candRes.records || []).forEach(rec => {
+        candNameById[rec.id] = rec.fields[KF.name] || 'Unknown';
+        candSalaryById[rec.id] = typeof rec.fields[KF.placementSalary] === 'number' ? rec.fields[KF.placementSalary] : null;
+      });
+      placements = placedMatches
+        .map(m => ({
+          candidateId: m.candidateId,
+          candidateName: candNameById[m.candidateId] || 'Unknown',
+          roleTitle: roleTitleById[m.roleId] || 'Untitled Role',
+          placementSalary: candSalaryById[m.candidateId] ?? null,
+          placedAt: m.stageChangedAt || '',
+        }))
+        .sort((a, b) => new Date(b.placedAt) - new Date(a.placedAt));
+    }
+
+    // Recent activity: Contact History entries scoped to this company's roles. Same
+    // fetch-broadly-then-filter-client-side pattern as fetchAllRoleMatches/
+    // handleCandidateHistory — linked-record fields can't be reliably matched via
+    // filterByFormula.
+    let allHistory = [];
+    let offset;
+    do {
+      const url = `https://api.airtable.com/v0/${BASE}/${CONTACT_HISTORY}?returnFieldsByFieldId=true&pageSize=100${offset ? `&offset=${offset}` : ''}`;
+      const r = await fetch(url, { headers: h }).then(r => r.json()).catch(() => ({ records: [] }));
+      allHistory = allHistory.concat(r.records || []);
+      offset = r.offset;
+    } while (offset);
+
+    activity = allHistory
+      .filter(rec => (rec.fields[CHF.role] || []).some(id => roleIds.includes(id)))
+      .map(rec => ({
+        id: rec.id,
+        type: rec.fields[CHF.type] || 'Note',
+        summary: rec.fields[CHF.summary] || '',
+        loggedAt: rec.fields[CHF.loggedAt] || rec.createdTime,
+        loggedBy: rec.fields[CHF.loggedBy] || '',
+      }))
+      .sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt))
+      .slice(0, 20);
+  }
+
+  return res.status(200).json({
+    company: {
+      id: companyRec.id,
+      name: cf[CF.name] || 'Untitled Company',
+      website: cf[CF.website] || '',
+      industry: cf[CF.industry] || '',
+      companySize: cf[CF.companySize] || '',
+      linkedinUrl: cf[CF.linkedinUrl] || '',
+      mainContactName: cf[CF.mainContactName] || '',
+      mainContactTitle: cf[CF.mainContactTitle] || '',
+      mainContactEmail: cf[CF.mainContactEmail] || '',
+      mainContactPhone: cf[CF.mainContactPhone] || '',
+      feeTerms: cf[CF.feeTerms] || '',
+      officeLocations: cf[CF.officeLocations] || '',
+      notes: cf[CF.notes] || '',
+      createdDate: cf[CF.createdDate] || '',
+    },
+    roles,
+    placements,
+    activity,
+  });
+}
+
+async function handleUpdateCompany(req, res) {
+  if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed' });
+  const AT_TOKEN = process.env.AT_TOKEN;
+  if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
+
+  const { companyId, ...updates } = req.body || {};
+  if (!companyId) return res.status(400).json({ error: 'Missing companyId' });
+
+  const clerkUserId = await getClerkUserId(req);
+  if (!clerkUserId) return res.status(401).json({ error: 'Invalid or missing session' });
+
+  const h = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
+  const access = await resolveAccess(clerkUserId, h);
+  if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet." });
+  if (access.viewerType !== 'staff') return res.status(403).json({ error: 'Staff only.' });
+
+  const allCompanyIds = access.organizations.flatMap(o => o.companyIds);
+  if (!allCompanyIds.includes(companyId)) return res.status(403).json({ error: 'Company not in your access scope' });
+
+  // Only the editable profile fields — deliberately excludes name/active/roles/notes'
+  // sibling tables etc. Whatever the frontend sends for these keys overwrites the field;
+  // keys not present in the request body are left untouched (a real partial update, not
+  // a full-record overwrite).
+  const EDITABLE = {
+    website: CF.website, industry: CF.industry, companySize: CF.companySize, linkedinUrl: CF.linkedinUrl,
+    mainContactName: CF.mainContactName, mainContactTitle: CF.mainContactTitle,
+    mainContactEmail: CF.mainContactEmail, mainContactPhone: CF.mainContactPhone,
+    feeTerms: CF.feeTerms, officeLocations: CF.officeLocations, notes: CF.notes,
+  };
+  const fields = {};
+  for (const [key, fieldId] of Object.entries(EDITABLE)) {
+    if (Object.prototype.hasOwnProperty.call(updates, key)) fields[fieldId] = updates[key] ?? '';
+  }
+  if (!Object.keys(fields).length) return res.status(400).json({ error: 'Nothing to update' });
+
+  const upd = await fetch(`https://api.airtable.com/v0/${BASE}/${COMPANIES}/${companyId}`, {
+    method: 'PATCH', headers: h,
+    body: JSON.stringify({ fields }),
+  }).then(r => r.json()).catch(() => null);
+
+  return upd?.id
+    ? res.status(200).json({ ok: true })
+    : res.status(500).json({ error: 'Failed to save' });
 }
 
 // ── SAVE NOTES ────────────────────────────────────────────────────
