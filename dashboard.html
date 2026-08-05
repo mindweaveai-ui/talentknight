@@ -66,6 +66,10 @@
     }
     .sidebar-top { padding: 16px 16px 12px; border-bottom: 1px solid var(--border); }
     .sidebar-company-name { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+    .sidebar-select-label {
+      font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--muted); margin: 0 0 4px;
+    }
     .company-select {
       font-family: inherit; font-size: 13px; font-weight: 600; width: 100%;
       padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px;
@@ -1261,7 +1265,12 @@ function buildEarningsView(company) {
 
 function orgSelectHtml(organizations) {
   if (organizations.length <= 1) return '';
-  return `<select class="company-select" id="orgSelect" style="margin-bottom:8px;">
+  // Organizations are the paying TalentKnight tenants (e.g. "Armstrong Knight") — kept
+  // visually distinct from the Companies dropdown below, which lists that Organization's
+  // own end-clients (e.g. Buckley Watson). Labeled explicitly so the two levels don't read
+  // as one flat list — see [[project_talentknight_notes_salary_tenant_leak_fix]] /
+  // multitenant_pivot memory for why this distinction matters.
+  return `<div class="sidebar-select-label">Organization</div><select class="company-select" id="orgSelect" style="margin-bottom:8px;">
     ${organizations.map((o, i) => `<option value="${i}"${i === orgIdx ? ' selected' : ''}>${esc(o.name || 'Organization')}</option>`).join('')}
   </select>`;
 }
@@ -1283,12 +1292,16 @@ function onOrgChange(val) {
 }
 
 function companySelectHtml(companies) {
+  // Every entry here is a client the current Organization recruits for — labeled "Client"
+  // so it reads as one level down from the Organization dropdown above it, not a peer list
+  // of top-level accounts. Mike flagged this exact ambiguity (Buckley Watson/TBC clients
+  // rendering flat alongside sibling brand names) — this label is the fix.
   if (companies.length > 1) {
-    return `<select class="company-select" id="companySelect">
+    return `<div class="sidebar-select-label">Client</div><select class="company-select" id="companySelect">
       ${companies.map((c, i) => `<option value="${i}"${i === companyIdx ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}
     </select>`;
   }
-  return `<div class="sidebar-company-name">${esc(companies[0].name)}</div>`;
+  return `<div class="sidebar-select-label">Client</div><div class="sidebar-company-name">${esc(companies[0].name)}</div>`;
 }
 
 function attachCompanySelectListener() {
