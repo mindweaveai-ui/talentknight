@@ -464,25 +464,48 @@ function extractPlaceName(text) {
   return (text || '').replace(/^greater\s+/i, '').split(',')[0].trim();
 }
 
+// (2026-08-05) A Buckley Watson "Tax Manager" role entered with Location "east london"
+// returned 32 matches, only 12 of them UK-based — South Africa, the US, Canada, India and
+// the UAE all got through. Root cause: postcodes.io's /places endpoint returns ZERO
+// results for "east london" (confirmed directly), so the ROLE's own location failed to
+// geocode, and filterByDistance's fallback for that case was `return candidates` —
+// completely unfiltered, geography enforcement skipped entirely. Compass-direction area
+// names are common recruiter shorthand, not a one-off typo — "south london" and "north
+// manchester" fail the exact same way (confirmed directly), while stripping the prefix and
+// retrying with "london" resolves correctly. So: strip a leading compass direction and
+// retry once before giving up, instead of only handling "greater ".
+function stripDirectionalPrefix(text) {
+  const stripped = (text || '').replace(/^(east|west|north|south|central)\s+/i, '').trim();
+  return stripped && stripped.toLowerCase() !== (text || '').trim().toLowerCase() ? stripped : null;
+}
+
 const geocodeCache = new Map();
 async function geocodeLocation(text) {
   const key = (text || '').trim().toLowerCase();
   if (!key) return null;
   if (geocodeCache.has(key)) return geocodeCache.get(key);
-  const placeName = extractPlaceName(text);
-  let result = null;
-  if (placeName) {
+
+  const tryQuery = async (placeName) => {
+    if (!placeName) return null;
     try {
       const url = `https://api.postcodes.io/places?q=${encodeURIComponent(placeName)}&limit=1`;
       const r = await fetch(url);
       const data = r.ok ? await r.json() : null;
       const hit = data?.result?.[0];
       if (hit && typeof hit.latitude === 'number' && typeof hit.longitude === 'number') {
-        result = { lat: hit.latitude, lon: hit.longitude };
+        return { lat: hit.latitude, lon: hit.longitude };
       }
-    } catch {
-      result = null;
-    }
+    } catch { /* fall through to next attempt / null */ }
+    return null;
+  };
+
+  const placeName = extractPlaceName(text);
+  let result = await tryQuery(placeName);
+  if (!result) {
+    // Second attempt: strip a leading compass direction ("East London" → "London") that
+    // extractPlaceName's "greater " strip doesn't cover, and retry once.
+    const directional = stripDirectionalPrefix(placeName);
+    if (directional) result = await tryQuery(directional);
   }
   geocodeCache.set(key, result);
   return result;
@@ -522,7 +545,16 @@ const UK_HINTS = /\b(united kingdom|england|scotland|wales|northern ireland|gb|u
 async function filterByDistance(roleLocation, candidates) {
   if (!roleLocation?.trim() || !candidates.length) return candidates;
   const roleGeo = await geocodeLocation(roleLocation);
-  if (!roleGeo) return candidates;
+  if (!roleGeo) {
+    // The Role's own location didn't resolve even after geocodeLocation's directional-
+    // prefix retry — could be a genuinely obscure/misspelled place name, or a phrasing
+    // pattern not yet accounted for. Either way, "can't compute distance" must never again
+    // mean "skip geography filtering entirely" (that was the root cause of the Buckley
+    // Watson Tax Manager incident, 2026-08-05 — see geocodeLocation's comment). Degrade to
+    // a country-level filter instead: drop anyone whose location text has no UK indication
+    // at all, keep the rest undecorated (no distanceMiles — genuinely unknown, not zero).
+    return candidates.filter(c => !c.location || UK_HINTS.test(c.location));
+  }
 
   const out = [];
   for (const c of candidates) {
