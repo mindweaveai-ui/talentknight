@@ -86,6 +86,10 @@ const RMF = {
   // Real geocoded distance in miles between the Role's Location and this candidate's
   // Location — see filterByDistance()/geocodeLocation() below. Added 2026-08-05.
   distanceMiles: 'fldTPNQbBIMUb2nNH',
+  // One-line AI summary of why this candidate fits this specific Role — written by the
+  // same rankPoolAgainstRole Claude call that produces fitScore. Added 2026-08-05 for the
+  // "AI Candidate Summaries" roadmap item.
+  summary: 'fld9JdfaoACkdbpMt',
 };
 
 // Stages that only Org Staff (Admin/Consultant) may see or set. "Matched" is where Vesper's
@@ -508,6 +512,12 @@ async function postNotification(text) {
 // Vesper demo's "Fit score" UX on demo.html) so the CRM can show recruiters how strong a
 // match actually is, not just an unscored ranked order. Each returned candidate carries
 // a `.fitScore` alongside its existing fields.
+//
+// (2026-08-05) Also asks for a one-line `.summary` per candidate in the same call —
+// the "AI Candidate Summaries" roadmap item (e.g. "10 years payroll bureau experience,
+// Sage Payroll expert, lives 8 miles away, immediately available"), so recruiters don't
+// have to open every profile to see why a match landed. Piggybacking on the existing
+// ranking call means this costs zero extra API round-trips — just a bit more output.
 async function rankPoolAgainstRole(briefText, pool, limit = 8) {
   if (!pool.length) return [];
   const listText = pool.slice(0, 40).map((c, i) => {
@@ -521,8 +531,8 @@ async function rankPoolAgainstRole(briefText, pool, limit = 8) {
     return line;
   }).join('\n');
 
-  const system = `You are a recruitment matching assistant. Given a role brief and a numbered list of candidates, return ONLY a JSON array of objects for the strongest matches, best match first, maximum ${limit} entries. Each object must have "n" (the candidate's number from the list, integer) and "score" (an integer 0-100 estimating how well they fit the role — 90+ excellent fit, 70-89 strong, 50-69 partial, below 50 only if you must include them to reach the list). No markdown, no preamble, no explanation. Example: [{"n":3,"score":92},{"n":1,"score":78}]`;
-  const raw = await callClaude(system, `Role brief: ${briefText}\n\nCandidates:\n${listText}`, 400);
+  const system = `You are a recruitment matching assistant. Given a role brief and a numbered list of candidates, return ONLY a JSON array of objects for the strongest matches, best match first, maximum ${limit} entries. Each object must have "n" (the candidate's number from the list, integer), "score" (an integer 0-100 estimating how well they fit the role — 90+ excellent fit, 70-89 strong, 50-69 partial, below 50 only if you must include them to reach the list), and "summary" (a single plain-English sentence, max ~15 words, highlighting the most relevant experience/skills/location/availability for THIS role — written for a recruiter skimming a list, not the candidate). No markdown, no preamble, no explanation. Example: [{"n":3,"score":92,"summary":"8 years payroll bureau experience, Sage Payroll expert, based 8 miles away"},{"n":1,"score":78,"summary":"Strong Excel/reporting background but limited sector-specific exposure"}]`;
+  const raw = await callClaude(system, `Role brief: ${briefText}\n\nCandidates:\n${listText}`, 900);
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
@@ -532,7 +542,8 @@ async function rankPoolAgainstRole(briefText, pool, limit = 8) {
         const cand = pool[(item?.n ?? 0) - 1];
         if (!cand) return null;
         const score = Math.max(0, Math.min(100, Math.round(Number(item?.score) || 0)));
-        return { ...cand, fitScore: score };
+        const summary = typeof item?.summary === 'string' ? item.summary.trim().slice(0, 200) : '';
+        return { ...cand, fitScore: score, summary };
       })
       .filter(Boolean)
       .slice(0, limit);
@@ -566,6 +577,7 @@ async function fetchAllRoleMatches(h) {
       fitScore: typeof rec.fields[RMF.fitScore] === 'number' ? rec.fields[RMF.fitScore] : null,
       stage: rec.fields[RMF.pipelineStage] || '',
       stageChangedAt: rec.fields[RMF.stageChangedAt] || '',
+      summary: rec.fields[RMF.summary] || '',
     })));
     offset = res.offset;
   } while (offset);
@@ -609,6 +621,7 @@ async function upsertRoleMatches(candidates, roleId, roleTitle, allMatches, h) {
     const fields = {};
     if (c.fitScore != null) fields[RMF.fitScore] = c.fitScore;
     if (c.distanceMiles != null) fields[RMF.distanceMiles] = c.distanceMiles;
+    if (c.summary) fields[RMF.summary] = c.summary;
 
     if (!existing) {
       fields[RMF.label] = `${c.name} → ${roleTitle}`;
@@ -802,7 +815,7 @@ async function handleDashboard(req, res) {
                 // Company Contacts never see staff-only stages (e.g. "Matched" — AI
                 // matches awaiting recruiter review) even if linked to their role.
                 if (!isStaff && STAFF_ONLY_STAGES.includes(stage)) return null;
-                return { ...cand, fitScore: m?.fitScore ?? null, pipelineStage: stage, stageChangedAt: m?.stageChangedAt || '' };
+                return { ...cand, fitScore: m?.fitScore ?? null, pipelineStage: stage, stageChangedAt: m?.stageChangedAt || '', summary: m?.summary || '' };
               })
               .filter(Boolean);
             const base = { ...role, candidateIds: undefined, candidates: roleCandidates };
