@@ -29,8 +29,12 @@ export default async function handler(req, res) {
   if (action === 'assistant-search')   return handleAssistantSearch(req, res);
   if (action === 'company-record')     return handleCompanyRecord(req, res);
   if (action === 'update-company')     return handleUpdateCompany(req, res);
+  if (action === 'create-company')     return handleCreateCompany(req, res);
   if (action === 'role-activity')      return handleRoleActivity(req, res);
   if (action === 'similar-candidates') return handleSimilarCandidates(req, res);
+  if (action === 'client-intelligence-scan') return handleClientIntelligenceScan(req, res);
+  if (action === 'client-signals')     return handleGetClientSignals(req, res);
+  if (action === 'update-signal-status') return handleUpdateSignalStatus(req, res);
   if (action === 'generate-token') return res.status(410).json({ error: 'Magic-link tokens are retired. Sign in via Clerk instead.' });
   return res.status(400).json({ error: 'Unknown action' });
 }
@@ -60,6 +64,15 @@ const ROLE_MATCHES = 'tblVD5U84GIci7Jkq';
 // Company Contacts.
 const CONTACT_HISTORY = 'tblSWBpdU3T1twcBk';
 
+// AI Client Intelligence (roadmap item #8, added 2026-08-05): flagged events detected by
+// monitoring clients' public Companies House data (director appointments/resignations,
+// registered office changes, accounts filed, company status changes). One row per detected
+// event, written by the daily client-intelligence-scan cron below. Deliberately starts with
+// Companies House only (free, no key-registration friction beyond a one-time signup, no
+// per-request cost) rather than funding databases or LinkedIn activity — those have no
+// free/reliable API and were explicitly deferred per Mike's own scoping call.
+const CLIENT_SIGNALS = 'tblzQlONQylNvfl6W';
+
 // Same Apify actor the public Vesper search on demo.html uses for live LinkedIn top-up.
 const APIFY_ACTOR = 'harvestapi~linkedin-profile-search';
 
@@ -75,6 +88,17 @@ const CF = {
   mainContactEmail: 'fldrzR2aaPumvHh4X', mainContactPhone: 'fldULpq6esdTVk1r8',
   feeTerms: 'fldkNO2L5rRUk2FS6', officeLocations: 'fldG68kB5UuZYQrF5',
   createdDate: 'fldtwEfCtHWCNqxLY',
+  // AI Client Intelligence (added 2026-08-05) — chNumber is the structured Companies House
+  // registration number (some Cyber Knight companies already had one embedded as free text
+  // in `notes`, e.g. "CH: 16694430" — that's unrelated legacy text, this is the field the
+  // scan actually reads). chSnapshot is a JSON blob of the last-known CH state (status,
+  // office address, active directors, latest filing dates), used to diff against fresh data
+  // each scan run. chLastChecked is just for visibility in the Airtable UI.
+  chNumber: 'fldPp2dZsnZPDkw9m', chSnapshot: 'fldRN4ADi87cdPbf2', chLastChecked: 'fldeogX3QQjTPMXRF',
+  // Needed by handleCreateCompany (added 2026-08-06) to link a newly-created Company to
+  // its Organization — every other handler reads this indirectly via resolveAccess'
+  // Organizations→Companies rollup, so this is the first place CF needed it directly.
+  organization: 'fld6nTsXuSP3fy780',
 };
 const RF = {
   title: 'fldO3J0Fh0JaZ5lRW', location: 'flddgoDm9N0krVu13', brief: 'fldGLYE5iZxdZsFEg', status: 'fldNdoolFfZisVSFS',
@@ -136,6 +160,12 @@ const CHF = {
   label: 'fldqaqYOdK7VRjZ7f', candidate: 'fldLv9NXLNG0gbySX', role: 'fldXGWEke6b7lf6Zf',
   type: 'flddkAhMPro2NafjX', summary: 'fldu0oKZifl6BEFIv', loggedAt: 'fldQfqojDi7RDmnTo',
   loggedBy: 'fldkIvwxNR7n70EYK',
+};
+// Client Signals (AI Client Intelligence, added 2026-08-05) — see CLIENT_SIGNALS comment above.
+const CSF = {
+  summary: 'fldHxpD6YBO5Jl4EC', company: 'fldLPZLfznHgW0ral', type: 'fldgJP63eSMRIteUV',
+  detail: 'fldKh29CDsg3nAI75', detectedDate: 'fldkPGu7ZVYSeoP2O', status: 'fldFpWbfDubtBl929',
+  rawData: 'fld7lxQ1TGQsoBzEl',
 };
 
 // Stages that only Org Staff (Admin/Consultant) may see or set. "Matched" is where Vesper's
@@ -1606,6 +1636,7 @@ async function handleCompanyRecord(req, res) {
       officeLocations: cf[CF.officeLocations] || '',
       notes: cf[CF.notes] || '',
       createdDate: cf[CF.createdDate] || '',
+      chNumber: cf[CF.chNumber] || '',
     },
     roles,
     placements,
@@ -1641,6 +1672,10 @@ async function handleUpdateCompany(req, res) {
     mainContactName: CF.mainContactName, mainContactTitle: CF.mainContactTitle,
     mainContactEmail: CF.mainContactEmail, mainContactPhone: CF.mainContactPhone,
     feeTerms: CF.feeTerms, officeLocations: CF.officeLocations, notes: CF.notes,
+    // Lets staff switch on AI Client Intelligence monitoring for a client without needing
+    // Airtable access — see handleClientIntelligenceScan, which silently skips any Company
+    // with this field blank.
+    chNumber: CF.chNumber,
   };
   const fields = {};
   for (const [key, fieldId] of Object.entries(EDITABLE)) {
@@ -1656,6 +1691,65 @@ async function handleUpdateCompany(req, res) {
   return upd?.id
     ? res.status(200).json({ ok: true })
     : res.status(500).json({ error: 'Failed to save' });
+}
+
+// ── CREATE COMPANY (self-serve "+ New client", added 2026-08-06) ──────────
+// Until now every Company record (Buckley Watson, the TBC placeholders, Cyber Knight's
+// whole client list) had to be created directly in Airtable — there was no dashboard path
+// at all, only "+ New role" under an ALREADY-existing Client. Mike hit this gap live while
+// trying to onboard a new Armstrong Knight client. Mirrors handleCreateRole's pattern.
+//
+// Restricted to Organization Admins, not Consultants. Consultants are scoped to specific
+// Companies via the Consultant Assignments table (see resolveAccess) — if a Consultant
+// created a brand-new Company themselves, they wouldn't even see it afterward until an
+// Admin assigned them to it, which would look like the button silently failed. Admins see
+// every Company in their Organization automatically, so this is unambiguous for them.
+// resolveAccess() deliberately doesn't expose tier on its returned organizations (nothing
+// else needed it), so this re-fetches the caller's own Org Staff record(s) to check it.
+async function handleCreateCompany(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const AT_TOKEN = process.env.AT_TOKEN;
+  if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
+
+  const { organizationId, name, website, industry, officeLocations } = req.body || {};
+  if (!organizationId || !name?.trim()) return res.status(400).json({ error: 'organizationId and name are required' });
+
+  const clerkUserId = await getClerkUserId(req);
+  if (!clerkUserId) return res.status(401).json({ error: 'Invalid or missing session' });
+
+  const h = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
+  const access = await resolveAccess(clerkUserId, h);
+  if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet." });
+  if (access.viewerType !== 'staff') return res.status(403).json({ error: 'Staff only.' });
+  if (!access.organizations.some(o => o.id === organizationId)) {
+    return res.status(403).json({ error: 'Organization not in your access scope' });
+  }
+
+  const staffRes = await fetch(
+    `https://api.airtable.com/v0/${BASE}/${ORG_STAFF}?filterByFormula=${encodeURIComponent(`AND({${OSF.clerkId}}='${clerkUserId}',{${OSF.active}}=1)`)}&returnFieldsByFieldId=true&pageSize=100`,
+    { headers: h }
+  ).then(r => r.json()).catch(() => ({ records: [] }));
+  const isAdminHere = (staffRes.records || []).some(s =>
+    (s.fields[OSF.organization] || [])[0] === organizationId && s.fields[OSF.tier] === 'Admin'
+  );
+  if (!isAdminHere) return res.status(403).json({ error: 'Only an Organization Admin can add a new client.' });
+
+  const createRes = await fetch(`https://api.airtable.com/v0/${BASE}/${COMPANIES}`, {
+    method: 'POST', headers: h,
+    body: JSON.stringify({ fields: {
+      [CF.name]: name.trim(),
+      [CF.active]: true,
+      [CF.organization]: [organizationId],
+      [CF.website]: website?.trim() || '',
+      [CF.industry]: industry?.trim() || '',
+      [CF.officeLocations]: officeLocations?.trim() || '',
+      [CF.createdDate]: new Date().toISOString().slice(0, 10),
+    } }),
+  }).then(r => r.json()).catch(() => null);
+
+  return createRes?.id
+    ? res.status(200).json({ ok: true, companyId: createRes.id, name: name.trim() })
+    : res.status(500).json({ error: 'Failed to create client' });
 }
 
 // ── SAVE NOTES ────────────────────────────────────────────────────
@@ -2257,6 +2351,304 @@ async function handleRematchPool(req, res) {
   }
 
   return res.status(200).json({ ok: true, rolesChecked: roles.length, totalLinked, totalNotify });
+}
+
+// ── AI CLIENT INTELLIGENCE (roadmap item #8, added 2026-08-05) ────────────
+// Monitors every Company across all Organizations that has a Companies House Number set
+// (CF.chNumber) for director appointments/resignations, registered office moves, accounts
+// filed, confirmation statements filed, and company status changes. v1 deliberately limited
+// to Companies House — it's free, requires no per-request cost, and needs only a one-time
+// API key signup (see COMPANIES_HOUSE_API_KEY below). Funding announcements and LinkedIn
+// activity signals from the original roadmap wishlist are deferred — there's no free/
+// reliable API for either, and Mike explicitly chose "start with what's free and reliable"
+// over a paid data source when this was scoped.
+//
+// Basic Auth per Companies House's REST API convention: API key as the username, blank
+// password. Docs: https://developer-specs.company-information.service.gov.uk/
+async function fetchChJson(path, apiKey) {
+  const auth = Buffer.from(`${apiKey}:`).toString('base64');
+  try {
+    const r = await fetch(`https://api.company-information.service.gov.uk${path}`, {
+      headers: { Authorization: `Basic ${auth}` },
+    });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch {
+    return null;
+  }
+}
+
+function formatChAddress(addr) {
+  if (!addr) return '';
+  return [addr.address_line_1, addr.address_line_2, addr.locality, addr.region, addr.postal_code, addr.country]
+    .filter(Boolean).join(', ');
+}
+
+// Pulls the four data points that matter for this feature in parallel: company profile
+// (status + registered office), officers (filtered to directors only — a new company
+// secretary isn't the kind of signal a recruiter needs to act on), and the most recent
+// accounts + confirmation-statement filings. Only ACTIVE directors (resignedOn null) are
+// kept in the snapshot — diffChSnapshots() below compares the active-name set between two
+// snapshots rather than tracking every resignedOn change individually, which is simpler and
+// sufficient: an appointment shows up as a name newly in the active set, a resignation as a
+// name newly missing from it.
+async function fetchCompanyHouseSnapshot(companyNumber, apiKey) {
+  const [profile, officersRes, accountsRes, confirmRes] = await Promise.all([
+    fetchChJson(`/company/${companyNumber}`, apiKey),
+    fetchChJson(`/company/${companyNumber}/officers?items_per_page=50`, apiKey),
+    fetchChJson(`/company/${companyNumber}/filing-history?category=accounts&items_per_page=1`, apiKey),
+    fetchChJson(`/company/${companyNumber}/filing-history?category=confirmation-statement&items_per_page=1`, apiKey),
+  ]);
+  if (!profile) return null;
+  const officers = (officersRes?.items || [])
+    .filter(o => /director/i.test(o.officer_role || ''))
+    .map(o => ({ name: o.name, role: o.officer_role, resignedOn: o.resigned_on || null }));
+  return {
+    status: profile.company_status || '',
+    officeAddress: formatChAddress(profile.registered_office_address),
+    officers,
+    lastAccountsDate: accountsRes?.items?.[0]?.date || null,
+    lastConfirmationDate: confirmRes?.items?.[0]?.date || null,
+    checkedAt: new Date().toISOString().slice(0, 10),
+  };
+}
+
+// Compares two snapshots and returns the list of detected events. Called only when a
+// PREVIOUS snapshot already exists — the very first check for a newly-added Companies House
+// Number just stores the initial snapshot with no diff, so a company that's had the same 5
+// directors for years doesn't flood Client Signals with 5 fake "appointed" events the moment
+// monitoring switches on.
+function diffChSnapshots(prev, cur) {
+  const events = [];
+  const prevActive = new Set((prev.officers || []).filter(o => !o.resignedOn).map(o => o.name));
+  const curActive = new Set((cur.officers || []).filter(o => !o.resignedOn).map(o => o.name));
+  for (const name of curActive) {
+    if (!prevActive.has(name)) events.push({ type: 'Director Appointed', detail: `${name} was appointed as a director.`, raw: { name } });
+  }
+  for (const name of prevActive) {
+    if (!curActive.has(name)) events.push({ type: 'Director Resigned', detail: `${name} resigned as a director.`, raw: { name } });
+  }
+  if (prev.officeAddress && cur.officeAddress && prev.officeAddress !== cur.officeAddress) {
+    events.push({ type: 'Registered Office Changed', detail: `Registered office moved from "${prev.officeAddress}" to "${cur.officeAddress}".`, raw: { from: prev.officeAddress, to: cur.officeAddress } });
+  }
+  if (prev.status && cur.status && prev.status !== cur.status) {
+    events.push({ type: 'Company Status Changed', detail: `Company status changed from "${prev.status}" to "${cur.status}".`, raw: { from: prev.status, to: cur.status } });
+  }
+  if (prev.lastAccountsDate && cur.lastAccountsDate && prev.lastAccountsDate !== cur.lastAccountsDate) {
+    events.push({ type: 'Accounts Filed', detail: `New accounts filed (made up to ${cur.lastAccountsDate}).`, raw: { date: cur.lastAccountsDate } });
+  }
+  if (prev.lastConfirmationDate && cur.lastConfirmationDate && prev.lastConfirmationDate !== cur.lastConfirmationDate) {
+    events.push({ type: 'Confirmation Statement Filed', detail: `New confirmation statement filed (${cur.lastConfirmationDate}).`, raw: { date: cur.lastConfirmationDate } });
+  }
+  return events;
+}
+
+// Rewrites each event's plain detail sentence into the roadmap's target voice — plain
+// English interpretation plus a concrete recommended action, e.g. "ABC Ltd secured £20m
+// funding, recruitment activity likely in 3-6 months, recommended action: contact Finance
+// Director." One Claude call per company (covering all its events for this run) rather than
+// per event, to keep API cost down. Falls back to the plain mechanical detail sentence
+// (still useful, just less actionable) if Claude is unavailable or returns something unusable.
+async function summarizeSignals(companyName, industry, events) {
+  const system = 'You are a recruitment CRM assistant. Given a client company and a list of detected Companies House events for them, write a short plain-English interpretation for EACH event plus one concrete recommended follow-up action for a recruiter — in the style: "Secured new funding/directors, recruitment activity likely to follow, recommended action: contact the Finance Director." Keep each to 1-2 sentences. Return ONLY a JSON array, one object per input event IN THE SAME ORDER, each with a "detail" string. No markdown, no preamble, no explanation.';
+  const userText = `Company: ${companyName}${industry ? ` (${industry})` : ''}\n\nEvents:\n${events.map((e, i) => `${i + 1}. [${e.type}] ${e.detail}`).join('\n')}`;
+  const raw = await callClaude(system, userText, 500);
+  if (!raw) return events;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return events;
+    return events.map((e, i) => {
+      const d = parsed[i]?.detail;
+      return { ...e, detail: (typeof d === 'string' && d.trim()) ? d.trim().slice(0, 1000) : e.detail };
+    });
+  } catch {
+    return events;
+  }
+}
+
+// Cron-gated exactly like handleRematchPool (Vercel sends CRON_SECRET as a Bearer token on
+// scheduled invocations — see vercel.json). Only processes active Companies that have a
+// Companies House Number set; everything else is silently skipped (not an error — most
+// Companies won't have a number populated yet, see the Companies House Number field
+// description in Airtable). Returns 200 with `skipped` rather than 500 when
+// COMPANIES_HOUSE_API_KEY isn't configured, so an unconfigured key doesn't show up as a
+// failing cron run in Vercel's dashboard — it's a genuine "not set up yet" state, not a bug.
+async function handleClientIntelligenceScan(req, res) {
+  const AT_TOKEN = process.env.AT_TOKEN;
+  if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
+
+  const cronSecret = process.env.CRON_SECRET;
+  const authHeader = req.headers.authorization || '';
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const chApiKey = process.env.COMPANIES_HOUSE_API_KEY;
+  if (!chApiKey) return res.status(200).json({ ok: true, skipped: 'COMPANIES_HOUSE_API_KEY not configured' });
+
+  const h = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
+
+  let companies = [];
+  let offset;
+  do {
+    const url = `https://api.airtable.com/v0/${BASE}/${COMPANIES}?filterByFormula=${encodeURIComponent(`AND({${CF.chNumber}}!='',{${CF.active}}=1)`)}&returnFieldsByFieldId=true&pageSize=100${offset ? `&offset=${offset}` : ''}`;
+    const r = await fetch(url, { headers: h }).then(r => r.json()).catch(() => ({ records: [] }));
+    companies = companies.concat(r.records || []);
+    offset = r.offset;
+  } while (offset);
+
+  let checked = 0, newSignals = 0, failed = 0;
+  const digestLines = [];
+
+  for (const rec of companies) {
+    const companyNumber = (rec.fields[CF.chNumber] || '').trim();
+    if (!companyNumber) continue;
+    const companyName = rec.fields[CF.name] || 'Unknown company';
+    const industry = rec.fields[CF.industry] || '';
+
+    const curSnap = await fetchCompanyHouseSnapshot(companyNumber, chApiKey);
+    if (!curSnap) { failed++; continue; }
+    checked++;
+
+    let prevSnap = null;
+    const prevRaw = rec.fields[CF.chSnapshot];
+    if (prevRaw) {
+      try { prevSnap = JSON.parse(prevRaw); } catch { prevSnap = null; }
+    }
+
+    if (prevSnap) {
+      let events = diffChSnapshots(prevSnap, curSnap);
+      if (events.length) {
+        events = await summarizeSignals(companyName, industry, events);
+        for (const ev of events) {
+          await fetch(`https://api.airtable.com/v0/${BASE}/${CLIENT_SIGNALS}`, {
+            method: 'POST', headers: h,
+            body: JSON.stringify({ fields: {
+              [CSF.summary]: `${ev.type} — ${companyName}`.slice(0, 200),
+              [CSF.company]: [rec.id],
+              [CSF.type]: ev.type,
+              [CSF.detail]: ev.detail,
+              [CSF.detectedDate]: curSnap.checkedAt,
+              [CSF.status]: 'New',
+              [CSF.rawData]: JSON.stringify(ev.raw || {}).slice(0, 9000),
+            } }),
+          }).catch(() => null);
+          newSignals++;
+        }
+        digestLines.push(`*${companyName}*: ${events.map(e => e.type).join(', ')}`);
+      }
+    }
+
+    await fetch(`https://api.airtable.com/v0/${BASE}/${COMPANIES}/${rec.id}`, {
+      method: 'PATCH', headers: h,
+      body: JSON.stringify({ fields: {
+        [CF.chSnapshot]: JSON.stringify(curSnap),
+        [CF.chLastChecked]: curSnap.checkedAt,
+      } }),
+    }).catch(() => null);
+  }
+
+  if (digestLines.length) {
+    await postNotification(`Client intelligence scan — ${newSignals} new signal(s) across ${checked} compan${checked === 1 ? 'y' : 'ies'} checked:\n${digestLines.join('\n')}`);
+  }
+
+  return res.status(200).json({ ok: true, checked, newSignals, failed, totalWithNumber: companies.length });
+}
+
+// Staff-only. Returns signals for one Company (companyId given) or, if omitted, every
+// signal across every Company the caller can see — used for a future dashboard-wide badge,
+// though v1's UI only calls this scoped to a single Company's record page.
+async function handleGetClientSignals(req, res) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  const AT_TOKEN = process.env.AT_TOKEN;
+  if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
+
+  const clerkUserId = await getClerkUserId(req);
+  if (!clerkUserId) return res.status(401).json({ error: 'Invalid or missing session' });
+
+  const h = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
+  const access = await resolveAccess(clerkUserId, h);
+  if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet." });
+  if (access.viewerType !== 'staff') return res.status(403).json({ error: 'Staff only.' });
+
+  const allCompanyIds = access.organizations.flatMap(o => o.companyIds);
+  const companyId = req.query.companyId;
+  if (companyId && !allCompanyIds.includes(companyId)) return res.status(403).json({ error: 'Company not in your access scope' });
+
+  let all = [];
+  let offset;
+  do {
+    const url = `https://api.airtable.com/v0/${BASE}/${CLIENT_SIGNALS}?returnFieldsByFieldId=true&pageSize=100${offset ? `&offset=${offset}` : ''}`;
+    const r = await fetch(url, { headers: h }).then(r => r.json()).catch(() => ({ records: [] }));
+    all = all.concat(r.records || []);
+    offset = r.offset;
+  } while (offset);
+
+  const scopeIds = companyId ? [companyId] : allCompanyIds;
+  const relevant = all.filter(rec => (rec.fields[CSF.company] || []).some(id => scopeIds.includes(id)));
+
+  const companyNameById = {};
+  if (!companyId && relevant.length) {
+    const compIds = [...new Set(relevant.flatMap(rec => rec.fields[CSF.company] || []))];
+    const compRes = await fetch(
+      `https://api.airtable.com/v0/${BASE}/${COMPANIES}?filterByFormula=${encodeURIComponent(`OR(${compIds.map(id => `RECORD_ID()='${id}'`).join(',')})`)}&returnFieldsByFieldId=true&pageSize=100`,
+      { headers: h }
+    ).then(r => r.json()).catch(() => ({ records: [] }));
+    (compRes.records || []).forEach(rec => { companyNameById[rec.id] = rec.fields[CF.name] || 'Unknown'; });
+  }
+
+  const signals = relevant
+    .map(rec => {
+      const cid = (rec.fields[CSF.company] || [])[0] || null;
+      return {
+        id: rec.id,
+        summary: rec.fields[CSF.summary] || '',
+        type: rec.fields[CSF.type] || '',
+        detail: rec.fields[CSF.detail] || '',
+        detectedDate: rec.fields[CSF.detectedDate] || rec.createdTime,
+        status: rec.fields[CSF.status] || 'New',
+        companyId: cid,
+        companyName: companyId ? undefined : (companyNameById[cid] || 'Unknown'),
+      };
+    })
+    .sort((a, b) => new Date(b.detectedDate) - new Date(a.detectedDate))
+    .slice(0, 50);
+
+  return res.status(200).json({ signals });
+}
+
+// Staff-only. Marks a signal Reviewed/Actioned/Dismissed — never deletes it, keeping a full
+// audit trail of what was surfaced and what a recruiter did about it.
+async function handleUpdateSignalStatus(req, res) {
+  if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed' });
+  const AT_TOKEN = process.env.AT_TOKEN;
+  if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
+
+  const { signalId, status } = req.body || {};
+  if (!signalId || !status) return res.status(400).json({ error: 'Missing fields' });
+  const ALLOWED_STATUSES = ['New', 'Reviewed', 'Actioned', 'Dismissed'];
+  if (!ALLOWED_STATUSES.includes(status)) return res.status(400).json({ error: 'Invalid status' });
+
+  const clerkUserId = await getClerkUserId(req);
+  if (!clerkUserId) return res.status(401).json({ error: 'Invalid or missing session' });
+
+  const h = { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
+  const access = await resolveAccess(clerkUserId, h);
+  if (!access) return res.status(403).json({ error: "Your account isn't linked to a company yet." });
+  if (access.viewerType !== 'staff') return res.status(403).json({ error: 'Staff only.' });
+
+  const allCompanyIds = access.organizations.flatMap(o => o.companyIds);
+  const sigRec = await fetch(`https://api.airtable.com/v0/${BASE}/${CLIENT_SIGNALS}/${signalId}?returnFieldsByFieldId=true`, { headers: h }).then(r => r.json()).catch(() => null);
+  if (!sigRec?.id) return res.status(404).json({ error: 'Signal not found' });
+  const sigCompanyIds = sigRec.fields[CSF.company] || [];
+  if (!sigCompanyIds.some(id => allCompanyIds.includes(id))) return res.status(403).json({ error: 'Signal not in your access scope' });
+
+  const upd = await fetch(`https://api.airtable.com/v0/${BASE}/${CLIENT_SIGNALS}/${signalId}`, {
+    method: 'PATCH', headers: h,
+    body: JSON.stringify({ fields: { [CSF.status]: status } }),
+  }).then(r => r.json()).catch(() => null);
+
+  return upd?.id ? res.status(200).json({ ok: true }) : res.status(500).json({ error: 'Save failed' });
 }
 
 // ── CLARIFY BRIEF (conversational intake, employer side) ──────────
