@@ -402,6 +402,25 @@ function extractKeywords(text) {
     .slice(0, 10);
 }
 
+// Enriches a bare Role Title into a fuller LinkedIn search string using keywords pulled
+// from the Brief — added 2026-08-06 after confirming raising Apify's maxItems/dataset-limit
+// caps (see comments above/below) had zero effect on Buckley Watson/Gravita's "accountant"
+// role: the actual searchQuery sent to Apify was just the literal title, a single generic
+// word. LinkedIn's relevance ranking for a fixed generic query + fixed location is stable
+// across repeated searches, so a bigger cap just reached deeper into the SAME ranked list
+// (confirmed live — 3 of the same 6 Role Matches had their Fit Score change between runs
+// but no new candidate ever appeared). Reuses extractKeywords() so this stays in sync with
+// what the pool-search keyword filter already considers "what this brief is about," minus
+// pure-numeric tokens (salary figures like "50000", years like "5") which mean nothing to a
+// LinkedIn text search and would only narrow results for no benefit. Capped at 4 keywords —
+// the actor documents searchQuery as fuzzy/OR-ish like LinkedIn's own search bar, not a
+// strict AND, but piling on all 10 raw keywords risks over-narrowing a search that's already
+// too sparse in some areas.
+function buildSearchQuery(title, brief) {
+  const keywords = extractKeywords(brief).filter(w => !/^\d+$/.test(w)).slice(0, 4);
+  return [title, ...keywords].filter(Boolean).join(' ').trim() || title;
+}
+
 // Builds the pool-filter keyword clause from a list of per-keyword field-check formulas
 // (each an OR across role/bio/skills/sector/location/company for one keyword). Previously
 // this was a flat OR across all keyword checks, so a single incidental hit — e.g. a shared
@@ -2035,9 +2054,12 @@ async function runMatchSearch(roleId, title, location, brief, h) {
       // by this same 25-item ceiling). Apify bills per result, so this roughly doubles that
       // one search's cost (still cents) and adds a bit of run time — Mike opted in
       // explicitly rather than this being silently bumped.
-      const actorInput = { profileScraperMode: 'Full', maxItems: 50, searchQuery: title };
+      // searchQuery enriched with brief keywords 2026-08-06 (see buildSearchQuery() comment
+      // above) — same role still stuck at 6 matches after both cap fixes, root cause was the
+      // generic single-word query itself.
+      const actorInput = { profileScraperMode: 'Full', maxItems: 50, searchQuery: buildSearchQuery(title, brief) };
       if (location) actorInput.locations = [normalizeLocation(await broadenLocationForSearch(location))];
-      console.log('[find-matches] actorInput for role', JSON.stringify({ title, roleLocation: location, locations: actorInput.locations }));
+      console.log('[find-matches] actorInput for role', JSON.stringify({ title, roleLocation: location, locations: actorInput.locations, searchQuery: actorInput.searchQuery }));
       const startUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/runs?token=${APIFY_TOKEN}&memory=256`;
       const r = await fetch(startUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(actorInput) });
       if (r.ok) {
@@ -2139,7 +2161,14 @@ async function handleFindMatchesPoll(req, res) {
     console.log('[find-matches-poll] first pass returned 0, triggering nationwide fallback', JSON.stringify({ runId, roleId, title }));
     if (title) {
       try {
-        const retryInput = { profileScraperMode: 'Full', maxItems: 50, searchQuery: title }; // kept in sync with runMatchSearch's cap above
+        // searchQuery enriched with brief keywords 2026-08-06, same as runMatchSearch's
+        // first-pass actorInput above — this fallback already broadens by dropping location
+        // entirely, no reason to also leave it stuck on a bare generic title once we know
+        // that's a separate lever (a 0-result first pass is almost always a location problem,
+        // not a query-specificity one, but there's no downside to keeping both passes
+        // consistent).
+        const roleBrief = roleRec.fields[RF.brief] || '';
+        const retryInput = { profileScraperMode: 'Full', maxItems: 50, searchQuery: buildSearchQuery(title, roleBrief) }; // maxItems kept in sync with runMatchSearch's cap above
         const retryStartUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/runs?token=${APIFY_TOKEN}&memory=256`;
         const rr = await fetch(retryStartUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(retryInput) });
         if (rr.ok) {
