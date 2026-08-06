@@ -16,6 +16,11 @@
     <changefreq>monthly</changefreq>
   </url>
   <url>
+    <loc>https://www.talentknight.ai/global-talent.html</loc>
+    <priority>0.6</priority>
+    <changefreq>weekly</changefreq>
+  </url>
+  <url>
     <loc>https://www.talentknight.ai/gdpr.html</loc>
     <priority>0.3</priority>
     <changefreq>yearly</changefreq>
