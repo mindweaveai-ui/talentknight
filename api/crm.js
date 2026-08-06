@@ -602,6 +602,52 @@ async function geocodeLocation(text) {
   return result;
 }
 
+// Broadens a Role's exact-typed location (e.g. "Brentwood") into a wider LinkedIn-
+// searchable area (e.g. "Essex") before it's ever sent to Apify — added 2026-08-06.
+// Mike compared a live "accountant" search in Brentwood (3 matches) against LinkedIn
+// Recruiter Lite's own radius search for the same brief, which surfaced far more. Root
+// cause: the Apify actor's `locations` filter is a strict exact match against one LinkedIn
+// geo entity, with no distance/radius parameter at all (confirmed via the actor's full
+// input schema) — it only surfaces people who've typed that literal town name into their
+// own LinkedIn profile, nothing in the surrounding commutable area. filterByDistance()
+// below already does real mile-radius filtering, but only on whatever candidates the
+// search handed it — a single small-town search starves it upstream (a near-identical
+// case, Service Desk Analyst in Brentwood, returned only 4 raw profiles for the same
+// reason, see the 2026-08-04 comment above runMatchSearch's actorInput).
+//
+// Fix: search the Role location's COUNTY instead (via postcodes.io's same Places API
+// already used for geocoding — Brentwood → Essex), so Apify pulls a much larger raw pool,
+// then let filterByDistance's existing 15-mile check narrow it back down against the
+// Role's real, precise location — never the broadened one. Falls back to the original
+// text unchanged if the county lookup fails or the location isn't UK-based/is Remote.
+const broadenCache = new Map();
+async function broadenLocationForSearch(text) {
+  const key = (text || '').trim().toLowerCase();
+  if (!key) return text;
+  if (broadenCache.has(key)) return broadenCache.get(key);
+  if (NON_UK_COUNTRY_HINTS.test(text) || /\bremote\b/i.test(text)) {
+    broadenCache.set(key, text);
+    return text;
+  }
+  const tryOne = async (name) => {
+    if (!name) return null;
+    try {
+      const url = `https://api.postcodes.io/places?q=${encodeURIComponent(name)}&limit=1`;
+      const r = await fetch(url);
+      const data = r.ok ? await r.json() : null;
+      return data?.result?.[0]?.county_unitary || null;
+    } catch {
+      return null;
+    }
+  };
+  const placeName = extractPlaceName(text);
+  let county = await tryOne(placeName);
+  if (!county) county = await tryOne(stripDirectionalPrefix(placeName));
+  const result = (county && county.toLowerCase() !== key) ? county : text;
+  broadenCache.set(key, result);
+  return result;
+}
+
 function haversineMiles(a, b) {
   const R = 3958.8; // Earth radius in miles
   const toRad = (d) => (d * Math.PI) / 180;
@@ -1983,7 +2029,7 @@ async function runMatchSearch(roleId, title, location, brief, h) {
   if (APIFY_TOKEN && title) {
     try {
       const actorInput = { profileScraperMode: 'Full', maxItems: 25, searchQuery: title };
-      if (location) actorInput.locations = [normalizeLocation(location)];
+      if (location) actorInput.locations = [normalizeLocation(await broadenLocationForSearch(location))];
       console.log('[find-matches] actorInput for role', JSON.stringify({ title, roleLocation: location, locations: actorInput.locations }));
       const startUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/runs?token=${APIFY_TOKEN}&memory=256`;
       const r = await fetch(startUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(actorInput) });
