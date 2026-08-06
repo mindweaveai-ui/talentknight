@@ -42,6 +42,7 @@
     { "src": "/", "dest": "/index.html" }
   ],
   "crons": [
-    { "path": "/api/crm?action=rematch-pool", "schedule": "0 3 * * *" }
+    { "path": "/api/crm?action=rematch-pool", "schedule": "0 3 * * *" },
+    { "path": "/api/crm?action=client-intelligence-scan", "schedule": "0 4 * * *" }
   ]
 }
