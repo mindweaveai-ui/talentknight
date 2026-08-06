@@ -453,6 +453,34 @@
     .client-edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .client-save-status { font-size: 12px; color: var(--green); opacity: 0; transition: opacity 0.3s; margin-left: 8px; }
 
+    /* ── AI CLIENT INTELLIGENCE ── added 2026-08-05 (roadmap item #8) */
+    .signal-row { padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .signal-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .signal-row-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .signal-type-badge {
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;
+      color: var(--blue); background: var(--blue-light); border-radius: 4px; padding: 1px 6px;
+      flex-shrink: 0;
+    }
+    .signal-status-badge {
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;
+      border-radius: 4px; padding: 1px 6px; flex-shrink: 0;
+    }
+    .signal-status-new { color: var(--amber); background: #fef3c7; }
+    .signal-status-reviewed { color: var(--blue); background: var(--blue-light); }
+    .signal-status-actioned { color: var(--green); background: #dcfce7; }
+    .signal-status-dismissed { color: var(--dim); background: var(--bg); }
+    .signal-date { font-size: 11px; color: var(--dim); margin-left: auto; flex-shrink: 0; }
+    .signal-detail { font-size: 12.5px; color: var(--text); margin-top: 5px; line-height: 1.5; }
+    .signal-actions { margin-top: 6px; display: flex; gap: 6px; }
+    .signal-action-btn {
+      font-family: inherit; font-size: 11px; font-weight: 600; color: var(--muted);
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      padding: 3px 8px; cursor: pointer; transition: background 0.12s;
+    }
+    .signal-action-btn:hover { background: var(--blue-light); color: var(--blue); }
+    .signal-action-btn:disabled { opacity: 0.5; cursor: default; }
+
     /* ── DRAWER ── */
     .drawer-backdrop {
       position: fixed; inset: 0; background: rgba(15,23,42,0.25); z-index: 300;
@@ -537,6 +565,7 @@
       position: fixed; inset: 0; background: rgba(15,23,42,0.4); z-index: 400;
       display: flex; align-items: center; justify-content: center; padding: 20px;
       opacity: 0; transition: opacity 0.18s; pointer-events: none;
+      overflow-y: auto;
     }
     .modal-overlay.open { opacity: 1; pointer-events: all; }
     .modal {
@@ -544,11 +573,20 @@
       border: 1px solid var(--border); box-shadow: 0 20px 60px rgba(15,23,42,0.2);
       transform: translateY(10px); transition: transform 0.18s;
       display: flex; flex-direction: column; overflow: hidden;
+      /* Cap the modal to the viewport (minus the overlay's own 20px padding on each
+         side) and let ONLY .modal-body scroll internally — added 2026-08-06 after the
+         Edit Role modal grew to 8 fields (Vacancy Dashboard's Hiring Manager + Role
+         Notes additions) and started running off the bottom of shorter screens with no
+         way to reach Save. Header/footer stay pinned via flex-shrink:0 below so the
+         title, close button, and Save/Cancel are always visible regardless of how many
+         fields the body holds. */
+      max-height: calc(100vh - 40px);
     }
     .modal-overlay.open .modal { transform: translateY(0); }
     .modal-header {
       padding: 20px 20px 16px; border-bottom: 1px solid var(--border);
       display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
     }
     .modal-title { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
     .modal-close {
@@ -557,7 +595,10 @@
       justify-content: center; font-size: 13px; color: var(--muted); transition: background 0.1s;
     }
     .modal-close:hover { background: var(--bg); color: var(--text); }
-    .modal-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+    .modal-body {
+      padding: 20px; display: flex; flex-direction: column; gap: 16px;
+      overflow-y: auto; min-height: 0;
+    }
     .modal-field label {
       display: block; font-size: 11px; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.6px; color: var(--dim); margin-bottom: 6px;
@@ -576,6 +617,7 @@
     .modal-footer {
       padding: 14px 20px; border-top: 1px solid var(--border);
       display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+      flex-shrink: 0;
     }
     .modal-cancel {
       font-family: inherit; font-size: 13px; font-weight: 500;
@@ -652,6 +694,39 @@
     <div class="modal-footer">
       <button class="modal-cancel" onclick="closeRoleModal()">Cancel</button>
       <button class="modal-submit" id="roleSubmitBtn" onclick="submitNewRole()">Submit role</button>
+    </div>
+  </div>
+</div>
+
+<!-- New client modal (added 2026-08-06 — see handleCreateCompany in api/crm.js) -->
+<div class="modal-overlay" id="newClientModalOverlay" onclick="closeNewClientModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">Add a new client</div>
+      <button class="modal-close" onclick="closeNewClientModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label>Client name <span class="req">*</span></label>
+        <input id="newClientName" class="modal-input" type="text" placeholder="e.g. Buckley Watson" />
+      </div>
+      <div class="modal-field">
+        <label>Website</label>
+        <input id="newClientWebsite" class="modal-input" type="url" placeholder="https://…" />
+      </div>
+      <div class="modal-field">
+        <label>Industry</label>
+        <input id="newClientIndustry" class="modal-input" type="text" placeholder="e.g. Accountancy" />
+      </div>
+      <div class="modal-field">
+        <label>Office locations</label>
+        <input id="newClientLocations" class="modal-input" type="text" placeholder="e.g. Leigh-on-Sea, Rayleigh" />
+      </div>
+      <div style="font-size:11.5px;color:var(--dim);">More detail (main contact, fee terms, notes) can be added afterwards from the client record.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-cancel" onclick="closeNewClientModal()">Cancel</button>
+      <button class="modal-submit" id="newClientSubmitBtn" onclick="submitNewClient()">Add client</button>
     </div>
   </div>
 </div>
@@ -831,7 +906,7 @@ function render() {
     main.innerHTML = `
       <div class="app-layout">
         <aside class="sidebar">
-          <div class="sidebar-top">${orgSelectHtml(organizations)}${companySelectHtml(companies)}${user.isStaff ? `<button class="client-record-link" onclick="openClientRecord()">🏢 View client record</button>` : ''}</div>
+          <div class="sidebar-top">${orgSelectHtml(organizations)}${companySelectHtml(companies)}${user.isStaff ? `<button class="client-record-link" onclick="openClientRecord()">🏢 View client record</button><button class="client-record-link" onclick="openNewClientModal()">＋ New client</button>` : ''}</div>
           <div class="role-list"><div class="role-list-empty">No roles yet</div></div>
           <button class="new-role-btn-sidebar" onclick="openRoleModal()">＋ New role</button>
           ${user.isStaff ? `<button class="earnings-toggle-btn" onclick="toggleEarningsView()">Forecast</button>` : ''}
@@ -858,7 +933,7 @@ function render() {
   main.innerHTML = `
     <div class="app-layout">
       <aside class="sidebar">
-        <div class="sidebar-top">${orgSelectHtml(organizations)}${companySelectHtml(companies)}${user.isStaff ? `<button class="client-record-link" onclick="openClientRecord()">🏢 View client record</button>` : ''}</div>
+        <div class="sidebar-top">${orgSelectHtml(organizations)}${companySelectHtml(companies)}${user.isStaff ? `<button class="client-record-link" onclick="openClientRecord()">🏢 View client record</button><button class="client-record-link" onclick="openNewClientModal()">＋ New client</button>` : ''}</div>
         <div class="sidebar-search">
           <input id="roleSearchInput" class="role-search-input" type="search" placeholder="Search roles…"
             oninput="onRoleSearch(this.value)" value="${esc(roleSearchQuery)}" autocomplete="off" />
@@ -1147,6 +1222,7 @@ async function runAssistantSearch() {
 // the profile fields (website, industry, main contact, etc.) are genuinely new data.
 let clientRecordData = null; // last-loaded record for the currently open company
 let clientEditMode = false;
+let clientSignalsData = []; // AI Client Intelligence signals for the currently open company
 
 function backToPipeline() {
   viewMode = 'pipeline';
@@ -1163,6 +1239,7 @@ function buildClientRecordView(company) {
 
 async function loadClientRecord(companyId) {
   clientEditMode = false;
+  clientSignalsData = [];
   try {
     const h = await authHeader();
     const r = await fetch(`/api/crm?action=company-record&companyId=${encodeURIComponent(companyId)}`, { headers: h });
@@ -1172,6 +1249,20 @@ async function loadClientRecord(companyId) {
   } catch {
     const body = document.getElementById('clientRecordBody');
     if (body) body.innerHTML = `<div class="assistant-empty">Couldn't load this client record.</div>`;
+    return;
+  }
+  // Client Intelligence signals load separately (own action/table) so a slow or empty
+  // signals fetch never blocks the rest of the client record from rendering.
+  try {
+    const h = await authHeader();
+    const r = await fetch(`/api/crm?action=client-signals&companyId=${encodeURIComponent(companyId)}`, { headers: h });
+    if (r.ok) {
+      const data = await r.json();
+      clientSignalsData = data.signals || [];
+      renderClientRecordBody();
+    }
+  } catch {
+    // Best-effort — the rest of the client record already rendered successfully.
   }
 }
 
@@ -1241,6 +1332,11 @@ function renderClientRecordBody() {
     </div>
 
     <div class="client-section">
+      <div class="client-card-label">Client intelligence${clientSignalsData.length ? ` · ${clientSignalsData.filter(s => s.status === 'New').length} new` : ''}</div>
+      ${renderClientSignals(clientSignalsData)}
+    </div>
+
+    <div class="client-section">
       <div class="client-card-label">Recent activity</div>
       ${activity.length ? `<div class="history-list">${activity.map(e => {
         const when = new Date(e.loggedAt);
@@ -1257,6 +1353,58 @@ function renderClientRecordBody() {
       <div class="client-card-label">Notes</div>
       <div style="font-size:13px;line-height:1.6;color:var(--text);white-space:pre-wrap;">${esc(c.notes)}</div>
     </div>` : ''}`;
+}
+
+// ── AI CLIENT INTELLIGENCE (2026-08-05, roadmap item #8) ──────────────────
+// Signals load in a separate request from the rest of the client record (see
+// loadClientRecord) since they come from a different table and shouldn't block the page.
+// Empty state deliberately explains WHY nothing shows rather than just saying "no signals" —
+// most Companies won't have a Companies House Number set yet, so a bare empty state would
+// look like the feature is broken rather than just unconfigured for this client.
+function renderClientSignals(signals) {
+  if (!signals.length) {
+    return `<div style="font-size:12.5px;color:var(--dim);">No signals yet. Monitoring only runs for clients with a Companies House Number set — add one via Edit if this client should be watched.</div>`;
+  }
+  const STATUS_CLASS = { New: 'signal-status-new', Reviewed: 'signal-status-reviewed', Actioned: 'signal-status-actioned', Dismissed: 'signal-status-dismissed' };
+  return signals.map(s => {
+    const when = new Date(s.detectedDate);
+    const dateStr = isNaN(when) ? '' : when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const statusClass = STATUS_CLASS[s.status] || 'signal-status-new';
+    return `
+      <div class="signal-row">
+        <div class="signal-row-top">
+          <span class="signal-type-badge">${esc(s.type)}</span>
+          <span class="signal-status-badge ${statusClass}">${esc(s.status)}</span>
+          <span class="signal-date">${esc(dateStr)}</span>
+        </div>
+        ${s.detail ? `<div class="signal-detail">${esc(s.detail)}</div>` : ''}
+        <div class="signal-actions">
+          ${s.status !== 'Reviewed' ? `<button class="signal-action-btn" onclick="updateSignalStatus('${s.id}','Reviewed')">Mark reviewed</button>` : ''}
+          ${s.status !== 'Actioned' ? `<button class="signal-action-btn" onclick="updateSignalStatus('${s.id}','Actioned')">Mark actioned</button>` : ''}
+          ${s.status !== 'Dismissed' ? `<button class="signal-action-btn" onclick="updateSignalStatus('${s.id}','Dismissed')">Dismiss</button>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function updateSignalStatus(signalId, status) {
+  const signal = clientSignalsData.find(s => s.id === signalId);
+  if (!signal) return;
+  const prevStatus = signal.status;
+  signal.status = status; // optimistic
+  renderClientRecordBody();
+  try {
+    const h = await authHeader();
+    const r = await fetch('/api/crm?action=update-signal-status', {
+      method: 'PATCH', headers: { ...h, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ signalId, status }),
+    });
+    if (!r.ok) throw new Error();
+  } catch {
+    signal.status = prevStatus; // revert on failure
+    renderClientRecordBody();
+    alert('Failed to update — please try again.');
+  }
 }
 
 function toggleClientEdit() {
@@ -1283,6 +1431,7 @@ function clientEditFormHtml(c) {
         ${field('editMainContactTitle', 'Main contact title', c.mainContactTitle)}
         ${field('editMainContactEmail', 'Main contact email', c.mainContactEmail, 'email')}
         ${field('editMainContactPhone', 'Main contact phone', c.mainContactPhone)}
+        ${field('editChNumber', 'Companies House number', c.chNumber)}
       </div>
       <div class="modal-field" style="margin-top:12px;">
         <label>Notes</label>
@@ -1310,6 +1459,7 @@ async function saveClientRecord() {
     mainContactTitle: document.getElementById('editMainContactTitle').value.trim(),
     mainContactEmail: document.getElementById('editMainContactEmail').value.trim(),
     mainContactPhone: document.getElementById('editMainContactPhone').value.trim(),
+    chNumber: document.getElementById('editChNumber').value.trim(),
     notes: document.getElementById('editNotes').value,
   };
   try {
@@ -2120,6 +2270,59 @@ async function submitNewRole() {
   } catch {
     alert('Failed to create role — please try again.');
     btn.disabled = false; btn.textContent = 'Submit role';
+  }
+}
+
+// ── New client (self-serve "+ New client", added 2026-08-06) ──────────
+// Creates the Company under whichever Organization is currently selected in the sidebar
+// dropdown (organizations[orgIdx]) — same "act on what's currently selected" pattern as
+// "+ New role" acting on currentCompany(). Backend enforces Org Admin only; a Consultant
+// clicking this gets a clear error rather than a client they can't see afterward.
+function openNewClientModal() {
+  document.getElementById('newClientName').value = '';
+  document.getElementById('newClientWebsite').value = '';
+  document.getElementById('newClientIndustry').value = '';
+  document.getElementById('newClientLocations').value = '';
+  document.getElementById('newClientSubmitBtn').disabled = false;
+  document.getElementById('newClientSubmitBtn').textContent = 'Add client';
+  document.getElementById('newClientModalOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('newClientName').focus(), 50);
+}
+
+function closeNewClientModal(e) {
+  if (e && e.target !== document.getElementById('newClientModalOverlay')) return;
+  document.getElementById('newClientModalOverlay').classList.remove('open');
+}
+
+async function submitNewClient() {
+  const name = document.getElementById('newClientName').value.trim();
+  if (!name) { document.getElementById('newClientName').focus(); return; }
+  const website = document.getElementById('newClientWebsite').value.trim();
+  const industry = document.getElementById('newClientIndustry').value.trim();
+  const officeLocations = document.getElementById('newClientLocations').value.trim();
+  const btn = document.getElementById('newClientSubmitBtn');
+  btn.disabled = true; btn.textContent = 'Adding…';
+
+  try {
+    const organizationId = state.organizations[orgIdx].id;
+    const h = await authHeader();
+    const r = await fetch('/api/crm?action=create-company', {
+      method: 'POST', headers: { ...h, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ organizationId, name, website, industry, officeLocations }),
+    });
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}));
+      throw new Error(body.error || 'Failed to add client');
+    }
+    const data = await r.json();
+    const org = state.organizations[orgIdx];
+    org.companies.push({ id: data.companyId, name, roles: [] });
+    companyIdx = org.companies.length - 1;
+    document.getElementById('newClientModalOverlay').classList.remove('open');
+    render();
+  } catch (err) {
+    alert(err.message || 'Failed to add client — please try again.');
+    btn.disabled = false; btn.textContent = 'Add client';
   }
 }
 
