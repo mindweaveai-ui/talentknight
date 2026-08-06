@@ -109,6 +109,12 @@ const RF = {
   // a general role-level note, distinct from the per-(candidate,role) Notes on Role Matches.
   hiringManagerName: 'fldgwOZSWNTaf4jk8', hiringManagerEmail: 'fld0bKtv5cm6Lm4G6', hiringManagerPhone: 'fldSy1xjSkpj8SZeF',
   roleNotes: 'fld79A1JKsXv50YRS',
+  // Offshore/hybrid readiness (2026-08-06) — groundwork for international sourcing, see
+  // global-talent.html. Work Arrangement is a single select (Onsite/Hybrid/Remote (UK)/
+  // Remote (International)); Target Country is free text, only meaningful once Work
+  // Arrangement points outside the UK. Neither field changes the Apify/matching pipeline yet
+  // — that's deliberately out of scope until there's a live offshore role to build it around.
+  workArrangement: 'fldjWqyulZPcLH0oq', targetCountry: 'fldtBCKpjmTp746li',
 };
 const KF = {
   name: 'fld8k1UET3DWwJV3S', role: 'fldwOPyq4vmWzEquB', company: 'fldJYcW9eWMMnFPDS',
@@ -999,6 +1005,9 @@ async function handleDashboard(req, res) {
         hiringManagerEmail: rec.fields[RF.hiringManagerEmail] || '',
         hiringManagerPhone: rec.fields[RF.hiringManagerPhone] || '',
         roleNotes: rec.fields[RF.roleNotes] || '',
+        // Offshore/hybrid readiness (2026-08-06) — see RF map comment.
+        workArrangement: rec.fields[RF.workArrangement] || 'Onsite',
+        targetCountry: rec.fields[RF.targetCountry] || '',
         feePercent: typeof rec.fields[RF.feePercent] === 'number' ? rec.fields[RF.feePercent] : null,
         targetSalary: typeof rec.fields[RF.targetSalary] === 'number' ? rec.fields[RF.targetSalary] : null,
       };
@@ -1879,7 +1888,7 @@ async function handleCreateRole(req, res) {
   const AT_TOKEN = process.env.AT_TOKEN;
   if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
 
-  const { companyId, title, location, brief } = req.body || {};
+  const { companyId, title, location, brief, workArrangement, targetCountry } = req.body || {};
   if (!companyId || !title?.trim()) return res.status(400).json({ error: 'companyId and title are required' });
 
   const clerkUserId = await getClerkUserId(req);
@@ -1892,15 +1901,21 @@ async function handleCreateRole(req, res) {
   const allCompanyIds = access.organizations.flatMap(o => o.companyIds);
   if (!allCompanyIds.includes(companyId)) return res.status(403).json({ error: 'Company not in your access scope' });
 
+  const roleFields = {
+    [RF.title]: title.trim(),
+    [RF.location]: (location || '').trim(),
+    [RF.brief]: (brief || '').trim(),
+    [RF.status]: 'Active',
+    [RF.company]: [companyId],
+  };
+  // Work Arrangement/Target Country (2026-08-06, offshore/hybrid groundwork) — optional,
+  // defaults to Onsite via Airtable's own default-free single select behavior if omitted.
+  if (workArrangement) roleFields[RF.workArrangement] = workArrangement;
+  if (targetCountry?.trim()) roleFields[RF.targetCountry] = targetCountry.trim();
+
   const roleRes = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLES}`, {
     method: 'POST', headers: h,
-    body: JSON.stringify({ fields: {
-      [RF.title]: title.trim(),
-      [RF.location]: (location || '').trim(),
-      [RF.brief]: (brief || '').trim(),
-      [RF.status]: 'Active',
-      [RF.company]: [companyId],
-    }}),
+    body: JSON.stringify({ fields: roleFields }),
   }).then(r => r.json());
 
   if (!roleRes.id) return res.status(500).json({ error: 'Failed to create role' });
@@ -2837,7 +2852,7 @@ async function handleUpdateRole(req, res) {
   const AT_TOKEN = process.env.AT_TOKEN;
   if (!AT_TOKEN) return res.status(500).json({ error: 'AT_TOKEN not configured' });
 
-  const { roleId, title, location, brief, status, hiringManagerName, hiringManagerEmail, hiringManagerPhone, roleNotes } = req.body || {};
+  const { roleId, title, location, brief, status, hiringManagerName, hiringManagerEmail, hiringManagerPhone, roleNotes, workArrangement, targetCountry } = req.body || {};
   if (!roleId) return res.status(400).json({ error: 'roleId is required' });
   if (title !== undefined && !title.trim()) return res.status(400).json({ error: 'title cannot be empty' });
   const VALID_STATUSES = ['Active', 'Paused', 'Filled', 'Closed'];
@@ -2866,6 +2881,8 @@ async function handleUpdateRole(req, res) {
   if (hiringManagerEmail !== undefined) fields[RF.hiringManagerEmail] = hiringManagerEmail.trim();
   if (hiringManagerPhone !== undefined) fields[RF.hiringManagerPhone] = hiringManagerPhone.trim();
   if (roleNotes !== undefined) fields[RF.roleNotes] = roleNotes.trim();
+  if (workArrangement !== undefined) fields[RF.workArrangement] = workArrangement;
+  if (targetCountry !== undefined) fields[RF.targetCountry] = targetCountry.trim();
 
   const upd = await fetch(`https://api.airtable.com/v0/${BASE}/${ROLES}/${roleId}`, {
     method: 'PATCH', headers: h,
