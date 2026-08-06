@@ -2028,7 +2028,14 @@ async function runMatchSearch(roleId, title, location, brief, h) {
   const APIFY_TOKEN = process.env.APIFY_TOKEN;
   if (APIFY_TOKEN && title) {
     try {
-      const actorInput = { profileScraperMode: 'Full', maxItems: 25, searchQuery: title };
+      // maxItems raised 25→50 2026-08-06, same day as broadenLocationForSearch() above —
+      // widening the search area (Brentwood→Essex) changes WHO'S likely to be among the
+      // raw results, but doesn't raise how many come back at all; confirmed live (Buckley
+      // Watson "accountant" role went 3→6 matches after the county broadening alone, capped
+      // by this same 25-item ceiling). Apify bills per result, so this roughly doubles that
+      // one search's cost (still cents) and adds a bit of run time — Mike opted in
+      // explicitly rather than this being silently bumped.
+      const actorInput = { profileScraperMode: 'Full', maxItems: 50, searchQuery: title };
       if (location) actorInput.locations = [normalizeLocation(await broadenLocationForSearch(location))];
       console.log('[find-matches] actorInput for role', JSON.stringify({ title, roleLocation: location, locations: actorInput.locations }));
       const startUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/runs?token=${APIFY_TOKEN}&memory=256`;
@@ -2125,7 +2132,7 @@ async function handleFindMatchesPoll(req, res) {
     console.log('[find-matches-poll] first pass returned 0, triggering nationwide fallback', JSON.stringify({ runId, roleId, title }));
     if (title) {
       try {
-        const retryInput = { profileScraperMode: 'Full', maxItems: 25, searchQuery: title };
+        const retryInput = { profileScraperMode: 'Full', maxItems: 50, searchQuery: title }; // kept in sync with runMatchSearch's cap above
         const retryStartUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/runs?token=${APIFY_TOKEN}&memory=256`;
         const rr = await fetch(retryStartUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(retryInput) });
         if (rr.ok) {
