@@ -686,6 +686,19 @@
         <input id="roleLocation" class="modal-input" type="text" placeholder="e.g. London (Hybrid)" />
       </div>
       <div class="modal-field">
+        <label>Work arrangement</label>
+        <select id="roleWorkArrangement" class="modal-input" onchange="toggleTargetCountryField('roleWorkArrangement','roleTargetCountryField')">
+          <option value="Onsite">Onsite</option>
+          <option value="Hybrid">Hybrid</option>
+          <option value="Remote (UK)">Remote (UK)</option>
+          <option value="Remote (International)">Remote (International)</option>
+        </select>
+      </div>
+      <div class="modal-field" id="roleTargetCountryField" style="display:none;">
+        <label>Target country</label>
+        <input id="roleTargetCountry" class="modal-input" type="text" placeholder="e.g. Philippines" />
+      </div>
+      <div class="modal-field">
         <label>Brief / key requirements</label>
         <textarea id="roleBrief" class="modal-textarea" placeholder="Qualifications, years of experience, specialisms, salary range…"></textarea>
       </div>
@@ -746,6 +759,19 @@
       <div class="modal-field">
         <label>Location</label>
         <input id="editRoleLocation" class="modal-input" type="text" />
+      </div>
+      <div class="modal-field">
+        <label>Work arrangement</label>
+        <select id="editRoleWorkArrangement" class="modal-input" onchange="toggleTargetCountryField('editRoleWorkArrangement','editRoleTargetCountryField')">
+          <option value="Onsite">Onsite</option>
+          <option value="Hybrid">Hybrid</option>
+          <option value="Remote (UK)">Remote (UK)</option>
+          <option value="Remote (International)">Remote (International)</option>
+        </select>
+      </div>
+      <div class="modal-field" id="editRoleTargetCountryField" style="display:none;">
+        <label>Target country</label>
+        <input id="editRoleTargetCountry" class="modal-input" type="text" placeholder="e.g. Philippines" />
       </div>
       <div class="modal-field">
         <label>Brief / key requirements</label>
@@ -983,6 +1009,7 @@ function buildPipelineView(role) {
       <div class="role-info">
         <span class="status-badge status-${role.status.toLowerCase()}">${esc(role.status)}</span>
         ${role.location ? `<span>📍 ${esc(role.location)}</span>` : ''}
+        ${role.workArrangement && role.workArrangement !== 'Onsite' ? `<span class="status-badge" style="background:var(--blue-light);color:var(--blue);">${esc(role.workArrangement)}${role.targetCountry ? ' · ' + esc(role.targetCountry) : ''}</span>` : ''}
         ${role.brief ? `<span class="role-brief" title="${esc(role.brief)}">${esc(role.brief)}</span>` : ''}
         ${state.user.isStaff ? `<button class="role-icon-btn" onclick="openEditRoleModal('${role.id}')" title="Edit role">✏️ Edit</button>` : ''}
         ${state.user.isStaff ? `<button class="find-matches-btn" id="findMatchesBtn" onclick="findMatches('${role.id}')">🔍 Find matches</button><span class="find-matches-status" id="findMatchesStatus"></span>` : ''}
@@ -2190,9 +2217,21 @@ async function savePlacementSalary(candidateId) {
 // creates the role as before.
 let pendingClarifyQuestions = [];
 
+// Shared by both New Role and Edit Role modals — Target Country is only relevant once
+// Work Arrangement points outside a UK office, so it stays hidden otherwise rather than
+// showing an always-visible field that's blank 95% of the time. Added 2026-08-06 alongside
+// the Work Arrangement/Target Country fields themselves (see RF map comment in api/crm.js).
+function toggleTargetCountryField(selectId, fieldId) {
+  const val = document.getElementById(selectId).value;
+  document.getElementById(fieldId).style.display = (val === 'Remote (International)' || val === 'Hybrid') ? '' : 'none';
+}
+
 function openRoleModal() {
   document.getElementById('roleTitle').value = '';
   document.getElementById('roleLocation').value = '';
+  document.getElementById('roleWorkArrangement').value = 'Onsite';
+  document.getElementById('roleTargetCountry').value = '';
+  toggleTargetCountryField('roleWorkArrangement', 'roleTargetCountryField');
   document.getElementById('roleBrief').value = '';
   document.getElementById('roleClarifyQuestions').innerHTML = '';
   pendingClarifyQuestions = [];
@@ -2221,6 +2260,8 @@ async function submitNewRole() {
   const title = document.getElementById('roleTitle').value.trim();
   if (!title) { document.getElementById('roleTitle').focus(); return; }
   const location = document.getElementById('roleLocation').value.trim();
+  const workArrangement = document.getElementById('roleWorkArrangement').value;
+  const targetCountry = document.getElementById('roleTargetCountry').value.trim();
   let brief = document.getElementById('roleBrief').value.trim();
   const btn = document.getElementById('roleSubmitBtn');
 
@@ -2255,12 +2296,12 @@ async function submitNewRole() {
     const h = await authHeader();
     const r = await fetch('/api/crm?action=create-role', {
       method: 'POST', headers: { ...h, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ companyId, title, location, brief }),
+      body: JSON.stringify({ companyId, title, location, brief, workArrangement, targetCountry }),
     });
     if (!r.ok) throw new Error();
     const data = await r.json();
     const company = currentCompany();
-    company.roles.push({ id: data.roleId, title, location, brief, status: 'Active', candidates: [] });
+    company.roles.push({ id: data.roleId, title, location, brief, status: 'Active', candidates: [], workArrangement, targetCountry });
     roleIdx = company.roles.length - 1;
     searchQuery = '';
     roleSearchQuery = '';
@@ -2343,6 +2384,9 @@ function openEditRoleModal(roleId) {
   editingRoleId = roleId;
   document.getElementById('editRoleTitle').value = role.title;
   document.getElementById('editRoleLocation').value = role.location || '';
+  document.getElementById('editRoleWorkArrangement').value = role.workArrangement || 'Onsite';
+  document.getElementById('editRoleTargetCountry').value = role.targetCountry || '';
+  toggleTargetCountryField('editRoleWorkArrangement', 'editRoleTargetCountryField');
   document.getElementById('editRoleBrief').value = role.brief || '';
   document.getElementById('editRoleStatus').value = role.status;
   document.getElementById('editRoleHMName').value = role.hiringManagerName || '';
@@ -2366,6 +2410,8 @@ async function submitEditRole() {
   const title = document.getElementById('editRoleTitle').value.trim();
   if (!title) { document.getElementById('editRoleTitle').focus(); return; }
   const location = document.getElementById('editRoleLocation').value.trim();
+  const workArrangement = document.getElementById('editRoleWorkArrangement').value;
+  const targetCountry = document.getElementById('editRoleTargetCountry').value.trim();
   const brief = document.getElementById('editRoleBrief').value.trim();
   const status = document.getElementById('editRoleStatus').value;
   const hiringManagerName = document.getElementById('editRoleHMName').value.trim();
@@ -2378,12 +2424,12 @@ async function submitEditRole() {
     const h = await authHeader();
     const r = await fetch('/api/crm?action=update-role', {
       method: 'PATCH', headers: { ...h, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roleId: editingRoleId, title, location, brief, status, hiringManagerName, hiringManagerEmail, hiringManagerPhone, roleNotes }),
+      body: JSON.stringify({ roleId: editingRoleId, title, location, brief, status, hiringManagerName, hiringManagerEmail, hiringManagerPhone, roleNotes, workArrangement, targetCountry }),
     });
     if (!r.ok) throw new Error();
     const company = currentCompany();
     const role = company.roles.find(r => r.id === editingRoleId);
-    if (role) Object.assign(role, { title, location, brief, status, hiringManagerName, hiringManagerEmail, hiringManagerPhone, roleNotes });
+    if (role) Object.assign(role, { title, location, brief, status, hiringManagerName, hiringManagerEmail, hiringManagerPhone, roleNotes, workArrangement, targetCountry });
     document.getElementById('editRoleModalOverlay').classList.remove('open');
     editingRoleId = null;
     render();
