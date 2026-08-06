@@ -2100,7 +2100,14 @@ async function handleFindMatchesPoll(req, res) {
   if (status === 'RUNNING' || status === 'READY' || status === 'CREATED') return res.status(200).json({ status: 'RUNNING' });
   if (status !== 'SUCCEEDED') return res.status(200).json({ status: 'FAILED', reason: status });
 
-  const datasetUrl = `https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${APIFY_TOKEN}&limit=25`;
+  // limit raised 25→50 2026-08-06, same day as maxItems above — this is a SEPARATE cap
+  // from the actor's own maxItems input (one caps how many profiles Apify scrapes, this
+  // caps how many of them we read back from its output dataset), and was the actual
+  // reason raising maxItems alone had zero visible effect: the actor was correctly
+  // scraping up to 50 profiles, but this fetch was still only ever reading the first 25
+  // of them back, silently discarding the rest before ranking ever saw them. Keep these
+  // two numbers in sync going forward.
+  const datasetUrl = `https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${APIFY_TOKEN}&limit=50`;
   let raw = [];
   try {
     const r = await fetch(datasetUrl);
